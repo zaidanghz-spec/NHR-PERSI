@@ -13,60 +13,28 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { SimpleSelect } from "../components/SimpleSelect";
 
-const mockSubmissions = [
-  {
-    id: "SIAP-2026-0042",
-    hospitalName: "RS Harapan Sehat Jakarta",
-    specialty: "Cardiology",
-    submittedDate: "2026-03-11",
-    status: "pending",
-    finalScore: 81.9,
-  },
-  {
-    id: "SIAP-2026-0041",
-    hospitalName: "RS Mitra Sejahtera Bandung",
-    specialty: "Oncology",
-    submittedDate: "2026-03-10",
-    status: "approved",
-    finalScore: 88.5,
-  },
-  {
-    id: "SIAP-2026-0040",
-    hospitalName: "RS Sehat Sentosa Surabaya",
-    specialty: "Neurology",
-    submittedDate: "2026-03-09",
-    status: "revision",
-    finalScore: 72.3,
-  },
-  {
-    id: "SIAP-2026-0039",
-    hospitalName: "RS Prima Medika Medan",
-    specialty: "Cardiology",
-    submittedDate: "2026-03-08",
-    status: "approved",
-    finalScore: 85.2,
-  },
-  {
-    id: "SIAP-2026-0038",
-    hospitalName: "RS Citra Husada Semarang",
-    specialty: "Oncology",
-    submittedDate: "2026-03-07",
-    status: "pending",
-    finalScore: 79.1,
-  },
-];
+// Submissions will be loaded from server in production
+const mockSubmissions: {
+  id: string;
+  hospitalName: string;
+  specialty: string;
+  submittedDate: string;
+  status: string;
+  finalScore: number;
+}[] = [];
 
 const scoreDistribution = [
-  { range: "85-100 (A)", count: 15 },
-  { range: "70-84 (B)", count: 28 },
-  { range: "55-69 (C)", count: 12 },
-  { range: "0-54 (D)", count: 5 },
+  { range: "90-100 — Platinum", count: 0, color: "bg-purple-500" },
+  { range: "80-89 — Outstanding", count: 0, color: "bg-green-500" },
+  { range: "70-79 — Excellent", count: 0, color: "bg-blue-500" },
+  { range: "60-69 — Commendable", count: 0, color: "bg-teal-500" },
+  { range: "0-59 — Developing", count: 0, color: "bg-amber-500" },
 ];
 
 const statusDistribution = [
-  { name: "Pending", value: 24, color: "#F59E0B" },
-  { name: "Approved", value: 42, color: "#10B981" },
-  { name: "Revision Required", value: 8, color: "#EF4444" },
+  { name: "Pending", value: 0, color: "#F59E0B" },
+  { name: "Approved", value: 0, color: "#10B981" },
+  { name: "Revision Required", value: 0, color: "#EF4444" },
 ];
 
 export function SiapAdminDashboardPage() {
@@ -86,11 +54,11 @@ export function SiapAdminDashboardPage() {
   });
 
   const stats = {
-    total: 74,
-    pending: 24,
-    approved: 42,
-    revision: 8,
-    averageScore: 82.4,
+    total: 0,
+    pending: 0,
+    approved: 0,
+    revision: 0,
+    averageScore: 0,
   };
 
   return (
@@ -157,8 +125,8 @@ export function SiapAdminDashboardPage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
-                      className="bg-[#0F4C81] h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${(item.count / 60) * 100}%` }}
+                      className={`${item.color} h-3 rounded-full transition-all duration-500`}
+                      style={{ width: item.count > 0 ? `${(item.count / 60) * 100}%` : "2%" }}
                     />
                   </div>
                 </div>
@@ -188,7 +156,8 @@ export function SiapAdminDashboardPage() {
                         className="h-2 rounded-full transition-all duration-500"
                         style={{
                           backgroundColor: item.color,
-                          width: `${(item.value / 74) * 100}%`,
+                          width: item.value > 0 ? `${Math.min((item.value / 74) * 100, 100)}%` : "2%",
+                          opacity: item.value > 0 ? 1 : 0.3,
                         }}
                       />
                     </div>
@@ -267,54 +236,60 @@ export function SiapAdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredSubmissions.map((submission) => (
-                  <tr
-                    key={submission.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-mono text-sm text-gray-900">
-                        {submission.id}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-gray-900">
-                        {submission.hospitalName}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-600">
-                        {submission.specialty}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-600">
-                        {new Date(submission.submittedDate).toLocaleDateString(
-                          "id-ID"
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-lg font-bold text-[#0F4C81]">
-                        {submission.finalScore}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={submission.status} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Link to={`/siap-persi/admin/review/${submission.id}`}>
-                        <Button
-                          size="sm"
-                          className="bg-[#0F4C81] hover:bg-[#0d3d66]"
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Review
-                        </Button>
-                      </Link>
+                {filteredSubmissions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-20 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center">
+                          <FileText className="w-10 h-10 text-gray-300" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-500 text-lg mb-1">Belum ada submission</p>
+                          <p className="text-sm text-gray-400 max-w-md">
+                            Submission dari rumah sakit akan muncul di sini setelah mereka menyelesaikan dan mengirimkan NHR PERSI Assessment.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                          <span className="text-sm text-blue-700 font-medium">Platform siap menerima submission</span>
+                        </div>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredSubmissions.map((submission) => (
+                    <tr key={submission.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="font-mono text-sm text-gray-900">{submission.id}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-medium text-gray-900">{submission.hospitalName}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-600">{submission.specialty}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-600">
+                          {new Date(submission.submittedDate).toLocaleDateString("id-ID")}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-lg font-bold text-[#0F4C81]">{submission.finalScore}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={submission.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Link to={`/siap-persi/admin/review/${submission.id}`}>
+                          <Button size="sm" className="bg-[#0F4C81] hover:bg-[#0d3d66]">
+                            <Eye className="w-4 h-4 mr-2" />
+                            Review
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

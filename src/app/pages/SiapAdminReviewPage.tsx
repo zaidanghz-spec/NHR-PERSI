@@ -16,33 +16,23 @@ export function SiapAdminReviewPage() {
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "">("");
 
-  // Mock data
+  // Submission data will be loaded from server based on submission ID
+  // Empty placeholder for production launch
   const submissionData = {
-    id: id || "SIAP-2026-0042",
-    hospitalName: "RS Harapan Sehat Jakarta",
-    specialty: "Cardiology",
-    submittedDate: "11 Maret 2026",
-    picName: "Dr. Ahmad Sudrajat, Sp.PD",
+    id: id || "—",
+    hospitalName: "Menunggu data dari server...",
+    specialty: "—",
+    submittedDate: "—",
+    picName: "—",
     scores: {
-      rsbk: 85,
-      clinicalAudit: 78,
-      patientReport: 90,
-      final: 81.9,
+      rsbk: 0,
+      clinicalAudit: 0,
+      patientReport: 0,
+      final: 0,
     },
     rsbkDetails: {
-      medicalStaff: [
-        { name: "Sp.JP - Dokter Spesialis Jantung", value: "1", score: 100 },
-        { name: "Sp.BTKV - Dokter Spesialis Bedah Toraks", value: "1", score: 100 },
-        { name: "Sp.PD - Dokter Spesialis Penyakit Dalam", value: "1", score: 100 },
-        { name: "Sp.An - Dokter Spesialis Anestesi", value: "1", score: 100 },
-        { name: "Sp.Rad - Dokter Spesialis Radiologi", value: "3", score: 50 },
-      ],
-      facilities: [
-        { name: "ICU", value: "1", score: 100 },
-        { name: "HCU", value: "1", score: 100 },
-        { name: "Operating Room", value: "1", score: 100 },
-        { name: "Chemotherapy Room", value: "2", score: 0 },
-      ],
+      medicalStaff: [] as { name: string; value: string; score: number }[],
+      facilities: [] as { name: string; value: string; score: number }[],
     },
   };
 
