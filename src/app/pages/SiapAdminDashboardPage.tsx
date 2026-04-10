@@ -1,4 +1,15 @@
 import { useState, useEffect } from "react";
+import { Download, ExternalLink } from "lucide-react";
+
+interface CustomSurveyDoc {
+  fileName: string;
+  base64: string;
+  uploadedAt: string;
+  hospitalCode: string;
+  hospitalName: string;
+  specialty: string;
+  diseaseName: string;
+}
 import { Link } from "react-router";
 import {
   FileText,
@@ -41,16 +52,24 @@ export function SiapAdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
-  const [pendingSurveyDocs, setPendingSurveyDocs] = useState(0);
+  const [surveyDocs, setSurveyDocs] = useState<CustomSurveyDoc[]>([]);
 
-  // Count uploaded custom survey PDFs from localStorage
+  // Load uploaded custom survey PDFs from localStorage
   useEffect(() => {
-    let count = 0;
+    const docs: CustomSurveyDoc[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith("custom-survey-")) count++;
+      if (key && key.startsWith("custom-survey-")) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            docs.push(parsed);
+          }
+        } catch {}
+      }
     }
-    setPendingSurveyDocs(count);
+    setSurveyDocs(docs);
   }, []);
 
   const filteredSubmissions = mockSubmissions.filter((submission) => {
@@ -120,30 +139,7 @@ export function SiapAdminDashboardPage() {
           />
         </div>
 
-        {/* Pending Custom Survey Docs Banner */}
-        {pendingSurveyDocs > 0 && (
-          <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4 mb-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FileText className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div>
-                <p className="font-bold text-indigo-900">
-                  {pendingSurveyDocs} Dokumen Survei RS Menunggu Review
-                </p>
-                <p className="text-sm text-indigo-600">
-                  Rumah sakit telah mengupload survei PREM/PROM internal mereka
-                </p>
-              </div>
-            </div>
-            <Link to="/siap-persi/admin/review/pending">
-              <Button className="bg-indigo-600 hover:bg-indigo-700 shrink-0">
-                <Eye className="w-4 h-4 mr-2" />
-                Lihat Dokumen
-              </Button>
-            </Link>
-          </div>
-        )}
+
 
         {/* Charts */}
         <div className="grid md:grid-cols-2 gap-8 mb-8">
@@ -203,6 +199,47 @@ export function SiapAdminDashboardPage() {
             </div>
           </div>
         </div>
+
+                {/* Custom Survey Documents List */}
+        {surveyDocs.length > 0 && (
+          <div className="bg-white rounded-xl border-2 border-indigo-200 p-6 mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <FileText className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Survei PREM/PROM Internal RS</h3>
+                <p className="text-sm text-gray-500">Dokumen survei yang diupload oleh rumah sakit</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {surveyDocs.map((doc, i) => (
+                <div key={i} className="flex items-start gap-4 p-4 border border-indigo-100 rounded-xl bg-indigo-50/20 hover:bg-indigo-50 transition-colors">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                        {doc.hospitalName}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                        {doc.specialty}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <a href={doc.base64} target="_blank" rel="noopener noreferrer" className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors">
+                      <ExternalLink className="w-5 h-5" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
