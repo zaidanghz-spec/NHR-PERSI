@@ -292,22 +292,43 @@ export function ClinicalAuditPage() {
           </div>
         )}
 
-        {/* Progress Bar */}
+        {/* Progress Bar + Scoring Info */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-gray-700">
-              Progress Review Pasien - {activeDisease.diseaseName}
+              Progress Review Pasien — {activeDisease.diseaseName}
             </span>
             <span className="text-sm text-gray-600">
-              {completedPatients} / 30 rekam medis ({progress.toFixed(0)}%) — {getSampleLabel(completedPatients)}
+              {completedPatients} / 30 rekam medis ({progress.toFixed(0)}%)
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
             <div
               className="bg-gradient-to-r from-purple-500 to-indigo-500 h-3 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
+
+          {/* Scoring Range Info */}
+          <div className="grid grid-cols-4 gap-2 mt-1">
+            {[
+              { range: "1–5 RM", pct: "80%", desc: "Sampel Minimal", color: completedPatients >= 1 && completedPatients <= 5 ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 border border-amber-200" },
+              { range: "6–10 RM", pct: "85%", desc: "Sampel Cukup", color: completedPatients >= 6 && completedPatients <= 10 ? "bg-yellow-500 text-white" : "bg-yellow-50 text-yellow-700 border border-yellow-200" },
+              { range: "11–20 RM", pct: "92%", desc: "Sampel Baik", color: completedPatients >= 11 && completedPatients <= 20 ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-700 border border-blue-200" },
+              { range: "21–30 RM", pct: "100%", desc: "Sampel Lengkap", color: completedPatients >= 21 ? "bg-green-500 text-white" : "bg-green-50 text-green-700 border border-green-200" },
+            ].map((tier) => (
+              <div key={tier.range} className={`rounded-lg px-3 py-2 text-center transition-all ${tier.color}`}>
+                <p className="font-bold text-sm">{tier.pct}</p>
+                <p className="font-semibold text-xs">{tier.range}</p>
+                <p className="text-[10px] opacity-80">{tier.desc}</p>
+              </div>
+            ))}
+          </div>
+          {completedPatients > 0 && (
+            <p className="text-xs text-center text-gray-500 mt-2">
+              ✓ Skor akhir Anda = skor raw × <strong>{(getSampleValidityWeight(completedPatients) * 100).toFixed(0)}%</strong> bobot validitas ({completedPatients} rekam medis)
+            </p>
+          )}
         </div>
 
         {/* Patient Selector */}

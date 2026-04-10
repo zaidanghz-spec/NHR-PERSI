@@ -59,6 +59,10 @@ export function PatientReportPage() {
   const [registerError, setRegisterError] = useState("");
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Custom hospital survey upload
+  const [customSurveyFile, setCustomSurveyFile] = useState<File | null>(null);
+  const [customSurveyUploaded, setCustomSurveyUploaded] = useState(false);
+  const [customSurveyFileName, setCustomSurveyFileName] = useState<string>("");
   const targetPatientCount = 30;
   // Range-based validity weight (fair scoring)
   // 1-5  patients = 80% validity,  6-10 = 85%, 11-20 = 92%, 21-30 = 100%
@@ -341,6 +345,29 @@ export function PatientReportPage() {
             <p className="text-3xl font-bold text-[#14B8A6]">{avgPromScore}</p>
             <p className="text-xs text-gray-400">Bobot 40%</p>
           </div>
+        </div>
+
+        {/* Scoring Range Info for Patient Report */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
+          <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">Bobot Validitas Berdasarkan Jumlah Survei</p>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { range: "1–5 Pasien", pct: "80%", color: patientCount >= 1 && patientCount <= 5 ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 border border-amber-200" },
+              { range: "6–10 Pasien", pct: "85%", color: patientCount >= 6 && patientCount <= 10 ? "bg-yellow-500 text-white" : "bg-yellow-50 text-yellow-700 border border-yellow-200" },
+              { range: "11–20 Pasien", pct: "92%", color: patientCount >= 11 && patientCount <= 20 ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-700 border border-blue-200" },
+              { range: "21–30 Pasien", pct: "100%", color: patientCount >= 21 ? "bg-green-500 text-white" : "bg-green-50 text-green-700 border border-green-200" },
+            ].map((tier) => (
+              <div key={tier.range} className={`rounded-lg px-3 py-2.5 text-center transition-all ${tier.color}`}>
+                <p className="font-bold text-sm">{tier.pct}</p>
+                <p className="text-xs mt-0.5">{tier.range}</p>
+              </div>
+            ))}
+          </div>
+          {patientCount > 0 && (
+            <p className="text-xs text-center text-gray-500 mt-3">
+              ✓ Bobot validitas saat ini: <strong>{(getSampleValidityWeight(patientCount) * 100).toFixed(0)}%</strong> — {getSampleLabel(patientCount)}
+            </p>
+          )}
         </div>
 
         {/* ========== PATIENT REGISTRATION SECTION ========== */}

@@ -235,26 +235,7 @@ export function RsbkFormPage() {
         <div className="bg-white rounded-xl border-2 border-[#0F4C81] p-6 mb-6">
           <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Hospital Structure Score</h3>
           
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-blue-50 rounded-lg p-5 text-center border border-blue-200">
-              <p className="text-sm font-semibold text-blue-800 mb-1">Sub-Skor SDM</p>
-              <p className="text-3xl font-bold text-blue-700">{sdmSubScore}</p>
-              <p className="text-xs text-gray-500 mt-1">dari 50 poin maks</p>
-              <div className="w-full bg-blue-200 rounded-full h-2 mt-3">
-                <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${Math.min((sdmSubScore / 50) * 100, 100)}%` }} />
-              </div>
-              <p className="text-xs text-gray-600 mt-2">({sdmPoints} / {sdmTargetPoints} poin) × 50</p>
-            </div>
-            <div className="bg-teal-50 rounded-lg p-5 text-center border border-teal-200">
-              <p className="text-sm font-semibold text-teal-800 mb-1">Sub-Skor Sarpras</p>
-              <p className="text-3xl font-bold text-teal-700">{sarprasSubScore}</p>
-              <p className="text-xs text-gray-500 mt-1">dari 50 poin maks</p>
-              <div className="w-full bg-teal-200 rounded-full h-2 mt-3">
-                <div className="bg-teal-600 h-2 rounded-full transition-all" style={{ width: `${Math.min((sarprasSubScore / 50) * 100, 100)}%` }} />
-              </div>
-              <p className="text-xs text-gray-600 mt-2">({sarprasPoints} / {sarprasTargetPoints} poin) × 50</p>
-            </div>
-          </div>
+
 
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm">
@@ -268,29 +249,70 @@ export function RsbkFormPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-gray-200 bg-blue-50/50">
-                  <td className="py-3 px-4 font-medium text-gray-900">SDM (Tenaga Medis)</td>
+                {/* SDM Row */}
+                <tr className="border-b-2 border-blue-200 bg-blue-50/60">
+                  <td className="py-3 px-4 font-bold text-blue-900">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+                      SDM — Tenaga Medis
+                    </div>
+                    <div className="mt-1 w-full bg-blue-200 rounded-full h-1.5">
+                      <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${sdmTargetPoints > 0 ? Math.min((sdmPoints / sdmTargetPoints) * 100, 100) : 0}%` }} />
+                    </div>
+                  </td>
                   <td className="py-3 px-4 text-center font-bold text-blue-700">{sdmPoints}</td>
                   <td className="py-3 px-4 text-center text-gray-600">{sdmTargetPoints}</td>
-                  <td className="py-3 px-4 text-center text-gray-600">× 50</td>
-                  <td className="py-3 px-4 text-center font-bold text-blue-700">{sdmSubScore}</td>
+                  <td className="py-3 px-4 text-center text-gray-500 font-medium">× 50</td>
+                  <td className="py-3 px-4 text-center font-bold text-blue-700 text-lg">{sdmSubScore}</td>
                 </tr>
-                <tr className="border-b border-gray-100 bg-teal-50/30">
-                  <td className="py-2 px-4 text-gray-600 pl-8">↳ Kapasitas Bed (1 bed = 1 poin)</td>
-                  <td className="py-2 px-4 text-center text-teal-700">{bedPoints}</td>
-                  <td className="py-2 px-4 text-center text-gray-500">{bedTargetPoints}</td>
-                  <td className="py-2 px-4 text-center text-gray-400" rowSpan={3}>× 50</td>
-                  <td className="py-2 px-4 text-center text-teal-700" rowSpan={3}>{sarprasSubScore}</td>
+                {/* Sarpras: Bed Row */}
+                <tr className="border-b border-gray-100 bg-teal-50/40">
+                  <td className="py-2.5 px-4 text-gray-700 pl-8">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400 inline-block"></span>
+                      Kapasitas Bed <span className="text-xs text-gray-400">(1 bed = 1 poin)</span>
+                    </div>
+                    <div className="mt-1 w-full bg-teal-100 rounded-full h-1">
+                      <div className="bg-teal-500 h-1 rounded-full transition-all" style={{ width: `${bedTargetPoints > 0 ? Math.min((bedPoints / bedTargetPoints) * 100, 100) : 0}%` }} />
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-semibold text-teal-700">{bedPoints}</td>
+                  <td className="py-2.5 px-4 text-center text-gray-500">{bedTargetPoints}</td>
+                  <td className="py-2.5 px-4 text-center text-gray-400 text-xs" rowSpan={3}>
+                    <div className="flex flex-col items-center gap-1">
+                      <span>× 50</span>
+                      <span className="text-[10px] text-gray-400">(Sarpras)</span>
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-bold text-teal-700 text-lg" rowSpan={3}>{sarprasSubScore}</td>
                 </tr>
+                {/* Sarpras: Ruangan */}
                 <tr className="border-b border-gray-100 bg-indigo-50/30">
-                  <td className="py-2 px-4 text-gray-600 pl-8">↳ Ruangan Khusus (1 ruangan = 5 poin)</td>
-                  <td className="py-2 px-4 text-center text-indigo-700">{roomPoints}</td>
-                  <td className="py-2 px-4 text-center text-gray-500">{roomTargetPoints}</td>
+                  <td className="py-2.5 px-4 text-gray-700 pl-8">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                      Ruangan Khusus <span className="text-xs text-gray-400">(1 ruangan = 5 poin)</span>
+                    </div>
+                    <div className="mt-1 w-full bg-indigo-100 rounded-full h-1">
+                      <div className="bg-indigo-500 h-1 rounded-full transition-all" style={{ width: `${roomTargetPoints > 0 ? Math.min((roomPoints / roomTargetPoints) * 100, 100) : 0}%` }} />
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-semibold text-indigo-700">{roomPoints}</td>
+                  <td className="py-2.5 px-4 text-center text-gray-500">{roomTargetPoints}</td>
                 </tr>
+                {/* Sarpras: Alat */}
                 <tr className="border-b border-gray-200 bg-purple-50/30">
-                  <td className="py-2 px-4 text-gray-600 pl-8">↳ Alat Medis (1 unit = 1 poin)</td>
-                  <td className="py-2 px-4 text-center text-purple-700">{alatPoints}</td>
-                  <td className="py-2 px-4 text-center text-gray-500">{alatTargetPoints}</td>
+                  <td className="py-2.5 px-4 text-gray-700 pl-8">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block"></span>
+                      Alat Medis <span className="text-xs text-gray-400">(1 unit = 1 poin)</span>
+                    </div>
+                    <div className="mt-1 w-full bg-purple-100 rounded-full h-1">
+                      <div className="bg-purple-500 h-1 rounded-full transition-all" style={{ width: `${alatTargetPoints > 0 ? Math.min((alatPoints / alatTargetPoints) * 100, 100) : 0}%` }} />
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-semibold text-purple-700">{alatPoints}</td>
+                  <td className="py-2.5 px-4 text-center text-gray-500">{alatTargetPoints}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -305,7 +327,7 @@ export function RsbkFormPage() {
           <div className="bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] rounded-xl p-5 text-white text-center">
             <p className="text-sm opacity-90 mb-1">Hospital Structure Score</p>
             <p className="text-4xl font-bold">{totalRsbkScore} <span className="text-lg font-normal opacity-80">/ 100</span></p>
-            <p className="text-sm opacity-80 mt-1">SDM: {sdmSubScore}/50 + Sarpras: {sarprasSubScore}/50</p>
+            <p className="text-sm opacity-80 mt-1">SDM ({sdmPoints}/{sdmTargetPoints}): {sdmSubScore}/50 + Sarpras ({sarprasPoints}/{sarprasTargetPoints}): {sarprasSubScore}/50</p>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 mt-4">

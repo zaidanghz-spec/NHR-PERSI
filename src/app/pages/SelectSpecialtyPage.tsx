@@ -317,7 +317,7 @@ export function SelectSpecialtyPage() {
             )}
 
             {/* Specialty Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
               {specialties.map((specialty) => (
                 <SpecialtyCard
                   key={specialty.id}
@@ -373,7 +373,7 @@ function SpecialtyCard({
   return (
     <button
       onClick={onToggle}
-      className={`bg-white rounded-xl border-2 overflow-hidden hover:shadow-xl transition-all text-left w-full relative ${
+      className={`bg-white rounded-xl border-2 overflow-hidden hover:shadow-xl transition-all text-left w-full relative flex flex-col h-full ${
         isSelected
           ? `${specialty.borderColor} shadow-lg scale-105`
           : "border-gray-200 hover:border-gray-300"
@@ -405,13 +405,13 @@ function SpecialtyCard({
       </div>
 
       {/* Content */}
-      <div className="p-6">
+      <div className="p-6 flex flex-col flex-1">
         <p className="text-gray-700 text-sm leading-relaxed mb-6">
           {specialty.description}
         </p>
 
         {/* Stats */}
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1">
           <StatItem label="Tenaga Medis" value={specialty.stats.doctors} />
           <StatItem label="Indikator Audit" value={specialty.stats.indicators} />
           <StatItem label="Alat Medis" value={specialty.stats.equipment} />
