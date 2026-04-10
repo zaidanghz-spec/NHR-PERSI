@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router";
 import {
   CheckCircle2,
@@ -6,15 +6,49 @@ import {
   Building2,
   Trophy,
   ArrowLeft,
+  FileText,
+  Download,
+  ExternalLink,
+  Clock,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
+
+// Type for uploaded custom survey document
+interface CustomSurveyDoc {
+  fileName: string;
+  base64: string;
+  uploadedAt: string;
+  hospitalCode: string;
+  hospitalName: string;
+  specialty: string;
+  diseaseName: string;
+}
 
 export function SiapAdminReviewPage() {
   const { id } = useParams<{ id: string }>();
   const [comment, setComment] = useState("");
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "">("");
+  const [customSurveyDocs, setCustomSurveyDocs] = useState<CustomSurveyDoc[]>([]);
+
+  // Load all custom survey PDFs from localStorage (all hospitals, all specialties)
+  useEffect(() => {
+    const docs: CustomSurveyDoc[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("custom-survey-")) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw) as CustomSurveyDoc;
+            docs.push(parsed);
+          }
+        } catch {}
+      }
+    }
+    setCustomSurveyDocs(docs);
+  }, []);
 
   // Submission data will be loaded from server based on submission ID
   // Empty placeholder for production launch
@@ -219,6 +253,87 @@ export function SiapAdminReviewPage() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Custom Survey PDF Documents */}
+        <div className="bg-white rounded-xl border-2 border-indigo-200 p-8 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+              <FileText className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Survei PREM/PROM Internal RS</h3>
+              <p className="text-sm text-gray-500">Dokumen survei yang diupload oleh rumah sakit</p>
+            </div>
+          </div>
+
+          {customSurveyDocs.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 border-2 border-dashed border-indigo-100 rounded-xl bg-indigo-50/30">
+              <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center">
+                <FileText className="w-7 h-7 text-indigo-300" />
+              </div>
+              <p className="font-semibold text-gray-400">Belum ada dokumen survei yang diupload</p>
+              <p className="text-xs text-gray-400 text-center max-w-sm">
+                Rumah sakit dapat mengupload survei PREM/PROM internal mereka dari halaman Patient Report.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {customSurveyDocs.map((doc, i) => (
+                <div key={i} className="flex items-start gap-4 p-4 border border-indigo-100 rounded-xl bg-indigo-50/20 hover:bg-indigo-50/40 transition-colors">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                        <Building2 className="w-3 h-3" />
+                        {doc.hospitalName || doc.hospitalCode}
+                      </span>
+                      {doc.specialty && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                          {doc.specialty}
+                        </span>
+                      )}
+                      {doc.diseaseName && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full">
+                          {doc.diseaseName}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Upload: {new Date(doc.uploadedAt).toLocaleString("id-ID")}
+                    </p>
+                    <div className="mt-2 flex items-center gap-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg w-fit">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      <span className="text-xs font-semibold text-amber-700">Menunggu Review Tim NHR PERSI</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <a
+                      href={doc.base64}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Buka
+                    </a>
+                    <a
+                      href={doc.base64}
+                      download={doc.fileName}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Unduh
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Admin Review Section */}

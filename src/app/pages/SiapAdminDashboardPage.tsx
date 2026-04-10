@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import {
   FileText,
@@ -41,6 +41,17 @@ export function SiapAdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
+  const [pendingSurveyDocs, setPendingSurveyDocs] = useState(0);
+
+  // Count uploaded custom survey PDFs from localStorage
+  useEffect(() => {
+    let count = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("custom-survey-")) count++;
+    }
+    setPendingSurveyDocs(count);
+  }, []);
 
   const filteredSubmissions = mockSubmissions.filter((submission) => {
     const matchesSearch =
@@ -108,6 +119,31 @@ export function SiapAdminDashboardPage() {
             isDecimal
           />
         </div>
+
+        {/* Pending Custom Survey Docs Banner */}
+        {pendingSurveyDocs > 0 && (
+          <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4 mb-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="font-bold text-indigo-900">
+                  {pendingSurveyDocs} Dokumen Survei RS Menunggu Review
+                </p>
+                <p className="text-sm text-indigo-600">
+                  Rumah sakit telah mengupload survei PREM/PROM internal mereka
+                </p>
+              </div>
+            </div>
+            <Link to="/siap-persi/admin/review/pending">
+              <Button className="bg-indigo-600 hover:bg-indigo-700 shrink-0">
+                <Eye className="w-4 h-4 mr-2" />
+                Lihat Dokumen
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* Charts */}
         <div className="grid md:grid-cols-2 gap-8 mb-8">

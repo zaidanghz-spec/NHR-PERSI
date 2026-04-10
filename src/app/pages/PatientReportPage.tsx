@@ -63,6 +63,19 @@ export function PatientReportPage() {
   const [customSurveyFile, setCustomSurveyFile] = useState<File | null>(null);
   const [customSurveyUploaded, setCustomSurveyUploaded] = useState(false);
   const [customSurveyFileName, setCustomSurveyFileName] = useState<string>("");
+
+  // Load existing custom survey upload from localStorage on mount
+  useEffect(() => {
+    const storageKey = `custom-survey-${hospitalCode}-${specialty || "general"}`;
+    const existing = localStorage.getItem(storageKey);
+    if (existing) {
+      try {
+        const parsed = JSON.parse(existing);
+        setCustomSurveyFileName(parsed.fileName || "");
+        setCustomSurveyUploaded(true);
+      } catch {}
+    }
+  }, [hospitalCode, specialty]);
   const targetPatientCount = 30;
   // Range-based validity weight (fair scoring)
   // 1-5  patients = 80% validity,  6-10 = 85%, 11-20 = 92%, 21-30 = 100%
