@@ -39,7 +39,7 @@ export function SubmissionSuccessPage() {
             Submission Berhasil!
           </h1>
           <p className="text-xl text-gray-600 mb-2">
-            Data SIAP PERSI Assessment Anda telah diterima dan sedang dalam proses review
+            Data NHR PERSI Assessment Anda telah diterima dan sedang dalam proses review
           </p>
           <p className="text-gray-500 mb-8">
             {hospitalName}
@@ -127,7 +127,7 @@ export function SubmissionSuccessPage() {
                   2
                 </div>
                 <p className="text-gray-700">
-                  Perhitungan skor dilakukan sesuai metodologi SIAP PERSI
+                  Perhitungan skor dilakukan sesuai metodologi NHR PERSI
                 </p>
               </div>
               <div className="flex gap-3">

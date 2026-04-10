@@ -44,7 +44,7 @@ export function NewHomePage() {
           <p className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-[#D97706]" />
             <span>
-              SIAP PERSI Assessment 2026 kini terbuka untuk seluruh rumah sakit
+              NHR PERSI Assessment 2026 kini terbuka untuk seluruh rumah sakit
               anggota PERSI.
             </span>
           </p>
@@ -115,7 +115,7 @@ export function NewHomePage() {
                       <TrendingUp className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <p className="font-[600]">SIAP PERSI Assessment 2026</p>
+                      <p className="font-[600]">NHR PERSI Assessment 2026</p>
                       <p className="text-sm text-white/60">
                         Submit data untuk ranking nasional
                       </p>
@@ -159,12 +159,12 @@ export function NewHomePage() {
         </div>
       </section>
 
-      {/* SIAP PERSI Three Pillars */}
+      {/* NHR PERSI Three Pillars */}
       <section className="max-w-7xl mx-auto px-6 -mt-10 relative z-10">
         <div className="grid md:grid-cols-3 gap-6">
           <PillarCard
             icon={<Shield className="w-7 h-7" />}
-            title="RSBK"
+            title="Hospital Structure"
             subtitle="Rumah Sakit Berstandar Kemampuan"
             description="Penilaian kesiapan sumber daya manusia, peralatan medis, dan infrastruktur rumah sakit."
             weight="15%"
@@ -197,7 +197,7 @@ export function NewHomePage() {
               Hospital Rankings
             </h2>
             <p className="text-gray-600">
-              Ranking rumah sakit nasional berdasarkan SIAP PERSI Assessment
+              Ranking rumah sakit nasional berdasarkan NHR PERSI Assessment
             </p>
           </div>
           <Link
@@ -261,9 +261,9 @@ export function NewHomePage() {
                     <td className="px-6 py-4">
                       <span
                         className={`px-2.5 py-1 rounded-md text-xs font-[600] ${
-                          r.grade === "A"
+                          r.grade === "Platinum" || r.grade === "Outstanding"
                             ? "bg-green-100 text-green-700"
-                            : r.grade === "B"
+                            : r.grade === "Excellent"
                             ? "bg-blue-100 text-blue-700"
                             : "bg-yellow-100 text-yellow-700"
                         }`}
@@ -286,9 +286,9 @@ export function NewHomePage() {
                 Belum Ada Data Ranking
               </h3>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Platform SIAP PERSI baru diluncurkan. Data ranking akan muncul
+                Platform NHR PERSI baru diluncurkan. Data ranking akan muncul
                 setelah rumah sakit menyelesaikan{" "}
-                <strong>SIAP PERSI Assessment</strong> dan proses review oleh
+                <strong>NHR PERSI Assessment</strong> dan proses review oleh
                 tim ahli PERSI selesai.
               </p>
               <div className="flex gap-3 justify-center">
@@ -487,7 +487,7 @@ export function NewHomePage() {
                 meningkatkan mutu layanan kesehatan nasional.
               </p>
               <p className="text-white/80 mb-8 leading-relaxed">
-                Platform SIAP PERSI merupakan inisiatif terbaru dalam
+                Platform NHR PERSI merupakan inisiatif terbaru dalam
                 mewujudkan transparansi dan akuntabilitas kualitas rumah sakit
                 melalui sistem penilaian berbasis evidence yang diakui secara
                 nasional.
@@ -549,7 +549,7 @@ export function NewHomePage() {
                     <Award className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-[600] mb-1">SIAP PERSI</h4>
+                    <h4 className="font-[600] mb-1">NHR PERSI</h4>
                     <p className="text-sm text-white/70 leading-relaxed">
                       Sistem penilaian kualitas RS berbasis tiga pilar: RSBK,
                       Clinical Audit, dan Patient Report (PREM & PROM).
@@ -566,7 +566,7 @@ export function NewHomePage() {
       <section className="max-w-7xl mx-auto px-6 py-16">
         <div className="text-center mb-12">
           <h2 className="text-2xl font-[700] text-gray-900 mb-2">
-            Bagaimana Cara Kerja SIAP PERSI?
+            Bagaimana Cara Kerja NHR PERSI?
           </h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
             Proses penilaian yang transparan dan terstruktur untuk memastikan
@@ -578,7 +578,7 @@ export function NewHomePage() {
           <StepCard
             number={1}
             title="Registrasi"
-            description="Rumah sakit mendaftar melalui portal SIAP PERSI dengan mengunggah surat tugas PIC"
+            description="Rumah sakit mendaftar melalui portal NHR PERSI dengan mengunggah surat tugas PIC"
             icon={<Building2 className="w-6 h-6" />}
           />
           <StepCard

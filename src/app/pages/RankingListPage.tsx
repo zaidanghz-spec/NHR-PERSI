@@ -48,7 +48,7 @@ export function RankingListPage() {
             Hospital Rankings Indonesia
           </h1>
           <p className="text-white/80">
-            Ranking rumah sakit nasional berdasarkan SIAP PERSI Assessment
+            Ranking rumah sakit nasional berdasarkan NHR PERSI Assessment
           </p>
         </div>
       </div>
@@ -180,11 +180,11 @@ export function RankingListPage() {
                       <td className="px-6 py-4">
                         <span
                           className={`px-3 py-1 rounded-lg text-xs font-[600] ${
-                            r.grade === "A"
+                            r.grade === "Platinum" || r.grade === "Outstanding"
                               ? "bg-green-100 text-green-700"
-                              : r.grade === "B"
+                              : r.grade === "Excellent"
                               ? "bg-blue-100 text-blue-700"
-                              : r.grade === "C"
+                              : r.grade === "Commendable"
                               ? "bg-yellow-100 text-yellow-700"
                               : "bg-red-100 text-red-700"
                           }`}
@@ -219,7 +219,7 @@ export function RankingListPage() {
                 Ranking Belum Tersedia
               </h2>
               <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                Platform SIAP PERSI baru diluncurkan. Data ranking akan muncul
+                Platform NHR PERSI baru diluncurkan. Data ranking akan muncul
                 setelah rumah sakit menyelesaikan assessment dan proses review
                 oleh tim ahli PERSI selesai.
               </p>
@@ -234,7 +234,7 @@ export function RankingListPage() {
                     number={1}
                     icon={<FileCheck className="w-5 h-5" />}
                     title="Rumah Sakit Submit Assessment"
-                    description="Lengkapi SIAP PERSI Assessment: RSBK, Clinical Audit, dan Patient Report"
+                    description="Lengkapi NHR PERSI Assessment: RSBK, Clinical Audit, dan Patient Report"
                     status="current"
                   />
                   <TimelineStep

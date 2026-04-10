@@ -20,7 +20,7 @@ const specialtyColors: Record<string, string> = {
 };
 
 const stageLabels: Record<string, string> = {
-  rsbk: "Form RSBK",
+  rsbk: "Hospital Structure Form",
   "clinical-audit": "Clinical Audit",
   "patient-report": "Patient Report",
   result: "Review & Submit",

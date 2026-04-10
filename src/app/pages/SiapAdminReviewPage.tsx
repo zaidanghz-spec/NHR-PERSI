@@ -47,16 +47,17 @@ export function SiapAdminReviewPage() {
   };
 
   const radarData = [
-    { category: "RSBK", value: submissionData.scores.rsbk },
+    { category: "Hospital Structure", value: submissionData.scores.rsbk },
     { category: "Clinical Audit", value: submissionData.scores.clinicalAudit },
     { category: "Patient Report", value: submissionData.scores.patientReport },
   ];
 
   const getGrade = (score: number) => {
-    if (score >= 85) return { grade: "A", color: "text-green-600", bg: "bg-green-50" };
-    if (score >= 70) return { grade: "B", color: "text-blue-600", bg: "bg-blue-50" };
-    if (score >= 55) return { grade: "C", color: "text-yellow-600", bg: "bg-yellow-50" };
-    return { grade: "D", color: "text-red-600", bg: "bg-red-50" };
+    if (score >= 90) return { grade: "Platinum", color: "text-purple-700", bg: "bg-purple-50" };
+    if (score >= 80) return { grade: "Outstanding", color: "text-green-700", bg: "bg-green-50" };
+    if (score >= 70) return { grade: "Excellent", color: "text-blue-700", bg: "bg-blue-50" };
+    if (score >= 60) return { grade: "Commendable", color: "text-teal-700", bg: "bg-teal-50" };
+    return { grade: "Developing", color: "text-amber-700", bg: "bg-amber-50" };
   };
 
   const gradeInfo = getGrade(submissionData.scores.final);
@@ -156,7 +157,7 @@ export function SiapAdminReviewPage() {
             </h3>
             <div className="space-y-4">
               <ScoreRow
-                label="RSBK"
+                label="Hospital Structure"
                 score={submissionData.scores.rsbk}
                 weight="15%"
                 weighted={(submissionData.scores.rsbk * 0.15).toFixed(1)}

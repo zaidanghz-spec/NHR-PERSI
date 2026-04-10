@@ -102,7 +102,7 @@ export function SiapAdminDashboardPage() {
             Admin Review Dashboard
           </h1>
           <p className="text-gray-600">
-            Kelola dan review submission SIAP PERSI Assessment dari rumah sakit
+            Kelola dan review submission NHR PERSI Assessment dari rumah sakit
           </p>
         </div>
 

@@ -212,7 +212,7 @@ export function SelectSpecialtyPage() {
             Pilih Spesialisasi
           </h1>
           <p className="text-gray-600 text-lg">
-            Pilih satu atau lebih spesialisasi yang akan dinilai untuk SIAP PERSI Assessment
+            Pilih satu atau lebih spesialisasi yang akan dinilai untuk NHR PERSI Assessment
           </p>
         </div>
 
@@ -579,7 +579,7 @@ function DraftCard({
             <strong className="text-blue-700">Selanjutnya:</strong>{" "}
             {specialtyNames[nextStage.specialty]} -{" "}
             {nextStage.stage === "rsbk"
-              ? "Form RSBK"
+              ? "Hospital Structure Form"
               : nextStage.stage === "clinicalAudit"
               ? "Clinical Audit"
               : "Patient Report"}

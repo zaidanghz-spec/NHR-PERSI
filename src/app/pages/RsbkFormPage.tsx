@@ -127,11 +127,11 @@ export function RsbkFormPage() {
           </Link>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Form RSBK - {specialtyInfo.name}</h1>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Hospital Structure Form - {specialtyInfo.name}</h1>
               <p className="text-gray-600">Rumah Sakit Berstandar Kemampuan — Input SDM, Kapasitas Bed, Ruangan & Alat Medis</p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 px-6 py-4 text-center min-w-[160px]">
-              <p className="text-sm text-gray-600 mb-1">Skor RSBK</p>
+              <p className="text-sm text-gray-600 mb-1">Hospital Structure Score</p>
               <p className="text-4xl font-bold text-[#0F4C81]">{totalRsbkScore}</p>
               <p className="text-xs text-gray-500 mt-1">dari 100</p>
             </div>
@@ -157,7 +157,7 @@ export function RsbkFormPage() {
           </p>
           <div className="space-y-2 text-sm text-gray-700">
             <p>&bull; Klik tombol <strong>+</strong> untuk mulai mengisi (dimulai dari 0). Setiap dokter = 1 poin, setiap bed = 1 poin, setiap ruangan = <strong>5 poin</strong></p>
-            <p>&bull; <strong>Skor RSBK</strong> = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = <strong>0–100</strong></p>
+            <p>&bull; <strong>Hospital Structure Score</strong> = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = <strong>0–100</strong></p>
             <p>&bull; Nilai RSBK dikalikan bobot <strong>15%</strong> untuk peringkat nasional</p>
           </div>
         </div>
@@ -233,7 +233,7 @@ export function RsbkFormPage() {
 
         {/* Summary */}
         <div className="bg-white rounded-xl border-2 border-[#0F4C81] p-6 mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Skor RSBK</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Hospital Structure Score</h3>
           
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-blue-50 rounded-lg p-5 text-center border border-blue-200">
@@ -295,7 +295,7 @@ export function RsbkFormPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-[#0F4C81]/10">
-                  <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={4}>Total RSBK</td>
+                  <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={4}>Total Hospital Structure</td>
                   <td className="py-3 px-4 text-center font-bold text-[#0F4C81] text-2xl">{totalRsbkScore}</td>
                 </tr>
               </tfoot>
@@ -303,13 +303,13 @@ export function RsbkFormPage() {
           </div>
 
           <div className="bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] rounded-xl p-5 text-white text-center">
-            <p className="text-sm opacity-90 mb-1">Skor RSBK</p>
+            <p className="text-sm opacity-90 mb-1">Hospital Structure Score</p>
             <p className="text-4xl font-bold">{totalRsbkScore} <span className="text-lg font-normal opacity-80">/ 100</span></p>
             <p className="text-sm opacity-80 mt-1">SDM: {sdmSubScore}/50 + Sarpras: {sarprasSubScore}/50</p>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 mt-4">
-            <p><strong>Rumus:</strong> Skor RSBK = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = 0–100</p>
+            <p><strong>Rumus:</strong> Hospital Structure Score = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = 0–100</p>
             <p className="mt-1">Sub-Skor SDM = (Poin SDM / Target SDM) × 50 | Sub-Skor Sarpras = (Total Bed + Ruangan×5 + Alat) / Target × 50</p>
             <p className="mt-1">Nilai akhir RSBK dikalikan bobot <strong>15%</strong> untuk peringkat nasional.</p>
           </div>
@@ -331,7 +331,7 @@ export function RsbkFormPage() {
 
         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-gray-700">
-            <strong>Tips:</strong> Anda dapat mengklik <strong>"Isi Nanti"</strong> untuk melanjutkan ke bagian berikutnya, kemudian kembali melengkapi Form RSBK sebelum submit final.
+            <strong>Tips:</strong> Anda dapat mengklik <strong>"Isi Nanti"</strong> untuk melanjutkan ke bagian berikutnya, kemudian kembali melengkapi Hospital Structure Form sebelum submit final.
           </p>
         </div>
       </div>

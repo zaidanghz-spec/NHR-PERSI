@@ -23,10 +23,11 @@ export function SiapPersiOverviewPage() {
   });
 
   const getGrade = (score: number) => {
-    if (score >= 85) return { grade: "A", color: "text-green-600", bg: "bg-green-50" };
-    if (score >= 70) return { grade: "B", color: "text-blue-600", bg: "bg-blue-50" };
-    if (score >= 55) return { grade: "C", color: "text-yellow-600", bg: "bg-yellow-50" };
-    return { grade: "D", color: "text-red-600", bg: "bg-red-50" };
+    if (score >= 90) return { grade: "Platinum", color: "text-purple-700", bg: "bg-purple-50" };
+    if (score >= 80) return { grade: "Outstanding", color: "text-green-700", bg: "bg-green-50" };
+    if (score >= 70) return { grade: "Excellent", color: "text-blue-700", bg: "bg-blue-50" };
+    if (score >= 60) return { grade: "Commendable", color: "text-teal-700", bg: "bg-teal-50" };
+    return { grade: "Developing", color: "text-amber-700", bg: "bg-amber-50" };
   };
 
   const finalGrade = getGrade(assessmentData.finalScore);
@@ -37,10 +38,10 @@ export function SiapPersiOverviewPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            SIAP PERSI Assessment
+            NHR PERSI Assessment
           </h1>
           <p className="text-gray-600">
-            Sistem Informasi Akreditasi dan Penilaian PERSI untuk evaluasi kualitas rumah sakit
+            National Hospital Ranking PERSI untuk evaluasi kualitas rumah sakit
           </p>
         </div>
 
@@ -50,7 +51,7 @@ export function SiapPersiOverviewPage() {
           <div className="flex items-center justify-between">
             <StepItem
               number={1}
-              label="RSBK"
+              label="Hospital Structure"
               sublabel="Kemampuan Layanan"
               status="completed"
               isLast={false}
@@ -82,7 +83,7 @@ export function SiapPersiOverviewPage() {
         {/* Score Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <ScoreCard
-            title="RSBK Score"
+            title="Hospital Structure Score"
             score={assessmentData.rsbkScore}
             weight="15%"
             icon={<Activity className="w-6 h-6" />}
@@ -127,7 +128,7 @@ export function SiapPersiOverviewPage() {
             </h2>
             <div className="space-y-4">
               <BarVisual
-                label="RSBK"
+                label="Hospital Structure"
                 value={assessmentData.rsbkScore}
                 color="bg-blue-500"
               />
@@ -172,7 +173,7 @@ export function SiapPersiOverviewPage() {
               <h3 className="font-bold text-gray-900 mb-4">Perhitungan Skor</h3>
               <div className="space-y-3">
                 <CalculationRow
-                  label="RSBK"
+                  label="Hospital Structure"
                   score={assessmentData.rsbkScore}
                   weight={0.15}
                   result={assessmentData.rsbkScore * 0.15}

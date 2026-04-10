@@ -191,7 +191,7 @@ export function HospitalLoginPage() {
             <h1 className="text-4xl font-[700] mb-4 leading-tight">
               Selamat Datang di
               <br />
-              <span className="text-[#0D9488]">SIAP PERSI Portal</span>
+              <span className="text-[#0D9488]">NHR PERSI Portal</span>
             </h1>
             <p className="text-lg text-white/80 leading-relaxed">
               Portal khusus bagi rumah sakit anggota PERSI untuk mengikuti

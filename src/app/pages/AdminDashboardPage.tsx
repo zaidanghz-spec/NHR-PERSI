@@ -77,7 +77,7 @@ export function AdminDashboardPage() {
               Admin Dashboard
             </h1>
             <p className="text-gray-500">
-              Pusat Kendali SIAP PERSI
+              Pusat Kendali NHR PERSI
             </p>
           </div>
           <Link to="/siap-persi/admin/dashboard">

@@ -20,6 +20,27 @@ function getOptionScore(value: string): number {
   return 0;
 }
 
+// Fair range-based sample multiplier
+// 1-5 rekam medis  = 80% validity weight
+// 6-10 rekam medis = 85% validity weight
+// 11-20 rekam medis = 92% validity weight
+// 21-30 rekam medis = 100% validity weight
+function getSampleValidityWeight(count: number): number {
+  if (count <= 0) return 0;
+  if (count <= 5) return 0.80;
+  if (count <= 10) return 0.85;
+  if (count <= 20) return 0.92;
+  return 1.0;
+}
+
+function getSampleLabel(count: number): string {
+  if (count <= 0) return "";
+  if (count <= 5) return "Sampel Minimal (80% bobot validitas)";
+  if (count <= 10) return "Sampel Cukup (85% bobot validitas)";
+  if (count <= 20) return "Sampel Baik (92% bobot validitas)";
+  return "Sampel Lengkap (100% bobot validitas)";
+}
+
 function getDraftKey(specialty: string) {
   return `clinical-audit-draft-${specialty}`;
 }
@@ -114,7 +135,10 @@ export function ClinicalAuditPage() {
       }
     }
 
-    return completedPatients > 0 ? Math.round(totalScore / completedPatients) : 0;
+    if (completedPatients === 0) return 0;
+    const rawScore = Math.round(totalScore / completedPatients);
+    const validityWeight = getSampleValidityWeight(completedPatients);
+    return Math.round(rawScore * validityWeight);
   };
 
   const getCompletedPatientsCount = () => {
@@ -202,7 +226,9 @@ export function ClinicalAuditPage() {
   };
 
   const categoryScores = calculateCategoryScores();
-  const totalWeightedAudit = Number(categoryScores.reduce((s, c) => s + c.weightedScore, 0).toFixed(1));
+  const rawWeightedAudit = Number(categoryScores.reduce((s, c) => s + c.weightedScore, 0).toFixed(1));
+  const validityWeight = getSampleValidityWeight(completedPatients);
+  const totalWeightedAudit = Number((rawWeightedAudit * validityWeight).toFixed(1));
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -224,7 +250,7 @@ export function ClinicalAuditPage() {
             to={`/siap-persi/rsbk/${specialty}`}
             className="inline-flex items-center text-[#0F4C81] hover:underline mb-4"
           >
-            ← Kembali ke Form RSBK
+            ← Kembali ke Hospital Structure Form
           </Link>
           <div className="flex items-center justify-between">
             <div>
@@ -273,7 +299,7 @@ export function ClinicalAuditPage() {
               Progress Review Pasien - {activeDisease.diseaseName}
             </span>
             <span className="text-sm text-gray-600">
-              {completedPatients} / 30 pasien selesai ({progress.toFixed(0)}%)
+              {completedPatients} / 30 rekam medis ({progress.toFixed(0)}%) — {getSampleLabel(completedPatients)}
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
@@ -358,9 +384,9 @@ export function ClinicalAuditPage() {
                 Panduan Audit Klinis
               </h3>
               <p className="text-gray-700 text-sm leading-relaxed mb-3">
-                Review rekam medis 30 pasien secara retrospektif untuk setiap penyakit. 
-                Evaluasi apakah setiap indikator <strong>dilaksanakan</strong> sesuai dengan 
-                standar protokol klinis.
+                Review rekam medis pasien secara retrospektif (minimal 1, optimal 30). 
+                Semakin banyak sampel, semakin tinggi bobot validitas skor audit Anda.
+                Evaluasi apakah setiap indikator <strong>dilaksanakan</strong> sesuai standar protokol klinis.
               </p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-start gap-2">
@@ -479,12 +505,12 @@ export function ClinicalAuditPage() {
 
           <Button
             onClick={handleSubmit}
-            disabled={completedPatients < 30}
+            disabled={completedPatients < 1}
             className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {completedPatients < 30
-              ? `Selesaikan ${30 - completedPatients} pasien lagi`
-              : "Lanjut ke Patient Report"}
+            {completedPatients < 1
+              ? "Isi minimal 1 rekam medis untuk melanjutkan"
+              : `Lanjut ke Patient Report (${completedPatients} RM, bobot ${(getSampleValidityWeight(completedPatients)*100).toFixed(0)}%)`}
             <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
         </div>

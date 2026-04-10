@@ -68,7 +68,7 @@ export const router = createBrowserRouter([
           { path: "admin/dashboard", Component: AdminDashboardPage },
           { path: "admin/review/:id", Component: ReviewSubmissionPage },
 
-          // SIAP PERSI Routes
+          // NHR PERSI Routes
           { path: "siap-persi/overview", Component: SiapPersiOverviewPage },
           { path: "siap-persi/select-specialty", Component: SelectSpecialtyPage },
           { path: "siap-persi/rsbk/:specialty", Component: RsbkFormPage },

@@ -5,12 +5,15 @@ import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { submitSurvey } from "../utils/api";
 
-// ===== 3 RATING OPTIONS =====
-// Puas = 100, Cukup = 50, Kurang = 0
+// ===== LIKERT SCALE 1-5 =====
+// Based on NHS PREM framework & validated patient experience instruments
+// 5=Sangat Setuju (100pts), 4=Setuju (75pts), 3=Netral (50pts), 2=Tidak Setuju (25pts), 1=Sangat Tidak Setuju (0pts)
 const ratingOptions = [
-  { value: "puas", label: "Puas", emoji: "\ud83d\ude0a", score: 100, color: "green" },
-  { value: "cukup", label: "Cukup", emoji: "\ud83d\ude10", score: 50, color: "yellow" },
-  { value: "kurang", label: "Kurang", emoji: "\ud83d\ude1e", score: 0, color: "red" },
+  { value: "5", label: "Sangat Setuju", emoji: "⭐⭐⭐⭐⭐", score: 100, color: "green" },
+  { value: "4", label: "Setuju", emoji: "⭐⭐⭐⭐", score: 75, color: "teal" },
+  { value: "3", label: "Netral", emoji: "⭐⭐⭐", score: 50, color: "yellow" },
+  { value: "2", label: "Tidak Setuju", emoji: "⭐⭐", score: 25, color: "orange" },
+  { value: "1", label: "Sangat Tidak Setuju", emoji: "⭐", score: 0, color: "red" },
 ];
 
 // Default generic questions (fallback if no specialty selected)
@@ -330,7 +333,7 @@ export function PatientPremPromPage() {
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-400 pb-6">
-          PERSI National Hospital Ranking Indonesia - SIAP PERSI Assessment
+          NHR PERSI - National Hospital Ranking Indonesia
         </div>
       </div>
     </div>

@@ -92,7 +92,7 @@ export function SiapPersiResultPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Rekapitulasi Nilai</h2>
             <div className="bg-[#0F4C81] text-white px-5 py-2 rounded-xl">
-              <span className="text-sm">Total SIAP PERSI</span>
+              <span className="text-sm">Total NHR PERSI</span>
               <span className="text-3xl font-bold ml-3">{totalSiapScore}</span>
             </div>
           </div>
@@ -112,7 +112,7 @@ export function SiapPersiResultPage() {
               <tbody>
                 <tr className="border-b border-gray-200 bg-blue-50/50">
                   <td className="py-4 px-4">
-                    <div className="font-medium text-gray-900">Form RSBK</div>
+                    <div className="font-medium text-gray-900">Hospital Structure Form</div>
                     <div className="text-xs text-gray-500">Tenaga medis & sarana prasarana</div>
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-blue-700">{rsbkScore}</td>
@@ -156,7 +156,7 @@ export function SiapPersiResultPage() {
               <tfoot>
                 <tr className="bg-[#0F4C81]/10">
                   <td className="py-4 px-4 font-bold text-[#0F4C81] text-lg" colSpan={3}>
-                    Total Skor SIAP PERSI
+                    Total Skor NHR PERSI
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-[#0F4C81] text-3xl">
                     {totalSiapScore}
@@ -181,7 +181,7 @@ export function SiapPersiResultPage() {
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
                 <div>
-                  <p className="font-semibold text-gray-900">Form RSBK</p>
+                  <p className="font-semibold text-gray-900">Hospital Structure Form</p>
                   <p className="text-sm text-gray-600">Tenaga medis & sarana prasarana</p>
                 </div>
               </div>
@@ -271,7 +271,7 @@ export function SiapPersiResultPage() {
                   </p>
                   <p className="flex items-start gap-2">
                     <span className="font-bold text-blue-600">2.</span>
-                    <span>Perhitungan skor dilakukan sesuai metodologi SIAP PERSI</span>
+                    <span>Perhitungan skor dilakukan sesuai metodologi NHR PERSI</span>
                   </p>
                   <p className="flex items-start gap-2">
                     <span className="font-bold text-blue-600">3.</span>

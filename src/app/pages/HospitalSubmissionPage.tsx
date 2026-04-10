@@ -114,7 +114,7 @@ export function HospitalSubmissionPage() {
           </div>
         </div>
 
-        {/* SIAP PERSI Assessment CTA */}
+        {/* NHR PERSI Assessment CTA */}
         <div className="bg-white rounded-2xl border-2 border-[#14B8A6] p-8 mb-8 hover:shadow-xl transition-all">
           <div className="flex items-start gap-6">
             <div className="w-16 h-16 bg-gradient-to-br from-[#0F4C81] to-[#14B8A6] rounded-2xl flex items-center justify-center flex-shrink-0">
@@ -122,7 +122,7 @@ export function HospitalSubmissionPage() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                SIAP PERSI Assessment
+                NHR PERSI Assessment
               </h2>
               <p className="text-gray-600 mb-4 leading-relaxed">
                 Mulai penilaian layanan spesialistik rumah sakit Anda. Pilih spesialisasi
@@ -131,7 +131,7 @@ export function HospitalSubmissionPage() {
               </p>
               <div className="grid grid-cols-3 gap-3 mb-6">
                 <div className="bg-blue-50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-gray-500">RSBK</p>
+                  <p className="text-xs text-gray-500">Hospital Structure</p>
                   <p className="font-bold text-[#0F4C81]">15%</p>
                 </div>
                 <div className="bg-purple-50 rounded-lg p-3 text-center">

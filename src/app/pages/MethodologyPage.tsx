@@ -22,7 +22,7 @@ export function MethodologyPage() {
             Metodologi Penilaian
           </span>
           <h1 className="text-4xl font-[700] mb-4">
-            SIAP PERSI Assessment
+            NHR PERSI Assessment
           </h1>
           <p className="text-lg text-white/80 max-w-3xl mx-auto leading-relaxed">
             Sistem penilaian kualitas rumah sakit berbasis evidence dengan tiga
@@ -37,10 +37,10 @@ export function MethodologyPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8">
           <h2 className="text-2xl font-[700] text-gray-900 mb-4">Overview</h2>
           <p className="text-gray-700 mb-4 leading-relaxed">
-            SIAP PERSI (Sistem Informasi Akreditasi dan Penilaian PERSI) adalah
+            NHR PERSI (National Hospital Ranking PERSI) adalah
             framework penilaian yang dirancang khusus untuk mengevaluasi
             kualitas layanan rumah sakit di Indonesia. Sistem ini menggunakan
-            pendekatan <strong>100% berbasis SIAP PERSI Assessment</strong>{" "}
+            pendekatan <strong>100% berbasis NHR PERSI Assessment</strong>{" "}
             tanpa general assessment, memastikan penilaian yang fokus, objektif,
             dan terstandar.
           </p>
@@ -54,7 +54,7 @@ export function MethodologyPage() {
         {/* Three Pillars */}
         <div className="mb-8">
           <h2 className="text-2xl font-[700] text-gray-900 mb-6 text-center">
-            Tiga Pilar Penilaian SIAP PERSI
+            Tiga Pilar Penilaian NHR PERSI
           </h2>
 
           <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -65,7 +65,7 @@ export function MethodologyPage() {
               <div className="text-3xl font-[700] text-[#D97706] mb-2">
                 15%
               </div>
-              <h3 className="font-[700] text-gray-900 mb-1">RSBK</h3>
+              <h3 className="font-[700] text-gray-900 mb-1">Hospital Structure</h3>
               <p className="text-sm text-[#0D9488] font-[500]">
                 Rumah Sakit Berstandar Kemampuan
               </p>
@@ -276,7 +276,7 @@ export function MethodologyPage() {
                 <p className="text-sm text-gray-700">
                   <strong>Metode:</strong> Survei menggunakan skala Likert yang
                   diberikan kepada pasien atau keluarga. RS mengunggah hasil
-                  survei melalui portal SIAP PERSI. Minimum 30 responden per
+                  survei melalui portal NHR PERSI. Minimum 30 responden per
                   spesialisasi.
                 </p>
               </div>
@@ -300,7 +300,7 @@ export function MethodologyPage() {
 
           <div className="bg-white rounded-lg p-6 font-mono text-sm mb-6">
             <div className="font-[700] mb-3 text-[#1E3A8A]">
-              Formula Skor Final SIAP PERSI:
+              Formula Skor Final NHR PERSI:
             </div>
             <div className="text-gray-700">
               <div>
@@ -345,7 +345,7 @@ export function MethodologyPage() {
             </h2>
           </div>
           <p className="text-gray-700 mb-6 leading-relaxed">
-            Pada fase awal, SIAP PERSI menilai tiga spesialisasi utama:
+            Pada fase awal, NHR PERSI menilai tiga spesialisasi utama:
           </p>
           <div className="grid md:grid-cols-3 gap-4">
             <div className="bg-red-50 rounded-lg p-5 border border-red-100">
@@ -417,7 +417,7 @@ export function MethodologyPage() {
             Siap Mengikuti Assessment?
           </h3>
           <p className="text-white/80 mb-6 max-w-xl mx-auto">
-            Daftarkan rumah sakit Anda dan mulai proses SIAP PERSI Assessment
+            Daftarkan rumah sakit Anda dan mulai proses NHR PERSI Assessment
             untuk masuk ke ranking nasional.
           </p>
           <div className="flex gap-4 justify-center">

@@ -60,6 +60,22 @@ export function PatientReportPage() {
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
   const [loading, setLoading] = useState(true);
   const targetPatientCount = 30;
+  // Range-based validity weight (fair scoring)
+  // 1-5  patients = 80% validity,  6-10 = 85%, 11-20 = 92%, 21-30 = 100%
+  const getSampleValidityWeight = (count: number): number => {
+    if (count <= 0) return 0;
+    if (count <= 5) return 0.80;
+    if (count <= 10) return 0.85;
+    if (count <= 20) return 0.92;
+    return 1.0;
+  };
+  const getSampleLabel = (count: number): string => {
+    if (count <= 0) return "Belum ada pasien";
+    if (count <= 5) return "Sampel Minimal (80%)";
+    if (count <= 10) return "Sampel Cukup (85%)";
+    if (count <= 20) return "Sampel Baik (92%)";
+    return "Sampel Lengkap (100%)";
+  };
 
   // Load registered patients from server
   const loadRegisteredPatients = useCallback(async () => {
@@ -415,7 +431,7 @@ export function PatientReportPage() {
               </li>
               <li className="flex gap-2">
                 <span className="font-bold text-[#0F4C81] shrink-0">3.</span>
-                <span>Masing-masing penyakit butuh 30 pasien yang disurvei</span>
+                <span>Target optimal 30 pasien per penyakit. Minimal 1 pasien sudah dapat lanjut dengan bobot 80%.</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold text-[#0F4C81] shrink-0">4.</span>
@@ -714,11 +730,11 @@ export function PatientReportPage() {
 
           <Button
             onClick={handleContinue}
-            disabled={patientCount < targetPatientCount}
+            disabled={patientCount < 1}
             className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {patientCount < targetPatientCount
-              ? `Kumpulkan ${targetPatientCount - patientCount} pasien lagi`
+            {patientCount < 1
+              ? `Daftarkan minimal 1 pasien untuk melanjutkan`
               : `Lanjut ke Hasil Akhir (Skor: ${overallScore})`}
             <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
@@ -979,7 +995,7 @@ function PatientQRModal({
       ctx.fillStyle = "#ffffff";
       ctx.font = "12px Arial";
       ctx.fillText("PERSI National Hospital Ranking Indonesia", 300, 880);
-      ctx.fillText("SIAP PERSI Assessment", 300, 900);
+      ctx.fillText("NHR PERSI Assessment", 300, 900);
 
       const link = document.createElement("a");
       link.download = `QR-${patient.name}-${patient.rm}.png`;

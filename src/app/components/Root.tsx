@@ -57,7 +57,7 @@ export function Root() {
               </div>
               <div>
                 <div className="font-[700] text-[#1E3A8A] leading-tight">
-                  SIAP PERSI
+                  NHR PERSI
                 </div>
                 <div className="text-[10px] text-gray-500 leading-tight">
                   National Hospital Ranking
@@ -139,7 +139,7 @@ export function Root() {
                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             <Shield className="w-4 h-4" />
-                            SIAP PERSI Review
+                            NHR PERSI Review
                           </Link>
                         )}
                         <button
@@ -219,7 +219,7 @@ export function Root() {
                 <div className="w-8 h-8 bg-[#1E3A8A] rounded flex items-center justify-center">
                   <Building2 className="w-5 h-5 text-white" />
                 </div>
-                <span className="font-[700] text-white">SIAP PERSI</span>
+                <span className="font-[700] text-white">NHR PERSI</span>
               </div>
               <p className="text-sm text-gray-400 mb-4 leading-relaxed">
                 Perhimpunan Rumah Sakit Seluruh Indonesia. Platform penilaian
@@ -285,7 +285,7 @@ export function Root() {
                     to="/siap-persi/overview"
                     className="hover:text-white transition-colors"
                   >
-                    SIAP PERSI Overview
+                    NHR PERSI Overview
                   </Link>
                 </li>
               </ul>
