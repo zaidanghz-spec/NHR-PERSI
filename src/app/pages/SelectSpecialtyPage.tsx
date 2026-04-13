@@ -426,18 +426,7 @@ function SpecialtyCard({
           </div>
         )}
 
-        {/* Start Single Assessment Button */}
-        <div className="mt-4">
-          <Button
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onStartSingleAssessment();
-            }}
-            className="w-full h-10 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold text-sm"
-          >
-            Mulai Assessment Spesialisasi Ini
-          </Button>
-        </div>
+
       </div>
     </button>
   );
