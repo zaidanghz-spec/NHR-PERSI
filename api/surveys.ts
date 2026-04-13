@@ -1,29 +1,31 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ensureTables } from "./_turso";
-import { randomUUID } from "crypto";
+import { ensureTables } from './_turso';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.status(200).end();
+export const config = { runtime: 'edge' };
 
-  const { hospitalCode, specialty } = req.query as {
-    hospitalCode: string;
-    specialty: string;
-  };
+export default async function handler(req: Request) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS' } });
+  }
+
+  const url = new URL(req.url);
+  const hospitalCode = url.searchParams.get('hospitalCode');
+  const specialty = url.searchParams.get('specialty');
+
+  if (!hospitalCode || !specialty) {
+    return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400 });
+  }
 
   try {
     const db = await ensureTables();
 
-    // GET — ambil semua survei
-    if (req.method === "GET") {
+    // GET
+    if (req.method === 'GET') {
       const rs = await db.execute({
-        sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? ORDER BY created_at DESC",
+        sql: 'SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? ORDER BY created_at DESC',
         args: [hospitalCode, specialty],
       });
-      return res.json({
-        surveys: rs.rows.map((r) => ({
+      return new Response(JSON.stringify({
+        surveys: rs.rows.map((r: any) => ({
           id: r.id,
           patientName: r.patient_name,
           medicalRecordNumber: r.patient_rm,
@@ -33,21 +35,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           answers: r.answers ? JSON.parse(r.answers as string) : {},
           timestamp: r.created_at,
         })),
-      });
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    // POST — simpan survei baru
-    if (req.method === "POST") {
-      const body = req.body;
-      const id = randomUUID();
+    // POST
+    if (req.method === 'POST') {
+      const body = await req.json();
+      const id = crypto.randomUUID();
 
-      // Cek duplikat berdasarkan RM
       const existing = await db.execute({
-        sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
-        args: [hospitalCode, specialty, body.medicalRecordNumber || ""],
+        sql: 'SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?',
+        args: [hospitalCode, specialty, body.medicalRecordNumber || ''],
       });
       if (existing.rows.length > 0) {
-        return res.status(409).json({ error: "Pasien sudah mengisi survei" });
+        return new Response(JSON.stringify({ error: 'Pasien sudah mengisi survei' }), { status: 409 });
       }
 
       await db.execute({
@@ -57,8 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           id,
           hospitalCode,
           specialty,
-          body.patientName || body.qName || "",
-          body.medicalRecordNumber || body.qRm || "",
+          body.patientName || body.qName || '',
+          body.medicalRecordNumber || body.qRm || '',
           body.premScore ?? 0,
           body.promScore ?? 0,
           body.overallScore ?? 0,
@@ -66,21 +67,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ],
       });
 
-      return res.json({ success: true, surveyId: id });
+      return new Response(JSON.stringify({ success: true, surveyId: id }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    // DELETE — reset semua survei untuk specialty tertentu
-    if (req.method === "DELETE") {
+    // DELETE
+    if (req.method === 'DELETE') {
       await db.execute({
-        sql: "DELETE FROM surveys WHERE hospital_code = ? AND specialty = ?",
+        sql: 'DELETE FROM surveys WHERE hospital_code = ? AND specialty = ?',
         args: [hospitalCode, specialty],
       });
-      return res.json({ success: true });
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    return res.status(405).json({ error: "Method not allowed" });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   } catch (err: any) {
-    console.error("surveys API error:", err);
-    return res.status(500).json({ error: err.message || "Internal server error" });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }

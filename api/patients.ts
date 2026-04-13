@@ -1,29 +1,28 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ensureTables } from "./_turso";
-import { randomUUID } from "crypto";
+import { ensureTables } from './_turso';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.status(200).end();
+export const config = { runtime: 'edge' };
 
-  const { hospitalCode, specialty, patientId } = req.query as {
-    hospitalCode: string;
-    specialty: string;
-    patientId?: string;
-  };
+export default async function handler(req: Request) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS' } });
+  }
+
+  const url = new URL(req.url);
+  const hospitalCode = url.searchParams.get('hospitalCode');
+  const specialty = url.searchParams.get('specialty');
+  const patientId = url.searchParams.get('patientId');
 
   try {
     const db = await ensureTables();
 
-    if (req.method === "GET") {
+    // GET
+    if (req.method === 'GET') {
       const rs = await db.execute({
-        sql: "SELECT * FROM patients WHERE hospital_code = ? AND specialty = ? ORDER BY created_at ASC",
+        sql: 'SELECT * FROM patients WHERE hospital_code = ? AND specialty = ? ORDER BY created_at ASC',
         args: [hospitalCode, specialty],
       });
-      return res.json({
-        patients: rs.rows.map((r) => ({
+      return new Response(JSON.stringify({
+        patients: rs.rows.map((r: any) => ({
           id: r.id,
           name: r.name,
           rm: r.rm,
@@ -31,39 +30,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           hospitalCode,
           createdAt: r.created_at,
         })),
-      });
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (req.method === "POST") {
-      const body = req.body;
-      const id = randomUUID();
+    // POST
+    if (req.method === 'POST') {
+      const body = await req.json();
+      const id = crypto.randomUUID();
 
       const existing = await db.execute({
-        sql: "SELECT id FROM patients WHERE hospital_code = ? AND specialty = ? AND rm = ?",
-        args: [hospitalCode, specialty, body.rm || ""],
+        sql: 'SELECT id FROM patients WHERE hospital_code = ? AND specialty = ? AND rm = ?',
+        args: [hospitalCode, specialty, body.rm || ''],
       });
       if (existing.rows.length > 0) {
-        return res.status(409).json({ error: "Pasien dengan RM ini sudah terdaftar" });
+        return new Response(JSON.stringify({ error: 'Pasien sudah terdaftar' }), { status: 409 });
       }
 
       await db.execute({
-        sql: "INSERT INTO patients (id, hospital_code, specialty, name, rm) VALUES (?, ?, ?, ?, ?)",
+        sql: 'INSERT INTO patients (id, hospital_code, specialty, name, rm) VALUES (?, ?, ?, ?, ?)',
         args: [id, hospitalCode, specialty, body.name, body.rm],
       });
-      return res.json({ success: true, patient: { id, name: body.name, rm: body.rm } });
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (req.method === "DELETE" && patientId) {
+    // DELETE
+    if (req.method === 'DELETE' && patientId) {
       await db.execute({
-        sql: "DELETE FROM patients WHERE id = ? AND hospital_code = ?",
+        sql: 'DELETE FROM patients WHERE id = ? AND hospital_code = ?',
         args: [patientId, hospitalCode],
       });
-      return res.json({ success: true });
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    return res.status(405).json({ error: "Method not allowed" });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   } catch (err: any) {
-    console.error("patients API error:", err);
-    return res.status(500).json({ error: err.message || "Internal server error" });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }

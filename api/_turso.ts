@@ -1,9 +1,11 @@
-import { createClient } from "@libsql/client";
+import { createClient } from "@libsql/client/web";
 
 export function getTurso() {
   const url = process.env.TURSO_DATABASE_URL;
   const authToken = process.env.TURSO_AUTH_TOKEN;
+  
   if (!url) throw new Error("TURSO_DATABASE_URL not set");
+  
   return createClient({ url, authToken });
 }
 
