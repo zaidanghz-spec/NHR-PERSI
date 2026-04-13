@@ -191,6 +191,10 @@ export function PatientReportPage() {
 
     try {
       const result = await api.registerPatient(hospitalCode, diseaseSpecialtyKey, newPatient);
+      if (!result.success && result.error) {
+        setRegisterError(result.error);
+        return;
+      }
       if (result.duplicate) {
         setRegisterError("Nomor rekam medis sudah terdaftar.");
         return;

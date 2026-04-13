@@ -164,10 +164,10 @@ export async function registerPatient(
   hospitalCode: string,
   specialty: string,
   patient: any
-): Promise<{ success: boolean; duplicate?: boolean; patient?: any }> {
+): Promise<{ success: boolean; duplicate?: boolean; patient?: any; error?: string }> {
   await initTursoTables();
   const db = getTurso();
-  if (!db) return { success: false };
+  if (!db) return { success: false, error: "Token Turso (VITE_TURSO_DATABASE_URL / VITE_TURSO_AUTH_TOKEN) belum terbaca. Pastikan sudah diubah dan Anda sudah mengeklik REDEPLOY di Vercel." };
 
   try {
     const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
