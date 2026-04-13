@@ -20,7 +20,10 @@ function getTurso() {
 }
 
 // Inisialisasi Tabel secara otomatis (hanya dari sisi Admin saat pertama kali memuat halaman)
+let tablesInitialized = false;
+
 export async function initTursoTables() {
+  if (tablesInitialized) return;
   const db = getTurso();
   if (!db) return;
 
@@ -61,6 +64,7 @@ export async function initTursoTables() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
     );
+    tablesInitialized = true;
   } catch (err) {
     console.warn("Failed to init Turso tables:", err);
   }
@@ -73,6 +77,7 @@ export async function submitSurvey(
   specialty: string,
   survey: any
 ): Promise<{ success: boolean; surveyId?: string; duplicate?: boolean }> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) {
     console.error("Turso not configured");
@@ -117,6 +122,7 @@ export async function submitSurvey(
 }
 
 export async function getSurveys(hospitalCode: string, specialty: string): Promise<any[]> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) return [];
 
@@ -143,6 +149,7 @@ export async function getSurveys(hospitalCode: string, specialty: string): Promi
 }
 
 export async function resetSurveys(hospitalCode: string, specialty: string): Promise<void> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) return;
   await db.execute({
@@ -158,6 +165,7 @@ export async function registerPatient(
   specialty: string,
   patient: any
 ): Promise<{ success: boolean; duplicate?: boolean; patient?: any }> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) return { success: false };
 
@@ -187,6 +195,7 @@ export async function registerPatient(
 }
 
 export async function getPatients(hospitalCode: string, specialty: string): Promise<any[]> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) return [];
 
@@ -210,6 +219,7 @@ export async function getPatients(hospitalCode: string, specialty: string): Prom
 }
 
 export async function removePatient(hospitalCode: string, specialty: string, patientId: string): Promise<void> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) return;
 
@@ -227,6 +237,7 @@ export async function saveDraft(
   specialty: string,
   draft: any
 ): Promise<void> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) return;
 
@@ -260,6 +271,7 @@ export async function getDraft(
   hospitalCode: string,
   specialty: string
 ): Promise<any | null> {
+  await initTursoTables();
   const db = getTurso();
   if (!db) return null;
 
