@@ -1,54 +1,49 @@
-import { ensureTables } from './_turso';
+import { ensureTables } from './_turso.js';
 
-export const config = { runtime: 'edge' };
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-export default async function handler(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS' } });
-  }
-
-  const url = new URL(req.url);
-  const hospitalCode = url.searchParams.get('hospitalCode');
-  const specialty = url.searchParams.get('specialty');
+  const { hospitalCode, specialty } = req.query;
 
   if (!hospitalCode || !specialty) {
-    return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400 });
+    return res.status(400).json({ error: 'Missing parameters' });
   }
 
   try {
     const db = await ensureTables();
 
-    // GET
     if (req.method === 'GET') {
       const rs = await db.execute({
         sql: 'SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? ORDER BY created_at DESC',
         args: [hospitalCode, specialty],
       });
-      return new Response(JSON.stringify({
-        surveys: rs.rows.map((r: any) => ({
+      return res.status(200).json({
+        surveys: rs.rows.map(r => ({
           id: r.id,
           patientName: r.patient_name,
           medicalRecordNumber: r.patient_rm,
           premScore: r.prem_score,
           promScore: r.prom_score,
           overallScore: r.overall_score,
-          answers: r.answers ? JSON.parse(r.answers as string) : {},
+          answers: r.answers ? JSON.parse(r.answers) : {},
           timestamp: r.created_at,
         })),
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      });
     }
 
-    // POST
     if (req.method === 'POST') {
-      const body = await req.json();
+      const body = req.body || {};
       const id = crypto.randomUUID();
 
       const existing = await db.execute({
         sql: 'SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?',
         args: [hospitalCode, specialty, body.medicalRecordNumber || ''],
       });
+      
       if (existing.rows.length > 0) {
-        return new Response(JSON.stringify({ error: 'Pasien sudah mengisi survei' }), { status: 409 });
+        return res.status(409).json({ error: 'Pasien sudah mengisi survei' });
       }
 
       await db.execute({
@@ -67,20 +62,19 @@ export default async function handler(req: Request) {
         ],
       });
 
-      return new Response(JSON.stringify({ success: true, surveyId: id }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return res.status(200).json({ success: true, surveyId: id });
     }
 
-    // DELETE
     if (req.method === 'DELETE') {
       await db.execute({
         sql: 'DELETE FROM surveys WHERE hospital_code = ? AND specialty = ?',
         args: [hospitalCode, specialty],
       });
-      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return res.status(200).json({ success: true });
     }
 
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 }
