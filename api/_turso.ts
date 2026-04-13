@@ -9,19 +9,23 @@ export function getTurso() {
 
 export async function ensureTables() {
   const db = getTurso();
-  await db.batch([
+
+  await db.execute(
     `CREATE TABLE IF NOT EXISTS surveys (
       id TEXT PRIMARY KEY,
       hospital_code TEXT NOT NULL,
       specialty TEXT NOT NULL,
-      patient_name TEXT,
-      patient_rm TEXT,
+      patient_name TEXT DEFAULT '',
+      patient_rm TEXT DEFAULT '',
       prem_score REAL DEFAULT 0,
       prom_score REAL DEFAULT 0,
       overall_score REAL DEFAULT 0,
-      answers TEXT,
+      answers TEXT DEFAULT '{}',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
+    )`
+  );
+
+  await db.execute(
     `CREATE TABLE IF NOT EXISTS patients (
       id TEXT PRIMARY KEY,
       hospital_code TEXT NOT NULL,
@@ -29,15 +33,19 @@ export async function ensureTables() {
       name TEXT NOT NULL,
       rm TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
+    )`
+  );
+
+  await db.execute(
     `CREATE TABLE IF NOT EXISTS drafts (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
       hospital_code TEXT NOT NULL,
       specialty TEXT NOT NULL,
-      data TEXT,
+      data TEXT DEFAULT '{}',
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-  ], "write");
+    )`
+  );
+
   return db;
 }
