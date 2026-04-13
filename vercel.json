@@ -1,0 +1,10 @@
+{
+  "rewrites": [
+    { "source": "/api/surveys/:hospitalCode/:specialty", "destination": "/api/surveys?hospitalCode=:hospitalCode&specialty=:specialty" },
+    { "source": "/api/surveys-bulk/:hospitalCode/:specialty", "destination": "/api/surveys?hospitalCode=:hospitalCode&specialty=:specialty" },
+    { "source": "/api/patients/:hospitalCode/:specialty/:patientId", "destination": "/api/patients?hospitalCode=:hospitalCode&specialty=:specialty&patientId=:patientId" },
+    { "source": "/api/patients/:hospitalCode/:specialty", "destination": "/api/patients?hospitalCode=:hospitalCode&specialty=:specialty" },
+    { "source": "/api/drafts/:type/:hospitalCode/:specialty", "destination": "/api/drafts?type=:type&hospitalCode=:hospitalCode&specialty=:specialty" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

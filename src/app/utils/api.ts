@@ -1,21 +1,18 @@
-// Use environment variables for Netlify deployment, with fallback values for Figma Make dev
-const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "duwultxmuxqmdtkwcqqu";
-const publicAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1d3VsdHhtdXhxbWR0a3djcXF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNzcyNzMsImV4cCI6MjA4ODg1MzI3M30.dMDnvoGJwF5RH5kGqgxFQaK7RIyOSYD_W2wamDf4gQI";
-
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-5e1d66c4`;
+// API client — calls Vercel Serverless Functions backed by Turso
+// Base URL adalah path relatif, artinya akan otomatis ke domain yang sama (prod maupun dev proxy)
+const BASE = "";
 
 async function request(path: string, options: RequestInit = {}) {
-  const url = `${BASE_URL}${path}`;
+  const url = `${BASE}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${publicAnonKey}`,
       ...(options.headers || {}),
     },
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
     console.error(`API Error [${res.status}] ${path}:`, data);
@@ -33,12 +30,12 @@ export async function submitSurvey(
   survey: any
 ): Promise<{ success: boolean; surveyId?: string; duplicate?: boolean }> {
   try {
-    return await request(`/surveys/${hospitalCode}/${specialty}`, {
+    return await request(`/api/surveys/${hospitalCode}/${specialty}`, {
       method: "POST",
       body: JSON.stringify(survey),
     });
   } catch (err: any) {
-    if (err.message?.includes("sudah mengisi")) {
+    if (err.message?.includes("sudah mengisi") || err.message?.includes("409")) {
       return { success: false, duplicate: true };
     }
     throw err;
@@ -49,7 +46,7 @@ export async function getSurveys(
   hospitalCode: string,
   specialty: string
 ): Promise<any[]> {
-  const data = await request(`/surveys/${hospitalCode}/${specialty}`);
+  const data = await request(`/api/surveys/${hospitalCode}/${specialty}`);
   return data.surveys || [];
 }
 
@@ -57,7 +54,7 @@ export async function resetSurveys(
   hospitalCode: string,
   specialty: string
 ): Promise<void> {
-  await request(`/surveys/${hospitalCode}/${specialty}`, { method: "DELETE" });
+  await request(`/api/surveys/${hospitalCode}/${specialty}`, { method: "DELETE" });
 }
 
 export async function bulkAddSurveys(
@@ -65,10 +62,9 @@ export async function bulkAddSurveys(
   specialty: string,
   surveys: any[]
 ): Promise<void> {
-  await request(`/surveys-bulk/${hospitalCode}/${specialty}`, {
-    method: "POST",
-    body: JSON.stringify({ surveys }),
-  });
+  for (const s of surveys) {
+    await submitSurvey(hospitalCode, specialty, s).catch(() => {});
+  }
 }
 
 // ============ REGISTERED PATIENTS ============
@@ -77,14 +73,14 @@ export async function registerPatient(
   hospitalCode: string,
   specialty: string,
   patient: any
-): Promise<{ success: boolean; duplicate?: boolean }> {
+): Promise<{ success: boolean; duplicate?: boolean; patient?: any }> {
   try {
-    return await request(`/patients/${hospitalCode}/${specialty}`, {
+    return await request(`/api/patients/${hospitalCode}/${specialty}`, {
       method: "POST",
       body: JSON.stringify(patient),
     });
   } catch (err: any) {
-    if (err.message?.includes("sudah terdaftar")) {
+    if (err.message?.includes("sudah terdaftar") || err.message?.includes("409")) {
       return { success: false, duplicate: true };
     }
     throw err;
@@ -95,7 +91,7 @@ export async function getPatients(
   hospitalCode: string,
   specialty: string
 ): Promise<any[]> {
-  const data = await request(`/patients/${hospitalCode}/${specialty}`);
+  const data = await request(`/api/patients/${hospitalCode}/${specialty}`);
   return data.patients || [];
 }
 
@@ -104,7 +100,7 @@ export async function removePatient(
   specialty: string,
   patientId: string
 ): Promise<void> {
-  await request(`/patients/${hospitalCode}/${specialty}/${patientId}`, {
+  await request(`/api/patients/${hospitalCode}/${specialty}/${patientId}`, {
     method: "DELETE",
   });
 }
@@ -117,7 +113,7 @@ export async function saveDraft(
   specialty: string,
   draft: any
 ): Promise<void> {
-  await request(`/drafts/${type}/${hospitalCode}/${specialty}`, {
+  await request(`/api/drafts/${type}/${hospitalCode}/${specialty}`, {
     method: "POST",
     body: JSON.stringify(draft),
   });
@@ -128,6 +124,6 @@ export async function getDraft(
   hospitalCode: string,
   specialty: string
 ): Promise<any | null> {
-  const data = await request(`/drafts/${type}/${hospitalCode}/${specialty}`);
+  const data = await request(`/api/drafts/${type}/${hospitalCode}/${specialty}`);
   return data.draft || null;
 }
