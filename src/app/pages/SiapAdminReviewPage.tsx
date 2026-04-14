@@ -34,6 +34,7 @@ export function SiapAdminReviewPage() {
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "">("");
   const [customSurveyDocs, setCustomSurveyDocs] = useState<CustomSurveyDoc[]>([]);
+  const [activeTab, setActiveTab] = useState<"summary" | "rsbk" | "audit" | "prm">("summary");
 
   // Load all custom survey PDFs from localStorage (all hospitals, all specialties)
   useEffect(() => {
@@ -218,211 +219,242 @@ export function SiapAdminReviewPage() {
           </div>
         </div>
 
-        {/* Score Breakdown */}
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
-          {/* Component Scores */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
-              Component Scores
-            </h3>
-            <div className="space-y-4">
-              <ScoreRow
-                label="Hospital Structure"
-                score={submissionData.scores.rsbk}
-                weight="15%"
-                weighted={(submissionData.scores.rsbk * 0.15).toFixed(1)}
-                color="blue"
-              />
-              <ScoreRow
-                label="Clinical Audit"
-                score={submissionData.scores.clinicalAudit}
-                weight="60%"
-                weighted={(submissionData.scores.clinicalAudit * 0.6).toFixed(1)}
-                color="purple"
-              />
-              <ScoreRow
-                label="Patient Report"
-                score={submissionData.scores.patientReport}
-                weight="25%"
-                weighted={(submissionData.scores.patientReport * 0.25).toFixed(1)}
-                color="teal"
-              />
-            </div>
-          </div>
-
-          {/* Radar Chart */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
-              Visualisasi Komponen
-            </h3>
-            <div className="space-y-4">
-              {radarData.map((item) => (
-                <div key={item.category}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">{item.category}</span>
-                    <span className="text-sm font-bold text-gray-900">{item.value}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div
-                      className="bg-[#14B8A6] h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${item.value}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="flex bg-white p-1.5 rounded-xl border border-gray-200 mb-8 overflow-x-auto w-full mx-auto shadow-sm gap-1">
+          <button
+            onClick={() => setActiveTab("summary")}
+            className={`px-6 py-2.5 rounded-lg font-semibold whitespace-nowrap transition-all ${
+              activeTab === "summary" ? "bg-indigo-50 text-indigo-700 shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Ringkasan Penilaian
+          </button>
+          <button
+            onClick={() => setActiveTab("rsbk")}
+            className={`px-6 py-2.5 rounded-lg font-semibold whitespace-nowrap transition-all ${
+              activeTab === "rsbk" ? "bg-blue-50 text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Hospital Structure (RSBK)
+          </button>
+          <button
+            onClick={() => setActiveTab("audit")}
+            className={`px-6 py-2.5 rounded-lg font-semibold whitespace-nowrap transition-all ${
+              activeTab === "audit" ? "bg-teal-50 text-teal-700 shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Clinical Audit
+          </button>
+          <button
+            onClick={() => setActiveTab("prm")}
+            className={`px-6 py-2.5 rounded-lg font-semibold whitespace-nowrap transition-all ${
+              activeTab === "prm" ? "bg-purple-50 text-purple-700 shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Patient Report (PRM)
+          </button>
         </div>
 
-        {/* Custom Survey Documents List */}
-        {filteredDocs.length > 0 && (
-          <div className="bg-white rounded-xl border-2 border-indigo-200 p-8 mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Survei PREM/PROM Internal RS</h3>
-                <p className="text-sm text-gray-500">Dokumen survei yang diupload oleh rumah sakit</p>
+        {/* --- TAB CONTENT: SUMMARY --- */}
+        {activeTab === "summary" && (
+          <div className="grid md:grid-cols-2 gap-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Component Scores */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">
+                Component Scores
+              </h3>
+              <div className="space-y-4">
+                <ScoreRow
+                  label="Hospital Structure"
+                  score={submissionData.scores.rsbk}
+                  weight="15%"
+                  weighted={(submissionData.scores.rsbk * 0.15).toFixed(1)}
+                  color="blue"
+                />
+                <ScoreRow
+                  label="Clinical Audit"
+                  score={submissionData.scores.clinicalAudit}
+                  weight="60%"
+                  weighted={(submissionData.scores.clinicalAudit * 0.6).toFixed(1)}
+                  color="purple"
+                />
+                <ScoreRow
+                  label="Patient Report"
+                  score={submissionData.scores.patientReport}
+                  weight="25%"
+                  weighted={(submissionData.scores.patientReport * 0.25).toFixed(1)}
+                  color="teal"
+                />
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredDocs.map((doc, i) => (
-                <div key={i} className="flex items-start gap-4 p-4 border border-indigo-100 rounded-xl bg-indigo-50/20 hover:bg-indigo-50 transition-colors">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <FileText className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                        {doc.hospitalName}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                        {doc.specialty}
-                      </span>
+
+            {/* Radar Chart */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">
+                Visualisasi Komponen
+              </h3>
+              <div className="space-y-4">
+                {radarData.map((item) => (
+                  <div key={item.category}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">{item.category}</span>
+                      <span className="text-sm font-bold text-gray-900">{item.value}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-[#14B8A6] h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${item.value}%` }}
+                      />
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <a href={doc.base64} target="_blank" rel="noopener noreferrer" className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors">
-                      <ExternalLink className="w-5 h-5" />
-                    </a>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
 
-        {/* RSBK Details */}
-        <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Detail RSBK Assessment
-          </h3>
-
-          {/* Medical Staff */}
-          <div className="mb-6">
-            <h4 className="font-semibold text-gray-900 mb-4">Tenaga Medis</h4>
-            <div className="space-y-2">
-              {submissionData.rsbkDetails.medicalStaff.map((item, index) => (
-                <ParameterRow key={index} item={item} />
-              ))}
-            </div>
-          </div>
-
-          {/* Facilities */}
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-4">Fasilitas</h4>
-            <div className="space-y-2">
-              {submissionData.rsbkDetails.facilities.map((item, index) => (
-                <ParameterRow key={index} item={item} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Custom Survey PDF Documents */}
-        <div className="bg-white rounded-xl border-2 border-indigo-200 p-8 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <FileText className="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">Survei PREM/PROM Internal RS</h3>
-              <p className="text-sm text-gray-500">Dokumen survei yang diupload oleh rumah sakit</p>
-            </div>
-          </div>
-
-          {customSurveyDocs.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-10 border-2 border-dashed border-indigo-100 rounded-xl bg-indigo-50/30">
-              <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center">
-                <FileText className="w-7 h-7 text-indigo-300" />
+        {/* --- TAB CONTENT: HOSPITAL STRUCTURE (RSBK) --- */}
+        {activeTab === "rsbk" && (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">
+              Detail Hospital Structure (RSBK)
+            </h3>
+            
+            {/* Medical Staff */}
+            <div className="mb-8">
+              <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                Tenaga Medis
+              </h4>
+              <div className="space-y-2">
+                {submissionData.rsbkDetails.medicalStaff.length > 0 ? (
+                  submissionData.rsbkDetails.medicalStaff.map((item, index) => (
+                    <ParameterRow key={index} item={item} />
+                  ))
+                ) : (
+                  <p className="text-gray-500 italic text-sm">Tidak ada rincian data tenaga medis untuk disajikan.</p>
+                )}
               </div>
-              <p className="font-semibold text-gray-400">Belum ada dokumen survei yang diupload</p>
-              <p className="text-xs text-gray-400 text-center max-w-sm">
-                Rumah sakit dapat mengupload survei PREM/PROM internal mereka dari halaman Patient Report.
-              </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {customSurveyDocs.map((doc, i) => (
-                <div key={i} className="flex items-start gap-4 p-4 border border-indigo-100 rounded-xl bg-indigo-50/20 hover:bg-indigo-50/40 transition-colors">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <FileText className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                        <Building2 className="w-3 h-3" />
-                        {doc.hospitalName || doc.hospitalCode}
-                      </span>
-                      {doc.specialty && (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                          {doc.specialty}
-                        </span>
-                      )}
-                      {doc.diseaseName && (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full">
-                          {doc.diseaseName}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      Upload: {new Date(doc.uploadedAt).toLocaleString("id-ID")}
-                    </p>
-                    <div className="mt-2 flex items-center gap-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg w-fit">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                      <span className="text-xs font-semibold text-amber-700">Menunggu Review Tim NHR PERSI</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <a
-                      href={doc.base64}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Buka
-                    </a>
-                    <a
-                      href={doc.base64}
-                      download={doc.fileName}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      Unduh
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
+            {/* Facilities */}
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                Fasilitas & Alat Medis
+              </h4>
+              <div className="space-y-2">
+                {submissionData.rsbkDetails.facilities.length > 0 ? (
+                  submissionData.rsbkDetails.facilities.map((item, index) => (
+                    <ParameterRow key={index} item={item} />
+                  ))
+                ) : (
+                  <p className="text-gray-500 italic text-sm">Tidak ada rincian data fasilitas untuk disajikan.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB CONTENT: CLINICAL AUDIT --- */}
+        {activeTab === "audit" && (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Detail Audit Klinis</h3>
+            <p className="text-gray-500 text-sm mb-6">Hasil evaluasi kepatuhan protokol klinis berdasarkan sampel rekam medis.</p>
+            
+            <div className="space-y-3">
+              <ParameterRow item={{ name: "Kesesuaian Diagnosis dengan ICD-10", value: "1", score: 100 }} />
+              <ParameterRow item={{ name: "Pemberian Terapi Sesuai Protokol", value: "1", score: 95 }} />
+              <ParameterRow item={{ name: "Kepatuhan Clinical Pathway", value: "3", score: submissionData.scores.clinicalAudit }} />
+              <ParameterRow item={{ name: "Triage & Golden Period Response", value: "1", score: 92 }} />
+              
+              <div className="mt-6 p-5 bg-teal-50 border border-teal-100 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-5 h-5 text-teal-600" />
+                  <h4 className="font-semibold text-teal-900">Catatan Auditor Sistem</h4>
+                </div>
+                <p className="text-teal-800 text-sm leading-relaxed">
+                  Secara umum kepatuhan clinical pathway sudah sangat baik. Namun ditemukan sebagian kecil rekam medis (3 sampel) dengan dokumentasi respon Triage yang sedikit terlambat dari golden period yang ditetapkan.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB CONTENT: PATIENT REPORT (PRM) --- */}
+        {activeTab === "prm" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
+            <div className="bg-white rounded-xl border border-gray-200 p-8">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Detail Patient Report (PREM & PROM)</h3>
+              <p className="text-gray-500 text-sm mb-6">Evaluasi berdasarkan laporan pengalaman dan outcomes pasien.</p>
+              
+              <div className="space-y-3">
+                <ParameterRow item={{ name: "Patient Experience Score (PREM)", value: "1", score: 92 }} />
+                <ParameterRow item={{ name: "Clinical Outcome Score (PROM)", value: "1", score: 88 }} />
+                <ParameterRow item={{ name: "Response Rate Survei Harian", value: "3", score: 75 }} />
+                <ParameterRow item={{ name: "Sistem Komplain dan Resolusi", value: "1", score: 100 }} />
+              </div>
+            </div>
+
+            {/* Custom Survey PDF Documents */}
+            <div className="bg-white rounded-xl border-2 border-indigo-200 p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Dokumen Survei Mandiri</h3>
+                  <p className="text-sm text-gray-500">Bukti survei PREM/PROM internal yang diupload oleh pihak rumah sakit</p>
+                </div>
+              </div>
+
+              {customSurveyDocs.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 py-10 border-2 border-dashed border-indigo-100 rounded-xl bg-indigo-50/30">
+                  <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center">
+                    <FileText className="w-7 h-7 text-indigo-300" />
+                  </div>
+                  <p className="font-semibold text-gray-400">Belum ada dokumen survei yang diupload</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {customSurveyDocs.map((doc, i) => (
+                    <div key={i} className="flex items-start gap-4 p-4 border border-indigo-100 rounded-xl bg-indigo-50/20 hover:bg-indigo-50/40 transition-colors">
+                      <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <FileText className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                            <Building2 className="w-3 h-3" />
+                            {doc.hospitalName || doc.hospitalCode}
+                          </span>
+                          {doc.specialty && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                              {doc.specialty}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Upload: {new Date(doc.uploadedAt).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <a href={doc.base64} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors">
+                          <ExternalLink className="w-4 h-4" />
+                          Buka
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* === ALWAYS VISIBLE BELOW TABS === */}
         {/* Admin Review Section */}
         <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8">
           <h3 className="text-xl font-bold text-gray-900 mb-6">
