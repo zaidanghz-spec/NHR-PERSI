@@ -396,7 +396,7 @@ export function MethodologyPage() {
             </p>
             <ul className="list-disc pl-5 mb-4 space-y-2 text-gray-700 leading-relaxed">
               <li>Untuk <strong>Top 100 Nasional</strong>, akan dilakukan review, audit, dan validasi data secara menyeluruh oleh PERSI Pusat.</li>
-              <li>Untuk <strong>3 Rumah Sakit Terbaik</strong>, akan direview ulang dan melalui proses audit validasi langsung oleh PERSI Wilayah setempat.</li>
+              <li>Untuk <strong>3 Rumah Sakit Terbaik Per Provinsi</strong>, akan direview ulang dan melalui proses audit validasi langsung oleh PERSI Wilayah setempat.</li>
             </ul>
             <p className="leading-relaxed">
               <strong>Publikasi:</strong> Setelah data diverifikasi dan
