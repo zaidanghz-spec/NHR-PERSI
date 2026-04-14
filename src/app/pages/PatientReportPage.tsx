@@ -101,10 +101,10 @@ export function PatientReportPage() {
       return;
     }
 
-    const countStr = prompt("Berapa jumlah pasien yang disurvei dalam dokumen PDF ini?\n(Maksimal 30)", "30");
+    const countStr = prompt("Berapa jumlah pasien yang disurvei dalam dokumen PDF ini?\n(Kosongkan atau isi 0 jika tidak tahu/ingin menggunakan kombinasi dengan QR Code)", "0");
     if (countStr === null) return;
     const count = parseInt(countStr, 10);
-    if (isNaN(count) || count <= 0) {
+    if (isNaN(count) || count < 0) {
       alert("Jumlah pasien tidak valid.");
       return;
     }
@@ -214,27 +214,28 @@ export function PatientReportPage() {
   });
 
   // Calculate aggregated scores
-  const patientCount = customSurveyUploaded ? customSurveyPatientCount : surveyResponses.length;
+  const patientCount = surveyResponses.length + (customSurveyUploaded ? customSurveyPatientCount : 0);
   
   const avgPremScore = customSurveyUploaded
     ? 0 // Menunggu Review
-    : patientCount > 0
-      ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / patientCount)
+    : surveyResponses.length > 0
+      ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / surveyResponses.length)
       : 0;
       
   const avgPromScore = customSurveyUploaded
     ? 0 // Menunggu Review
-    : patientCount > 0
-      ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / patientCount)
+    : surveyResponses.length > 0
+      ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / surveyResponses.length)
       : 0;
       
   const overallScore = customSurveyUploaded
     ? 0 // Menunggu Review
-    : patientCount > 0
-      ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / patientCount)
+    : surveyResponses.length > 0
+      ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / surveyResponses.length)
       : 0;
 
   const progress = Math.min((patientCount / targetPatientCount) * 100, 100);
+  const isQRLocked = customSurveyUploaded && customSurveyPatientCount >= 30;
 
   // Build personalized survey URL with disease index
   const buildSurveyUrl = (patient: RegisteredPatient) => {
@@ -533,7 +534,7 @@ export function PatientReportPage() {
         </div>
 
         {/* ========== PATIENT REGISTRATION SECTION ========== */}
-        {!customSurveyUploaded ? (
+        {!isQRLocked ? (
           <div className="bg-white rounded-2xl border-2 border-[#0F4C81] p-6 md:p-8 mb-6">
             <div className="flex items-start justify-between gap-4 mb-6">
               <div className="flex items-start gap-4">
@@ -546,6 +547,9 @@ export function PatientReportPage() {
                   </h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
                     Isi data pasien (nama & no. RM), lalu generate QR code personal. Pasien scan QR untuk mengisi survei PREM & PROM khusus penyakit ini.
+                    {customSurveyUploaded && customSurveyPatientCount < 30 && (
+                      <span className="block mt-1 text-teal-600 font-semibold">Anda mengunggah PDF dengan {customSurveyPatientCount} pasien. Anda bisa menambah data lewat QR di sini hingga mencapai 30 pasien.</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -725,21 +729,21 @@ export function PatientReportPage() {
                 Survei Digital (QR Code) Dinonaktifkan
               </h3>
               <p className="text-gray-600 max-w-lg leading-relaxed">
-                Fitur pendaftaran dan QR Code dikunci secara otomatis karena Anda telah memilih untuk menggunakan opsi <strong>Upload Hasil Survei Internal (PDF)</strong> untuk penyakit ini.
+                Fitur pendaftaran otomatis dikunci karena Anda telah mengisi {customSurveyPatientCount} pasien via <strong>Upload PDF</strong> (Target 30 telah terpenuhi).
               </p>
               <Button 
                 onClick={handleRemoveFile}
                 variant="outline"
                 className="mt-5 border-gray-300 bg-white"
               >
-                Gunakan Survei Digital (Hapus PDF)
+                Hapus File PDF untuk Membuka QR Code
               </Button>
             </div>
           </div>
         )}
 
-        {/* Response Table */}
-        {customSurveyUploaded ? null : surveyResponses.length > 0 && (
+        {/* Response Table (always shown if there are QR code responses) */}
+        {surveyResponses.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-900">
