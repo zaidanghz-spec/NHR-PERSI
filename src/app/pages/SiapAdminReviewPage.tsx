@@ -57,35 +57,29 @@ export function SiapAdminReviewPage() {
 
   const { submissions, updateSubmissionStatus, publishRanking } = useData();
 
-  // Submission data will be loaded from server based on submission ID
+  // Submission data will be loaded from context
   const actualSubmission = submissions.find(s => s.id === id);
 
+  // Helper to map Indonesian name to technical key
+  const getSpecialtyKey = (name: string) => {
+    return Object.keys(specialtyAuditData).find(
+      key => specialtyAuditData[key].name === name
+    ) || "cardiology";
+  };
+
   const submissionData = actualSubmission ? {
-    id: actualSubmission.id,
-    hospitalName: actualSubmission.hospitalName,
-    specialty: actualSubmission.specialty,
-    submittedDate: actualSubmission.submittedDate,
-    picName: actualSubmission.picName,
-    scores: actualSubmission.scores,
-    status: actualSubmission.status,
-    rsbkDetails: { medicalStaff: [], facilities: [] }
+    ...actualSubmission,
+    specialtyKey: getSpecialtyKey(actualSubmission.specialty),
   } : {
     id: id || "—",
-    hospitalName: "Menunggu data dari server...",
+    hospitalName: "Memuat...",
     specialty: "—",
+    specialtyKey: "cardiology",
     submittedDate: "—",
     picName: "—",
     status: "Pending",
-    scores: {
-      rsbk: 0,
-      clinicalAudit: 0,
-      patientReport: 0,
-      final: 0,
-    },
-    rsbkDetails: {
-      medicalStaff: [] as { name: string; value: string; score: number }[],
-      facilities: [] as { name: string; value: string; score: number }[],
-    },
+    scores: { rsbk: 0, clinicalAudit: 0, patientReport: 0, final: 0 },
+    details: {}
   };
 
   const filteredDocs = customSurveyDocs.filter(d => 
@@ -330,10 +324,11 @@ export function SiapAdminReviewPage() {
                 </h4>
                 <div className="grid gap-3">
                   {(() => {
-                    const specKey = submissionData.specialty.toLowerCase();
-                    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                    const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                     const items = specData.rsbkItems.filter(i => i.category === "sdm");
                     const data = (submissionData as any).details?.rsbkData || {};
+                    
+                    if (Object.keys(data).length === 0) return <p className="text-amber-600 text-sm italic">Data detail input kuesioner tidak ditemukan untuk submission lama ini.</p>;
                     
                     return items.map(item => {
                       const val = data[item.id] || "0";
@@ -361,8 +356,7 @@ export function SiapAdminReviewPage() {
                 </h4>
                 <div className="grid gap-3">
                   {(() => {
-                    const specKey = submissionData.specialty.toLowerCase();
-                    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                    const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                     const items = specData.rsbkItems.filter(i => i.category === "sarana");
                     const data = (submissionData as any).details?.rsbkData || {};
                     
@@ -392,8 +386,7 @@ export function SiapAdminReviewPage() {
                 </h4>
                 <div className="grid gap-3">
                   {(() => {
-                    const specKey = submissionData.specialty.toLowerCase();
-                    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                    const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                     const items = specData.rsbkItems.filter(i => i.category === "alat");
                     const data = (submissionData as any).details?.rsbkData || {};
                     
@@ -426,10 +419,11 @@ export function SiapAdminReviewPage() {
             
             <div className="grid gap-3">
               {(() => {
-                const specKey = submissionData.specialty.toLowerCase();
-                const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                 const questions = specData.auditQuestions;
                 const data = (submissionData as any).details?.auditData || {};
+                
+                if (Object.keys(data).length === 0) return <p className="text-amber-600 text-sm italic">Data rincian audit klinis tidak tersedia.</p>;
                 
                 return questions.map(q => {
                   const val = data[q.id] || "0"; // val is "1" (yes) or "2" (no)
@@ -466,9 +460,10 @@ export function SiapAdminReviewPage() {
                   </h4>
                   <div className="grid gap-3">
                     {(() => {
-                      const specKey = submissionData.specialty.toLowerCase();
-                      const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                      const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                       const data = (submissionData as any).details?.prmData || {};
+                      
+                      if (Object.keys(data).length === 0) return <p className="text-amber-600 text-sm italic">Data survei PREM tidak tersedia.</p>;
                       
                       return specData.premQuestions.map(q => {
                         const val = data[q.id] || "0"; // score 0-5
@@ -496,9 +491,10 @@ export function SiapAdminReviewPage() {
                   </h4>
                   <div className="grid gap-3">
                     {(() => {
-                      const specKey = submissionData.specialty.toLowerCase();
-                      const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                      const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                       const data = (submissionData as any).details?.prmData || {};
+                      
+                      if (Object.keys(data).length === 0) return <p className="text-amber-600 text-sm italic">Data survei PROM tidak tersedia.</p>;
                       
                       return specData.promQuestions.map(q => {
                         const val = data[q.id] || "0";
