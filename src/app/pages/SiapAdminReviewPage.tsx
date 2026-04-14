@@ -317,8 +317,8 @@ export function SiapAdminReviewPage() {
         {/* --- TAB CONTENT: HOSPITAL STRUCTURE (RSBK) --- */}
         {activeTab === "rsbk" && (
           <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 font-black uppercase tracking-tight">
-              Detail Hospital Structure (RSBK)
+            <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight">
+              Hospital Structure Detail (RSBK)
             </h3>
             
             <div className="space-y-8">
@@ -332,10 +332,10 @@ export function SiapAdminReviewPage() {
                   {(() => {
                     const specKey = submissionData.specialty.toLowerCase();
                     const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
-                    const sdmItems = specData.rsbkItems.filter(i => i.category === "sdm");
+                    const items = specData.rsbkItems.filter(i => i.category === "sdm");
                     const data = (submissionData as any).details?.rsbkData || {};
                     
-                    return sdmItems.map(item => {
+                    return items.map(item => {
                       const val = data[item.id] || "0";
                       return (
                         <ParameterRow 
@@ -353,20 +353,51 @@ export function SiapAdminReviewPage() {
                 </div>
               </div>
 
-              {/* Sarana Prasarana & Alat */}
+              {/* Sarana Prasarana */}
               <div>
                 <h4 className="font-extrabold text-[#14B8A6] mb-5 flex items-center gap-3 text-lg">
                   <div className="w-3 h-3 rounded-full bg-teal-500 shadow-lg shadow-teal-200"></div>
-                  Sarana, Prasarana & Alat Medis
+                  Sarana & Prasarana
                 </h4>
                 <div className="grid gap-3">
                   {(() => {
                     const specKey = submissionData.specialty.toLowerCase();
                     const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
-                    const sarprasItems = specData.rsbkItems.filter(i => i.category !== "sdm");
+                    const items = specData.rsbkItems.filter(i => i.category === "sarana");
                     const data = (submissionData as any).details?.rsbkData || {};
                     
-                    return sarprasItems.map(item => {
+                    return items.map(item => {
+                      const val = data[item.id] || "0";
+                      return (
+                        <ParameterRow 
+                          key={item.id} 
+                          item={{
+                            name: item.name,
+                            value: "1",
+                            score: parseInt(val) * item.pointPerUnit,
+                            detail: `${val} ${item.inputUnit || "ruangan"}`
+                          }} 
+                        />
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Alat Medis */}
+              <div>
+                <h4 className="font-extrabold text-purple-600 mb-5 flex items-center gap-3 text-lg">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 shadow-lg shadow-purple-200"></div>
+                  Alat Medis
+                </h4>
+                <div className="grid gap-3">
+                  {(() => {
+                    const specKey = submissionData.specialty.toLowerCase();
+                    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                    const items = specData.rsbkItems.filter(i => i.category === "alat");
+                    const data = (submissionData as any).details?.rsbkData || {};
+                    
+                    return items.map(item => {
                       const val = data[item.id] || "0";
                       return (
                         <ParameterRow 
@@ -423,37 +454,69 @@ export function SiapAdminReviewPage() {
         {activeTab === "prm" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
             <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
-              <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Detail Patient Report (PRM)</h3>
-              <p className="text-gray-500 text-sm mb-6 font-medium">Evaluasi berdasarkan instrumen laporan survei PREM & PROM.</p>
+              <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Patient Reported Measures (PREM & PROM)</h3>
+              <p className="text-gray-500 text-sm mb-8 font-medium">Laporan feedback kuesioner pengalaman dan hasil klinis pasien.</p>
               
-              <div className="grid gap-4">
-                {(() => {
-                  const specKey = submissionData.specialty.toLowerCase();
-                  const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
-                  const data = (submissionData as any).details?.prmData || {};
-                  
-                  // Calculate average or show status
-                  return (
-                    <>
-                      <ParameterRow 
-                        item={{ 
-                          name: "PREM Overview (Patient Experience)", 
-                          value: "1", 
-                          score: parseInt(submissionData.scores.patientReport.toString()), 
-                          detail: "Berdasarkan Pengalaman Pasien" 
-                        }} 
-                      />
-                      <ParameterRow 
-                        item={{ 
-                          name: "PROM Overview (Patient Outcome)", 
-                          value: "1", 
-                          score: parseInt(submissionData.scores.patientReport.toString()), 
-                          detail: "Berdasarkan Hasil Klinis Mandiri" 
-                        }} 
-                      />
-                    </>
-                  );
-                })()}
+              <div className="space-y-10">
+                {/* PREM Section */}
+                <div>
+                  <h4 className="font-extrabold text-blue-600 mb-5 flex items-center gap-2 text-lg">
+                    <CheckCircle2 className="w-5 h-5" />
+                    Patient Experience (PREM)
+                  </h4>
+                  <div className="grid gap-3">
+                    {(() => {
+                      const specKey = submissionData.specialty.toLowerCase();
+                      const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                      const data = (submissionData as any).details?.prmData || {};
+                      
+                      return specData.premQuestions.map(q => {
+                        const val = data[q.id] || "0"; // score 0-5
+                        return (
+                          <ParameterRow 
+                            key={q.id} 
+                            item={{
+                              name: q.question,
+                              value: "1",
+                              score: parseInt(val) * 20, // Normalize to 100
+                              detail: `Skor Pasien: ${val}/5`
+                            }} 
+                          />
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* PROM Section */}
+                <div>
+                  <h4 className="font-extrabold text-emerald-600 mb-5 flex items-center gap-2 text-lg">
+                    <CheckCircle2 className="w-5 h-5" />
+                    Patient Outcome (PROM)
+                  </h4>
+                  <div className="grid gap-3">
+                    {(() => {
+                      const specKey = submissionData.specialty.toLowerCase();
+                      const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                      const data = (submissionData as any).details?.prmData || {};
+                      
+                      return specData.promQuestions.map(q => {
+                        const val = data[q.id] || "0";
+                        return (
+                          <ParameterRow 
+                            key={q.id} 
+                            item={{
+                              name: q.question,
+                              value: "1",
+                              score: parseInt(val) * 20, // Normalize to 100
+                              detail: `Hasil Klinis: ${val}/5`
+                            }} 
+                          />
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
               </div>
             </div>
 
