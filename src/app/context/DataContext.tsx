@@ -118,7 +118,7 @@ const defaultNews: NewsItem[] = [
     id: "news-3",
     title: "Clinical Audit: Standar Baru Evaluasi Mutu Layanan Spesialistik RS",
     excerpt: "Metode clinical audit berbasis 30 rekam medis menjadi standar baru dalam menilai kepatuhan protokol klinis rumah sakit di Indonesia.",
-    content: "PERSI memperkenalkan metode clinical audit sebagai komponen utama dalam sistem penilaian NHR PERSI. Metode ini menggunakan sampel 30 rekam medis per spesialisasi untuk mengevaluasi kepatuhan rumah sakit terhadap protokol klinis yang telah ditetapkan.",
+    content: "PERSI memperkenalkan metode clinical audit sebagai komponen utama dalam sistem penilaian NHR PERSI. Metode ini menggunakan sampel 30 rekam medis per pelayanan untuk mengevaluasi kepatuhan rumah sakit terhadap protokol klinis yang telah ditetapkan.",
     category: "publikasi",
     imageUrl: "https://images.unsplash.com/photo-1758691462743-f9fc9e430d39?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3NwaXRhbCUyMGRvY3RvcnMlMjBtZWV0aW5nJTIwcHJvZmVzc2lvbmFsfGVufDF8fHx8MTc3MzM2NjU2MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     author: "Dr. Andi Wijaya, MPH",

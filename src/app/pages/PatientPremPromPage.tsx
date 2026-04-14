@@ -154,7 +154,7 @@ export function PatientPremPromPage() {
               <li>Nama pasien</li>
               <li>Nomor rekam medis</li>
               <li>Kode rumah sakit</li>
-              <li>Spesialisasi</li>
+              <li>Pelayanan</li>
             </ul>
           </div>
         </div>
@@ -237,7 +237,7 @@ export function PatientPremPromPage() {
             <div className="mt-4 flex items-center gap-3 p-3 bg-[#0F4C81]/5 rounded-lg border border-[#0F4C81]/10">
               <Heart className="w-4 h-4 text-[#0F4C81]" />
               <div>
-                <span className="font-medium text-gray-900 text-sm">Spesialisasi: {specData.name}</span>
+                <span className="font-medium text-gray-900 text-sm">Pelayanan: {specData.name}</span>
                 {diseaseName && <span className="text-xs text-gray-500 ml-2">Penyakit: {diseaseName}</span>}
               </div>
             </div>

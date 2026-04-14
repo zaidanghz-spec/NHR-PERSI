@@ -74,7 +74,7 @@ export function RankingListPage() {
                   onChange={(e) => setSpecialtyFilter(e.target.value)}
                   className="h-10 px-4 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white"
                 >
-                  <option value="all">Semua Spesialisasi</option>
+                  <option value="all">Semua Pelayanan</option>
                   {specialties.map((s) => (
                     <option key={s} value={s}>
                       {s}
@@ -116,7 +116,7 @@ export function RankingListPage() {
                       Rumah Sakit
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-[600] text-gray-500 uppercase tracking-wider">
-                      Spesialisasi
+                      Pelayanan
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-[600] text-gray-500 uppercase tracking-wider">
                       RSBK

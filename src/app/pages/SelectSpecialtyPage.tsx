@@ -55,7 +55,7 @@ export function SelectSpecialtyPage() {
 
   const handleStartAssessment = () => {
     if (selectedSpecialties.length === 0) {
-      alert("Pilih minimal 1 spesialisasi untuk memulai assessment");
+      alert("Pilih minimal 1 pelayanan untuk memulai assessment");
       return;
     }
 
@@ -217,10 +217,10 @@ export function SelectSpecialtyPage() {
             ← Kembali ke Overview
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Pilih Spesialisasi
+            Pilih Pelayanan
           </h1>
           <p className="text-gray-600 text-lg">
-            Pilih satu atau lebih spesialisasi yang akan dinilai untuk NHR PERSI Assessment
+            Pilih satu atau lebih pelayanan yang akan dinilai untuk NHR PERSI Assessment
           </p>
         </div>
 
@@ -284,10 +284,10 @@ export function SelectSpecialtyPage() {
                     Feature Highlight
                   </div>
                   <h3 className="font-black text-white mb-3 text-3xl tracking-tight">
-                    Sistem Multi-Spesialisasi Paralel
+                    Sistem Multi-Pelayanan Paralel
                   </h3>
                   <p className="text-white/80 leading-relaxed max-w-2xl text-lg font-medium">
-                    Efisiensi tanpa batas. Pilih beberapa spesialisasi sekaligus dan selesaikan seluruh assessment dalam satu alur kerja yang terintegrasi secara otomatis.
+                    Efisiensi tanpa batas. Pilih beberapa pelayanan sekaligus dan selesaikan seluruh assessment dalam satu alur kerja yang terintegrasi secara otomatis.
                   </p>
                 </div>
                 <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 border border-white/10">
@@ -319,7 +319,7 @@ export function SelectSpecialtyPage() {
                     </div>
                     <div className="flex-1">
                       <p className="font-extrabold text-white text-base md:text-lg">
-                        {selectedSpecialties.length} Spesialisasi Siap Dinilai
+                        {selectedSpecialties.length} Pelayanan Siap Dinilai
                       </p>
                       <p className="text-white/70 text-xs md:text-sm font-medium line-clamp-1">
                         {selectedSpecialties.map(id => 
@@ -357,7 +357,7 @@ export function SelectSpecialtyPage() {
               {selectedSpecialties.length === 0 && (
                 <div className="inline-flex items-center gap-3 py-3 px-6 bg-white border border-gray-100 rounded-full shadow-sm text-gray-500 text-sm font-medium">
                   <Layout className="w-4 h-4 text-[#0F4C81]" />
-                  Pilih spesialisasi di atas untuk memulai perjalanan assessment Anda
+                  Pilih pelayanan di atas untuk memulai perjalanan assessment Anda
                 </div>
               )}
             </div>
@@ -582,7 +582,7 @@ function DraftCard({
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           {/* Specialties List */}
           <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Spesialisasi</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Pelayanan</p>
             <div className="flex flex-wrap gap-3">
               {draft.selectedSpecialties.map((spec) => (
                 <div

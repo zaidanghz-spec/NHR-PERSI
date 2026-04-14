@@ -179,7 +179,7 @@ export function MethodologyPage() {
             <p className="text-gray-700 mb-4 leading-relaxed">
               Pilar ini mengevaluasi kepatuhan rumah sakit terhadap protokol
               klinis yang telah ditetapkan. Penilaian menggunakan metode audit
-              30 rekam medis per spesialisasi untuk mengukur presisi diagnosa
+              30 rekam medis per pelayanan untuk mengukur presisi diagnosa
               dan tatalaksana.
             </p>
 
@@ -189,7 +189,7 @@ export function MethodologyPage() {
               </h4>
               <ul className="space-y-2">
                 {[
-                  "Kepatuhan terhadap protokol klinis per spesialisasi",
+                  "Kepatuhan terhadap protokol klinis per pelayanan",
                   "Kesesuaian diagnosa dengan standar (misal: Door-to-Balloon untuk STEMI)",
                   "Ketepatan tatalaksana berdasarkan evidence-based medicine",
                   "Dokumentasi rekam medis yang lengkap dan akurat",
@@ -212,7 +212,7 @@ export function MethodologyPage() {
                 <Info className="w-4 h-4 text-[#0D9488] mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-gray-700">
                   <strong>Metode:</strong> Review 30 rekam medis per
-                  spesialisasi. Setiap rekam medis dinilai berdasarkan apakah indikator
+                  pelayanan. Setiap rekam medis dinilai berdasarkan apakah indikator
                   dilaksanakan dengan 3 pilihan: &quot;Sesuai&quot;, &quot;Tidak Sesuai namun Sesuai dengan Pengecualian Klinis&quot;,
                   atau &quot;Tidak Sesuai&quot;. Data
                   dimasukkan secara anonim.
@@ -277,7 +277,7 @@ export function MethodologyPage() {
                   <strong>Metode:</strong> Survei menggunakan skala Likert yang
                   diberikan kepada pasien atau keluarga. RS mengunggah hasil
                   survei melalui portal NHR PERSI. Minimum 30 responden per
-                  spesialisasi.
+                  pelayanan.
                 </p>
               </div>
             </div>
@@ -336,16 +336,16 @@ export function MethodologyPage() {
           </div>
         </div>
 
-        {/* Spesialisasi */}
+        {/* Pelayanan */}
         <div className="bg-white rounded-xl border border-gray-200 p-8 mt-8">
           <div className="flex items-start gap-3 mb-6">
             <Target className="w-6 h-6 text-[#0D9488] mt-0.5" />
             <h2 className="text-2xl font-[700] text-gray-900">
-              Spesialisasi yang Dinilai
+              Pelayanan yang Dinilai
             </h2>
           </div>
           <p className="text-gray-700 mb-6 leading-relaxed">
-            Pada fase awal, NHR PERSI menilai tiga spesialisasi utama:
+            Pada fase awal, NHR PERSI menilai tiga pelayanan utama:
           </p>
           <div className="grid md:grid-cols-3 gap-4">
             <div className="bg-red-50 rounded-lg p-5 border border-red-100">

@@ -58,12 +58,12 @@ export function SpecialtyProgressTracker({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-gray-900">
-            Progress Multi-Spesialisasi
+            Progress Multi-Pelayanan
           </h3>
           <p className="text-sm text-gray-600">
             {selectedSpecialties.length > 1
-              ? `Spesialisasi ${currentIndex + 1} dari ${selectedSpecialties.length}`
-              : "1 spesialisasi dipilih"}
+              ? `Pelayanan ${currentIndex + 1} dari ${selectedSpecialties.length}`
+              : "1 pelayanan dipilih"}
           </p>
         </div>
         {selectedSpecialties.length > 1 && (
@@ -141,7 +141,7 @@ export function SpecialtyProgressTracker({
           {stageLabels[currentStage]}
           {selectedSpecialties.length > 1 && (
             <span className="text-gray-500 ml-2">
-              (Klik spesialisasi lain untuk pindah)
+              (Klik pelayanan lain untuk pindah)
             </span>
           )}
         </p>

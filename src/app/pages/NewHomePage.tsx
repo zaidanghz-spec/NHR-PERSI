@@ -86,7 +86,7 @@ export function NewHomePage() {
                 <span className="text-[#0D9488]">Berdasarkan Data Objektif.</span>
               </h1>
               <p className="text-lg text-white/80 mb-8 leading-relaxed max-w-xl">
-                Transparansi kualitas rumah sakit di Indonesia untuk spesialisasi
+                Transparansi kualitas rumah sakit di Indonesia untuk pelayanan
                 Jantung, Syaraf, dan Kanker. Standar yang diakui, hasil yang
                 terverifikasi.
               </p>
@@ -174,7 +174,7 @@ export function NewHomePage() {
             icon={<FileText className="w-7 h-7" />}
             title="Clinical Audit"
             subtitle="Audit Klinis"
-            description="Evaluasi kepatuhan terhadap protokol klinis melalui review 30 rekam medis per spesialisasi."
+            description="Evaluasi kepatuhan terhadap protokol klinis melalui review 30 rekam medis per pelayanan."
             weight="60%"
             color="bg-[#0D9488]"
           />
@@ -220,7 +220,7 @@ export function NewHomePage() {
                     Rumah Sakit
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-[600] text-gray-500 uppercase">
-                    Spesialisasi
+                    Pelayanan
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-[600] text-gray-500 uppercase">
                     Skor
@@ -586,7 +586,7 @@ export function NewHomePage() {
           <StepCard
             number={2}
             title="Isi Assessment"
-            description="Lengkapi data RSBK, Clinical Audit, dan Patient Report per spesialisasi"
+            description="Lengkapi data RSBK, Clinical Audit, dan Patient Report per pelayanan"
             icon={<FileText className="w-6 h-6" />}
           />
           <StepCard

@@ -152,7 +152,7 @@ export function SiapPersiOverviewPage() {
               <h3 className="font-bold text-gray-900 mb-4">Status Penilaian</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Spesialisasi</span>
+                  <span className="text-gray-600">Pelayanan</span>
                   <span className="font-semibold text-gray-900">
                     {assessmentData.specialty}
                   </span>

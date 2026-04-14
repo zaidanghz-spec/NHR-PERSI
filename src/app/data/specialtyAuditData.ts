@@ -45,41 +45,74 @@ export interface SpecialtyData {
 
 // ============ KARDIOLOGI ============
 const cardiologyRsbkItems: RsbkItem[] = [
-  // SDM - DPJP Inti (Total Target SDM: 20)
-  { id: "sdm-spjp", name: "Sp.JP (Jantung & Pembuluh Darah)", category: "sdm", subCategory: "DPJP Inti", target: 6, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-sppd", name: "Sp.PD (Penyakit Dalam)", category: "sdm", subCategory: "DPJP Inti", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-spb", name: "Sp.B (Bedah)", category: "sdm", subCategory: "DPJP Inti", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-spa", name: "Sp.A (Anak)", category: "sdm", subCategory: "DPJP Inti", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  // SDM - Sub-Spesialis
-  { id: "sdm-spjp-intervensi", name: "Sp.JP Sub/Fellow Kardio Intervensi", category: "sdm", subCategory: "Sub-Spesialis", target: 3, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-sppdkkv", name: "Sp.PD-KKV (Kardiovaskular)", category: "sdm", subCategory: "Sub-Spesialis", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-spbtkv", name: "Sp.BTKV (Bedah Toraks Kardiovaskular)", category: "sdm", subCategory: "Sub-Spesialis", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-spa-kardio", name: "Sp.A Sub Kardio", category: "sdm", subCategory: "Sub-Spesialis", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  // SDM - Penunjang
-  { id: "sdm-span", name: "Sp.An (Anestesi)", category: "sdm", subCategory: "Penunjang", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-spread", name: "Sp.Rad (Radiologi)", category: "sdm", subCategory: "Penunjang", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  // Sarana - Kapasitas Bed (1 bed = 1 poin, Total Target Bed: 59 Poin)
+  // SDM - DPJP
+  { id: "sdm-sp-jp-pd", name: "Sp. JP / Sp. PD", category: "sdm", subCategory: "DPJP", target: 5, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-b", name: "Sp. B", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-a", name: "Sp. A", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-pdkkv", name: "Sp. PD.KKV", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-jp-intervensi", name: "Sp. JP (Sub) / Sp. JP Fellow Kardio Intervensi", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-b-onk", name: "Sp. B / Sp.B.Sub.Onk/ Sp.B. Sub BVE/ Sp.BTKV", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-jp-intensif", name: "Sp. JP (Sub/Fellow) Perawatan Intensif dan Kegawatan Kardiovaskular", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-jp-pediatrik", name: "Sp. JP (Sub/Fellow) Kardiologi Pediatrik dan PJB/ Sp. A (Sub) Kardio", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-jp-citra", name: "Sp. JP (Sub/ Fellow) Pencitraan Kardiovaskular / Ekokardiografi / Aritmia", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-jp-vaskular", name: "Sp. JP (Sub/Fellow) Kedokteran Vaskular / Prevensi Rehabilitasi", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-btkv-sub", name: "Sp. BTKV (Sub/Fellow) / Sp. BTKV Sub BVE", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+
+  // SDM - Spesialis Lain
+  { id: "sdm-sp-an", name: "Sp. An / Sp. An (Sub Intensif Care / Kardiovaskuler)", category: "sdm", subCategory: "Spesialis Lain", target: 3, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-pk", name: "Sp. PK / Sp. PK (Sub)", category: "sdm", subCategory: "Spesialis Lain", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-rad", name: "Sp. Rad / Sp. Rad (Fellow/Sub)", category: "sdm", subCategory: "Spesialis Lain", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-a-etia", name: "Sp. A (Fellow/Sub. ETIA)", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-kfr", name: "Sp. KFR", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-gk", name: "Sp. GK", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-p", name: "Sp. P", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n", name: "Sp. N", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+
+  // Sarana - Kapasitas Bed (1 bed = 1 poin)
   { id: "sarana-iccu-bed", name: "ICCU (Intensive Cardiac Care Unit)", category: "sarana", subCategory: "Kapasitas Bed", target: 10, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-icu-bed", name: "ICU (General)", category: "sarana", subCategory: "Kapasitas Bed", target: 5, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-hcu-bed", name: "HCU (High Care Unit)", category: "sarana", subCategory: "Kapasitas Bed", target: 10, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-picu-nicu-bed", name: "PICU / NICU (Khusus Jantung Anak)", category: "sarana", subCategory: "Kapasitas Bed", target: 4, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-rawatinap-bed", name: "Ruang Rawat Inap Biasa (Khusus Jantung)", category: "sarana", subCategory: "Kapasitas Bed", target: 30, pointPerUnit: 1, inputUnit: "bed" },
+
   // Sarana - Ruangan Khusus (1 ruangan = 5 poin)
   { id: "sarana-cathlab", name: "Ruang Cathlab", category: "sarana", subCategory: "Ruangan Khusus", target: 2, pointPerUnit: 5, inputUnit: "ruangan" },
   { id: "sarana-ok-mayor", name: "Ruang Operasi Mayor", category: "sarana", subCategory: "Ruangan Khusus", target: 1, pointPerUnit: 5, inputUnit: "ruangan" },
-  // Alat Medis
-  { id: "alat-ekg", name: "EKG (Elektrokardiogram)", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-echo3d", name: "ECHO (3D)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-holter", name: "Holter Monitor", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-treadmill", name: "Treadmill", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-ct", name: "CT Scan", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-mri", name: "MRI", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-ivus", name: "IVUS (Intravascular Ultrasound)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-iabp", name: "IABP (Intra-aortic Balloon Pump)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-hlm", name: "Heart Lung Machine", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-ecmo", name: "ECMO", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-ventilator", name: "Ventilator", category: "alat", target: 4, pointPerUnit: 1, inputUnit: "unit" },
+
+  // Alat Medis Dasar & Madya
+  { id: "alat-ekg", name: "EKG", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-usg", name: "USG", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-echo", name: "ECHO / Advance ECHO (3D)/TTE", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-xray", name: "X-ray", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-holter", name: "Holter monitor", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-treadmill", name: "Treadmill/Ergo cycle", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-bedside", name: "Bedside Monitor", category: "alat", target: 4, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ventilator", name: "Ventilator", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-abpm", name: "ABPM (Ambulatory Blood Pressure Monitoring)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ctscan", name: "CT Scan", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-atherectomy", name: "Atherectomy device", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ivus", name: "IVUS (Intravascular ultrasound)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-sternal_saw", name: "Sternal Saw", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-act", name: "ACT (Activated Clotting Time) Intraoperatif", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-thrombectomy", name: "Thrombectomy Device", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-syringe_actuator", name: "Syringe actuator for an injector (Injector Pump)", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ice", name: "Intracardiac Echocardiography (ICE) Probe ICE", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-tilt_table", name: "Tilt Table Test", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+
+  // Alat Medis Utama & Paripurna
+  { id: "alat-mri", name: "MRI", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ep_mapping", name: "Elektrofisiologi mapping system (2D dan 3D)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-thoracoscopy", name: "Thoracoscopy", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-iabp", name: "IABP (Intra-aortic balloon pump)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-heart_lung", name: "Heart lung machine", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-eecp", name: "EECP (Enhanced External Counterpulsation)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-rotablator", name: "Rotablator", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-gamma_camera", name: "Gamma Camera", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-lvad", name: "LVAD (Left Ventricular Assist Device)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-nitric_oxide", name: "Nitric Oxide machine", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ecmo", name: "ECMO (Extracorporeal Membrane Oxygenation)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-transplant_set", name: "Heart Transplant set", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ablation_pfa", name: "Pulse-Field Ablation / Cryoablation System", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
 ];
 
 const cardiologyDiseases: DiseaseAudit[] = [
@@ -159,36 +192,75 @@ const cardiologyDiseases: DiseaseAudit[] = [
 
 // ============ NEUROLOGI ============
 const neurologyRsbkItems: RsbkItem[] = [
-  // SDM - DPJP Inti (Total Target SDM: 15)
-  { id: "sdm-spn", name: "Sp.N (Neurologi)", category: "sdm", subCategory: "DPJP Inti", target: 5, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-sppd", name: "Sp.PD (Penyakit Dalam)", category: "sdm", subCategory: "DPJP Inti", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-spa", name: "Sp.A (Anak)", category: "sdm", subCategory: "DPJP Inti", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  // SDM - Sub-Spesialis
-  { id: "sdm-spn-intervensi", name: "Sp.N Sub Neurovaskular/Intervensi", category: "sdm", subCategory: "Sub-Spesialis", target: 3, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-spbs-vaskular", name: "Sp.BS (Bedah Saraf) Vaskular", category: "sdm", subCategory: "Sub-Spesialis", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  // SDM - Penunjang
-  { id: "sdm-span-neuro", name: "Sp.An (KIC/Neuroanestesi)", category: "sdm", subCategory: "Penunjang", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  // Sarana - Kapasitas Bed (1 bed = 1 poin, Total Target Bed: 45 Poin)
+  // SDM - DPJP
+  { id: "sdm-sp-n", name: "Sp. N / Sp. N fellowship Neurointervensi vaskular", category: "sdm", subCategory: "DPJP", target: 5, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-pd", name: "Sp. PD", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-a", name: "Sp. A", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-bs-vaskular", name: "Sp. B / Sp. BS / Sp. BS Fellow Vaskular / Subs Bedah Saraf Vaskular", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n-subs", name: "Sp. N Subs/Fellow Neurobehaviour / Geriatri / Neurogenetika", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n-infeksi", name: "Sp. N Subs/Fellow Neuroinfeksi / Imunologi / Traumatologi", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n-onkologi", name: "Sp. N / Sp. BS Subs/Fellow Neuro-Onkologi", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n-pediatri", name: "Sp. N Subs Neuropediatri / Sp. BS Bedah Saraf Pediatrik", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n-restorasi", name: "Sp. N Subs Neurorestorasi dan Neuroengineering", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n-nyeri", name: "Sp. N Subs/Fellow Nyeri dan Nyeri Kepala", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-n-neuroftalmologi", name: "Sp. N Subs Neurootologi-Neurooftalmologi", category: "sdm", subCategory: "DPJP", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-bs-fungsional", name: "Sp. BS Fellowship Bedah Saraf Fungsional / Spine / Neurospine", category: "sdm", subCategory: "DPJP", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+
+  // SDM - Spesialis Lain
+  { id: "sdm-sp-pk", name: "Sp. PK / Sp. PK (Sub)", category: "sdm", subCategory: "Spesialis Lain", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-rad", name: "Sp. Rad / Sp. Rad Fellow Neuroradiologi / Rad Subs Radiologi intervensi", category: "sdm", subCategory: "Spesialis Lain", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-an", name: "Sp. An (Sub Intensif Care / Neuroanestesi / KIC)", category: "sdm", subCategory: "Spesialis Lain", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-kfr", name: "Sp. KFR / Sp. KFR Subs Rehabilitasi Neuromuskuler", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-gk", name: "Sp. GK", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-sp-pa", name: "Sp. PA", category: "sdm", subCategory: "Spesialis Lain", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+
+  // Sarana - Kapasitas Bed (1 bed = 1 poin)
   { id: "sarana-stroke-bed", name: "Unit Stroke (Stroke Unit)", category: "sarana", subCategory: "Kapasitas Bed", target: 10, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-hcu-bed", name: "HCU (Neurologi)", category: "sarana", subCategory: "Kapasitas Bed", target: 8, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-icu-bed", name: "ICU (Neuro-Intensive Care)", category: "sarana", subCategory: "Kapasitas Bed", target: 5, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-picu-nicu-bed", name: "PICU / NICU (Khusus Neuro)", category: "sarana", subCategory: "Kapasitas Bed", target: 2, pointPerUnit: 1, inputUnit: "bed" },
   { id: "sarana-rawatinap-bed", name: "Ruang Rawat Inap Biasa (Khusus Neuro)", category: "sarana", subCategory: "Kapasitas Bed", target: 20, pointPerUnit: 1, inputUnit: "bed" },
+  
   // Sarana - Ruangan Khusus (1 ruangan = 5 poin)
   { id: "sarana-eeg", name: "Ruang EEG", category: "sarana", subCategory: "Ruangan Khusus", target: 1, pointPerUnit: 5, inputUnit: "ruangan" },
   { id: "sarana-cathlab", name: "Ruang Cathlab", category: "sarana", subCategory: "Ruangan Khusus", target: 1, pointPerUnit: 5, inputUnit: "ruangan" },
-  { id: "sarana-ok", name: "Ruang Operasi", category: "sarana", subCategory: "Ruangan Khusus", target: 1, pointPerUnit: 5, inputUnit: "ruangan" },
+  { id: "sarana-ok", name: "Ruang Operasi Bedah Saraf", category: "sarana", subCategory: "Ruangan Khusus", target: 1, pointPerUnit: 5, inputUnit: "ruangan" },
   { id: "sarana-mri-ct", name: "Ruang MRI/CT", category: "sarana", subCategory: "Ruangan Khusus", target: 1, pointPerUnit: 5, inputUnit: "ruangan" },
-  // Alat Medis
+
+  // Alat Medis Dasar & Madya
+  { id: "alat-mikroskop", name: "Mikroskop", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-hematoanalyzer", name: "Hematoanalyzer / Chemical Analyzer", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-fotometer", name: "Fotometer/Spektrofotometer", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-xray", name: "X-Ray", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-usg", name: "USG", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-funduscopy", name: "Funduscopy", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-palu_percussor", name: "Palu Percussor (Reflex hammer)", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-garpu_tala", name: "Tuning Fork (Garpu Tala)", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-tcd", name: "Transcranial Doppler (TCD)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-ct", name: "CT Scan (256 Slice)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-mri", name: "MRI (3 Tesla)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-cathlab", name: "Cathlab Biplane", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-eeg", name: "EEG / Video EEG", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-emg", name: "EMG (Elektromiografi)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-mikroskop", name: "Mikroskop Bedah Saraf", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-neuronavigasi", name: "Neuronavigasi", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
-  { id: "alat-icp", name: "ICP Monitoring", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-usg_doppler", name: "USG Doppler (carotid/CDU)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ct_64", name: "CT Scan (64 Slice)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-cathlab", name: "Cathlab", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-set_biopsi", name: "Set Biopsi", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-set_kraniotomi", name: "Set Kraniotomi / Laminektomi", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-high_speed_drill", name: "High Speed Drill (BOR Highspeed)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+
+  // Alat Medis Utama & Paripurna
+  { id: "alat-immunoanalyzer", name: "Immunoanalyzer / Alkes Patologi Anatomi", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-flowcytometer", name: "Flowcytometer", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-qpcr", name: "qPCR (Real-Time PCR)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-ct_128", name: "CT Scan (128/256 Slice)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-mri_15_3", name: "MRI (1.5 - 3 Tesla)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-c_arm", name: "C-Arm", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-eeg", name: "Electroencephalograph (EEG)/Video EEG / Long Term EEG", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-emg", name: "Elektromyogram (EMG), Evoke Potential, Neurostimulator", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-usg_muskuloskeletal", name: "Ultrasonography Muskuloskeletal", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-radiofrequency", name: "Radiofrequency Lesion Generator", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-set_microneurosurgery", name: "Set Microneurosurgery / Mikroskop Bedah Saraf", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-cathlab_biplane", name: "Cathlab Biplane", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-neurofisiologi", name: "Intraoperatif neurofisiologi Monitoring", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-stereotaxic", name: "Stereotaxic instrument (Neuronavigasi) / Set Bedah Saraf Stereotaxy", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-neuro_endoscope", name: "Neurological Endoscope", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+  { id: "alat-icp", name: "Intracranial Pressure Monitoring Device", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
 ];
 
 const neurologyDiseases: DiseaseAudit[] = [

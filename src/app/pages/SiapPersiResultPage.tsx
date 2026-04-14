@@ -117,7 +117,7 @@ export function SiapPersiResultPage() {
             </p>
             {selectedSpecialties.length > 1 && (
               <p className="text-sm text-gray-500 mt-2">
-                Spesialisasi {currentIndex + 1} dari {selectedSpecialties.length}
+                Pelayanan {currentIndex + 1} dari {selectedSpecialties.length}
               </p>
             )}
           </div>
@@ -263,10 +263,10 @@ export function SiapPersiResultPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-2xl font-bold mb-2">
-                  Lanjut ke Spesialisasi Berikutnya
+                  Lanjut ke Pelayanan Berikutnya
                 </h3>
                 <p className="text-white/90 mb-4">
-                  Anda masih memiliki {selectedSpecialties.length - currentIndex - 1} spesialisasi lagi yang perlu diisi
+                  Anda masih memiliki {selectedSpecialties.length - currentIndex - 1} pelayanan lagi yang perlu diisi
                 </p>
                 <div className="flex items-center gap-2 bg-white/20 rounded-lg px-4 py-2 inline-flex">
                   <ArrowRight className="w-5 h-5" />
@@ -296,7 +296,7 @@ export function SiapPersiResultPage() {
                   Proses Review oleh Tim PERSI
                 </h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  Setelah Anda submit, data dari <strong>{selectedSpecialties.length} spesialisasi</strong> akan 
+                  Setelah Anda submit, data dari <strong>{selectedSpecialties.length} pelayanan</strong> akan 
                   direview oleh tim ahli PERSI untuk verifikasi dan validasi. Proses ini memastikan 
                   kualitas dan kredibilitas penilaian.
                 </p>
@@ -346,7 +346,7 @@ export function SiapPersiResultPage() {
               onClick={handleSubmit}
               className="flex-1 h-12 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold"
             >
-              Submit Semua untuk Review ({selectedSpecialties.length} Spesialisasi)
+              Submit Semua untuk Review ({selectedSpecialties.length} Pelayanan)
             </Button>
           )}
         </div>

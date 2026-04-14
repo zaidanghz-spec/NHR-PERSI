@@ -69,7 +69,7 @@ export function SubmissionSuccessPage() {
             </div>
             <div className="mt-4 bg-white/10 rounded-lg p-3">
               <p className="text-sm">
-                <strong>{submittedSpecialties.length} Spesialisasi</strong> telah disubmit untuk review
+                <strong>{submittedSpecialties.length} Pelayanan</strong> telah disubmit untuk review
               </p>
             </div>
           </div>

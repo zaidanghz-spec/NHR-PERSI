@@ -123,7 +123,7 @@ export function RsbkFormPage() {
         {/* Header */}
         <div className="mb-6">
           <Link to="/siap-persi/select-specialty" className="inline-flex items-center text-[#0F4C81] hover:underline mb-4">
-            &larr; Kembali ke Pilih Spesialisasi
+            &larr; Kembali ke Pilih Pelayanan
           </Link>
           <div className="flex items-center justify-between">
             <div>

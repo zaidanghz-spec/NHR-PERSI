@@ -126,7 +126,7 @@ export function HospitalSubmissionPage() {
                 NHR PERSI Assessment
               </h2>
               <p className="text-gray-600 mb-4 leading-relaxed">
-                Mulai penilaian layanan spesialistik rumah sakit Anda. Pilih spesialisasi
+                Mulai penilaian layanan spesialistik rumah sakit Anda. Pilih pelayanan
                 (Kardiologi, Neurologi, atau Onkologi) dan isi form RSBK, Clinical Audit,
                 serta Patient Report.
               </p>
@@ -148,7 +148,7 @@ export function HospitalSubmissionPage() {
                 onClick={() => navigate("/siap-persi/select-specialty")}
                 className="h-14 px-10 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold text-lg"
               >
-                Pilih Spesialisasi & Mulai Assessment
+                Pilih Pelayanan & Mulai Assessment
                 <ArrowRight className="w-6 h-6 ml-3" />
               </Button>
             </div>
