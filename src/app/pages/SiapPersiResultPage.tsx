@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import { useData } from "../context/DataContext";
+import { draftManager } from "../utils/draftManager";
 
 export function SiapPersiResultPage() {
   const { specialty } = useParams<{ specialty: string }>();
@@ -40,6 +41,8 @@ export function SiapPersiResultPage() {
 
   const handleSubmit = () => {
     const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
+    const draftId = draftManager.getCurrentDraftId();
+    const draft = draftId ? draftManager.getDraftById(draftId) : null;
     
     // Loop through all selected specialties and create a submission for each
     selectedSpecialties.forEach((spec) => {
@@ -50,6 +53,9 @@ export function SiapPersiResultPage() {
       const audit = parseFloat(sessionStorage.getItem(`${spec}_clinicalAuditScore`) || "0");
       const report = parseFloat(sessionStorage.getItem(`${spec}_patientReportScore`) || "0");
       const final = Number(((rsbk * 0.15) + (audit * 0.60) + (report * 0.25)).toFixed(2));
+
+      // Get real raw data from draft
+      const specProgress = draft?.progress[spec];
 
       addSubmission({
         hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
@@ -65,7 +71,10 @@ export function SiapPersiResultPage() {
           final,
         },
         details: { 
-          specialties: [{ specialty: info.name, disease: info.disease }] 
+          specialties: [{ specialty: info.name, disease: info.disease }],
+          rsbkData: specProgress?.rsbk.data || {},
+          auditData: specProgress?.clinicalAudit.data || {},
+          prmData: specProgress?.patientReport.data || {},
         },
       });
 
@@ -74,6 +83,12 @@ export function SiapPersiResultPage() {
       sessionStorage.removeItem(`${spec}_clinicalAuditScore`);
       sessionStorage.removeItem(`${spec}_patientReportScore`);
     });
+    
+    // Cleanup draft
+    if (draftId) {
+      draftManager.deleteDraft(draftId);
+      draftManager.clearCurrentDraftId();
+    }
     
     // General cleanup
     sessionStorage.removeItem("currentSpecialty");

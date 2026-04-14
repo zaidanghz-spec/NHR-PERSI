@@ -316,67 +316,70 @@ export function SiapAdminReviewPage() {
         {/* --- TAB CONTENT: HOSPITAL STRUCTURE (RSBK) --- */}
         {activeTab === "rsbk" && (
           <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 font-black uppercase tracking-tight">
               Detail Hospital Structure (RSBK)
             </h3>
             
             <div className="space-y-8">
               {/* SDM */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <h4 className="font-extrabold text-[#0F4C81] mb-5 flex items-center gap-3 text-lg">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 shadow-lg shadow-blue-200"></div>
                   Sumber Daya Manusia (SDM)
                 </h4>
-                <div className="space-y-2">
-                  {submissionData.rsbkDetails.medicalStaff?.length > 0 ? (
-                    submissionData.rsbkDetails.medicalStaff.map((item, index) => (
-                      <ParameterRow 
-                        key={index} 
-                        item={{...item, detail: `${item.score >= 90 ? "Kecukupan Terpenuhi" : "Kurang"} • 6 Personel Utama`}} 
-                      />
-                    ))
-                  ) : (
-                    <>
-                      <ParameterRow item={{ name: "Kesesuaian Kualifikasi Dokter Spesialis", value: "1", score: 100, detail: "Dokter Spesialis Kemuhammadiyahan • Aktif STR/SIP" }} />
-                      <ParameterRow item={{ name: "Kecukupan Rasio Perawat Tersertifikasi", value: "1", score: 95, detail: "Ratio 1:2 • 14 Perawat Bersertifikat" }} />
-                    </>
-                  )}
+                <div className="grid gap-3">
+                  {(() => {
+                    const specKey = submissionData.specialty.toLowerCase();
+                    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                    const sdmItems = specData.rsbkItems.filter(i => i.category === "sdm");
+                    const data = (submissionData as any).details?.rsbkData || {};
+                    
+                    return sdmItems.map(item => {
+                      const val = data[item.id] || "0";
+                      return (
+                        <ParameterRow 
+                          key={item.id} 
+                          item={{
+                            name: item.name,
+                            value: "1",
+                            score: parseInt(val) * item.pointPerUnit,
+                            detail: `${val} ${item.inputUnit || "orang"}`
+                          }} 
+                        />
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
-              {/* Sarana Prasarana */}
+              {/* Sarana Prasarana & Alat */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-teal-500"></div>
-                  Sarana & Prasarana
+                <h4 className="font-extrabold text-[#14B8A6] mb-5 flex items-center gap-3 text-lg">
+                  <div className="w-3 h-3 rounded-full bg-teal-500 shadow-lg shadow-teal-200"></div>
+                  Sarana, Prasarana & Alat Medis
                 </h4>
-                <div className="space-y-2">
-                  <ParameterRow item={{ name: "Ketersediaan Ruang Perawatan Khusus", value: "1", score: 100, detail: "HCU/ICU/ICCU • 4 Tempat Tidur Standard" }} />
-                  <ParameterRow item={{ name: "Fasilitas Kamar Operasi / Tindakan Berstandar", value: "1", score: 100, detail: "1 Kamar Operasi Utama • HEPA Filter OK" }} />
-                  <ParameterRow item={{ name: "Kesiapan Sistem Gas Medis & Tata Udara", value: "1", score: 90, detail: "Sentral Gas Medis • Maintenance Terjadwal" }} />
-                </div>
-              </div>
-
-              {/* Alat Medis */}
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                  Alat Medis
-                </h4>
-                <div className="space-y-2">
-                  {submissionData.rsbkDetails.facilities?.length > 0 ? (
-                    submissionData.rsbkDetails.facilities.map((item, index) => (
-                      <ParameterRow 
-                        key={index} 
-                        item={{...item, detail: "Unit Terkalibrasi • Ready-to-Use"}} 
-                      />
-                    ))
-                  ) : (
-                    <>
-                      <ParameterRow item={{ name: "Kelengkapan Alat Diagnostik Spesialistik", value: "1", score: 90, detail: "8 Jenis Alat Utama • Terkalibrasi BPFK" }} />
-                      <ParameterRow item={{ name: "Kesesuaian & Kalibrasi Alat Life-Support", value: "1", score: 100, detail: "Defibrillator/Ventilator • Backup Battery OK" }} />
-                    </>
-                  )}
+                <div className="grid gap-3">
+                  {(() => {
+                    const specKey = submissionData.specialty.toLowerCase();
+                    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                    const sarprasItems = specData.rsbkItems.filter(i => i.category !== "sdm");
+                    const data = (submissionData as any).details?.rsbkData || {};
+                    
+                    return sarprasItems.map(item => {
+                      const val = data[item.id] || "0";
+                      return (
+                        <ParameterRow 
+                          key={item.id} 
+                          item={{
+                            name: item.name,
+                            value: "1",
+                            score: parseInt(val) * item.pointPerUnit,
+                            detail: `${val} ${item.inputUnit || "unit"}`
+                          }} 
+                        />
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -386,13 +389,31 @@ export function SiapAdminReviewPage() {
         {/* --- TAB CONTENT: CLINICAL AUDIT --- */}
         {activeTab === "audit" && (
           <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Detail Audit Klinis</h3>
-            <p className="text-gray-500 text-sm mb-6">Hasil evaluasi kepatuhan protokol klinis berdasarkan 30 sampel rekam medis.</p>
+            <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Detail Audit Klinis</h3>
+            <p className="text-gray-500 text-sm mb-6 font-medium">Hasil evaluasi kepatuhan protokol klinis per item pertanyaan.</p>
             
-            <div className="space-y-3">
-              <ParameterRow item={{ name: "Kesesuaian Diagnosis", value: "1", score: 98, detail: "30/30 Rekam Medis Sesuai ICD-10" }} />
-              <ParameterRow item={{ name: "Kesesuaian Tata Laksana (Terapi & Tindakan)", value: "1", score: 92, detail: "28/30 Rekam Medis Sesuai Clinical Pathway" }} />
-              <ParameterRow item={{ name: "Capaian Outcome Klinis", value: "3", score: 85, detail: "Indikator Mortalitas & Morbiditas Terpenuhi" }} />
+            <div className="grid gap-3">
+              {(() => {
+                const specKey = submissionData.specialty.toLowerCase();
+                const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                const questions = specData.auditQuestions;
+                const data = (submissionData as any).details?.auditData || {};
+                
+                return questions.map(q => {
+                  const val = data[q.id] || "0"; // val is "1" (yes) or "2" (no)
+                  return (
+                    <ParameterRow 
+                      key={q.id} 
+                      item={{
+                        name: q.question,
+                        value: val,
+                        score: val === "1" ? 100 : 0,
+                        detail: val === "1" ? "Patuh / Terpenuhi" : "Tidak Terpenuhi"
+                      }} 
+                    />
+                  );
+                });
+              })()}
             </div>
           </div>
         )}
@@ -400,13 +421,38 @@ export function SiapAdminReviewPage() {
         {/* --- TAB CONTENT: PATIENT REPORT (PRM) --- */}
         {activeTab === "prm" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
-            <div className="bg-white rounded-xl border border-gray-200 p-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Detail Patient Report (PRM)</h3>
-              <p className="text-gray-500 text-sm mb-6">Evaluasi berdasarkan instrumen laporan survei rumah sakit terkait.</p>
+            <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+              <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Detail Patient Report (PRM)</h3>
+              <p className="text-gray-500 text-sm mb-6 font-medium">Evaluasi berdasarkan instrumen laporan survei PREM & PROM.</p>
               
-              <div className="space-y-3">
-                <ParameterRow item={{ name: "Hasil Survei PREM (Patient Reported Experience Measures)", value: "1", score: 95, detail: "Skor Kepuasan 4.8/5.0 • 124 Responden Pasien" }} />
-                <ParameterRow item={{ name: "Hasil Survei PROM (Patient Reported Outcome Measures)", value: "1", score: 88, detail: "Perbaikan Fungsional 92% • 98 Laporan Outcomes" }} />
+              <div className="grid gap-4">
+                {(() => {
+                  const specKey = submissionData.specialty.toLowerCase();
+                  const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+                  const data = (submissionData as any).details?.prmData || {};
+                  
+                  // Calculate average or show status
+                  return (
+                    <>
+                      <ParameterRow 
+                        item={{ 
+                          name: "PREM Overview (Patient Experience)", 
+                          value: "1", 
+                          score: parseInt(submissionData.scores.patientReport.toString()), 
+                          detail: "Berdasarkan Pengalaman Pasien" 
+                        }} 
+                      />
+                      <ParameterRow 
+                        item={{ 
+                          name: "PROM Overview (Patient Outcome)", 
+                          value: "1", 
+                          score: parseInt(submissionData.scores.patientReport.toString()), 
+                          detail: "Berdasarkan Hasil Klinis Mandiri" 
+                        }} 
+                      />
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
