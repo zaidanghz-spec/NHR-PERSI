@@ -126,6 +126,7 @@ export function PatientReportPage() {
       try {
         localStorage.setItem(customSurveyKey, JSON.stringify(doc));
         setCustomSurveyFileName(file.name);
+        setCustomSurveyPatientCount(doc.patientCount);
         setCustomSurveyUploaded(true);
         alert(`File PDF survei internal untuk jenis penyakit ${activeDisease?.diseaseName} berhasil diunggah!`);
       } catch (err) {
