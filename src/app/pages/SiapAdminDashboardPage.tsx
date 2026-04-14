@@ -36,10 +36,10 @@ const mockSubmissions: {
 }[] = [];
 
 const scoreDistribution = [
-  { range: "85-100 — A (Excellent)", count: 0, color: "bg-green-500" },
-  { range: "70-84 — B (Good)", count: 0, color: "bg-blue-500" },
-  { range: "55-69 — C (Average)", count: 0, color: "bg-yellow-500" },
-  { range: "0-54 — D (Below Standard)", count: 0, color: "bg-red-500" },
+  { range: "85-100 — Diamond (Sangat Baik)", count: 0, color: "bg-teal-500" },
+  { range: "70-84 — Gold (Baik)", count: 0, color: "bg-amber-400" },
+  { range: "55-69 — Silver (Menengah)", count: 0, color: "bg-slate-400" },
+  { range: "0-54 — Bronze (Perbaikan)", count: 0, color: "bg-orange-700" },
 ];
 
 const statusDistribution = [
@@ -76,10 +76,10 @@ export function SiapAdminDashboardPage() {
   };
 
   const dynamicScoreDistribution = [
-    { range: "85-100 — A (Excellent)", count: submissions.filter(s => (s.scores?.final || 0) >= 85).length, color: "bg-green-500" },
-    { range: "70-84 — B (Good)", count: submissions.filter(s => (s.scores?.final || 0) >= 70 && (s.scores?.final || 0) < 85).length, color: "bg-blue-500" },
-    { range: "55-69 — C (Average)", count: submissions.filter(s => (s.scores?.final || 0) >= 55 && (s.scores?.final || 0) < 70).length, color: "bg-yellow-500" },
-    { range: "0-54 — D (Below Standard)", count: submissions.filter(s => (s.scores?.final || 0) < 55).length, color: "bg-red-500" },
+    { range: "85-100 — Diamond (Sangat Baik)", count: submissions.filter(s => (s.scores?.final || 0) >= 85).length, color: "bg-teal-500" },
+    { range: "70-84 — Gold (Baik)", count: submissions.filter(s => (s.scores?.final || 0) >= 70 && (s.scores?.final || 0) < 85).length, color: "bg-amber-400" },
+    { range: "55-69 — Silver (Menengah)", count: submissions.filter(s => (s.scores?.final || 0) >= 55 && (s.scores?.final || 0) < 70).length, color: "bg-slate-400" },
+    { range: "0-54 — Bronze (Perbaikan)", count: submissions.filter(s => (s.scores?.final || 0) < 55).length, color: "bg-orange-700" },
   ];
 
   const dynamicStatusDistribution = [
