@@ -1,4 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { 
+  getAllSubmissions, 
+  addSubmission as addSubmissionToDb, 
+  updateSubmissionStatus as updateStatusInDb,
+  getAllHospitalAccounts,
+  addHospitalAccount as addAccountToDb,
+  updateAccountStatus as updateAccountStatusInDb 
+} from "../utils/api";
+import { draftManager } from "../utils/draftManager";
 
 // ============ TYPES ============
 export interface NewsItem {
@@ -229,6 +238,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
   });
   const [approvedRankings, setApprovedRankings] = useState<ApprovedRanking[]>(() => loadFromStorage("persi_rankings", []));
   const [submissions, setSubmissions] = useState<SubmissionType[]>(() => loadFromStorage("persi_submissions", []));
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+
+  // Initial cloud sync
+  useEffect(() => {
+    async function syncSubmissions() {
+      setIsCloudSyncing(true);
+      try {
+        const dbSubs = await getAllSubmissions();
+        if (dbSubs.length > 0) {
+          // Merge logic: simpler for now, trust DB
+          setSubmissions(dbSubs);
+          localStorage.setItem("persi_submissions", JSON.stringify(dbSubs));
+        }
+      } catch (err) {
+        console.error("Failed to sync from cloud:", err);
+      } finally {
+        setIsCloudSyncing(false);
+      }
+    }
+    syncSubmissions();
+    
+    // Sync Hospital Accounts
+    async function syncAccounts() {
+      try {
+        const dbAccs = await getAllHospitalAccounts();
+        if (dbAccs.length > 0) {
+          setHospitalAccounts(dbAccs);
+          localStorage.setItem("persi_hospital_accounts", JSON.stringify(dbAccs));
+        }
+      } catch (err) {
+        console.error("Failed to sync accounts:", err);
+      }
+    }
+    syncAccounts();
+    draftManager.syncWithCloud();
+    
+    // Polling for updates (every 10 seconds for real-time feel)
+    const interval = setInterval(() => {
+      syncSubmissions();
+      syncAccounts();
+      draftManager.syncWithCloud();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Persist to localStorage
   useEffect(() => { localStorage.setItem("persi_news", JSON.stringify(news)); }, [news]);
@@ -284,6 +337,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     setHospitalAccounts(updatedAccounts);
     localStorage.setItem("persi_hospital_accounts", JSON.stringify(updatedAccounts));
+    addAccountToDb(account).catch(err => console.error("Cloud account push failed:", err));
     return true;
   }, [hospitalAccounts]);
 
@@ -317,6 +371,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("persi_hospital_accounts", JSON.stringify(updated));
       return updated;
     });
+    updateAccountStatusInDb(email, "activated").catch(err => console.error("Cloud activation failed:", err));
   }, []);
 
   const rejectHospital = useCallback((email: string) => {
@@ -329,6 +384,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("persi_hospital_accounts", JSON.stringify(updated));
       return updated;
     });
+    updateAccountStatusInDb(email, "rejected").catch(err => console.error("Cloud rejection failed:", err));
   }, []);
 
   const hospitalLogout = useCallback(() => {
@@ -369,20 +425,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setApprovedRankings(prev => prev.filter(r => r.submissionId !== submissionId));
   }, []);
 
-  const addSubmission = useCallback((sub: Omit<SubmissionType, "id">) => {
-    setSubmissions(prev => [
-      { ...sub, id: `SUB-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}` }, 
-      ...prev
-    ]);
+  const addSubmission = useCallback(async (sub: Omit<SubmissionType, "id">) => {
+    const newId = `SUB-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}`;
+    const fullSub = { ...sub, id: newId };
+    
+    setSubmissions(prev => [fullSub, ...prev]);
+    
+    try {
+      await addSubmissionToDb(fullSub);
+    } catch (err) {
+      console.error("Cloud push failed:", err);
+    }
   }, []);
 
-  const updateSubmissionStatus = useCallback((id: string, status: SubmissionType["status"], notes?: string) => {
+  const updateSubmissionStatus = useCallback(async (id: string, status: SubmissionType["status"], notes?: string) => {
     setSubmissions(prev => prev.map(s => {
       if (s.id === id) {
         return { ...s, status, ...(notes !== undefined ? { reviewerNotes: notes } : {}) };
       }
       return s;
     }));
+
+    // Sync to cloud
+    try {
+      await updateStatusInDb(id, status);
+    } catch (err) {
+      console.error("Cloud status update failed:", err);
+    }
 
     // Auto-takedown: if changing to Revision Required, remove from rankings
     if (status === "Revision Required") {

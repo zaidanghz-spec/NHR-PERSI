@@ -1,3 +1,5 @@
+import { saveHospitalDraft, getAllHospitalDrafts, deleteHospitalDraft as deleteCloudDraft } from "./api";
+
 export interface DraftData {
   draftId: string;
   hospitalName: string;
@@ -67,6 +69,9 @@ export const draftManager = {
     drafts.push(draft);
     localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
 
+    // Async push to cloud
+    saveHospitalDraft(draft).catch(err => console.error("Cloud draft sync failed:", err));
+
     return draft;
   },
 
@@ -109,6 +114,9 @@ export const draftManager = {
 
     drafts[draftIndex] = draft;
     localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+
+    // Async push to cloud
+    saveHospitalDraft(draft).catch(err => console.error("Cloud draft update failed:", err));
   },
 
   // Delete draft
@@ -116,6 +124,9 @@ export const draftManager = {
     const drafts = this.getAllDrafts();
     const filtered = drafts.filter((d) => d.draftId !== draftId);
     localStorage.setItem(DRAFTS_KEY, JSON.stringify(filtered));
+
+    // Async delete from cloud
+    deleteCloudDraft(draftId).catch(err => console.error("Cloud draft deletion failed:", err));
   },
 
   // Get current draft ID from session
@@ -184,4 +195,33 @@ export const draftManager = {
     // All completed, go to result of last specialty
     return null;
   },
+
+  // Manual cloud sync reconciliation
+  async syncWithCloud(): Promise<void> {
+    try {
+      const cloudDrafts = await getAllHospitalDrafts();
+      if (cloudDrafts.length > 0) {
+        const localDrafts = this.getAllDrafts();
+        
+        // Merge strategy: Cloud overrides if cloud is newer or local is missing
+        const mergedDrafts = [...localDrafts];
+        
+        cloudDrafts.forEach(cd => {
+          const index = mergedDrafts.findIndex(ld => ld.draftId === cd.draftId);
+          if (index === -1) {
+            mergedDrafts.push(cd);
+          } else {
+            // Compare updatedAt
+            if (new Date(cd.updatedAt) > new Date(mergedDrafts[index].updatedAt)) {
+              mergedDrafts[index] = cd;
+            }
+          }
+        });
+
+        localStorage.setItem(DRAFTS_KEY, JSON.stringify(mergedDrafts));
+      }
+    } catch (err) {
+      console.error("Manual cloud sync failed:", err);
+    }
+  }
 };

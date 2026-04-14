@@ -69,9 +69,166 @@ export async function initTursoTables() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
     );
+
+    await db.execute(
+      `CREATE TABLE IF NOT EXISTS submissions (
+        id TEXT PRIMARY KEY,
+        hospital_name TEXT NOT NULL,
+        specialty TEXT NOT NULL,
+        pic_name TEXT,
+        submitted_date TEXT,
+        status TEXT,
+        scores TEXT,
+        details TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    );
+
+    await db.execute(
+      `CREATE TABLE IF NOT EXISTS hospital_accounts (
+        email TEXT PRIMARY KEY,
+        password TEXT NOT NULL,
+        hospital_name TEXT NOT NULL,
+        pic_name TEXT,
+        status TEXT,
+        surat_tugas_filename TEXT,
+        surat_tugas_data TEXT,
+        registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    );
     tablesInitialized = true;
   } catch (err) {
     console.warn("Failed to init Turso tables:", err);
+  }
+}
+
+// ============ HOSPITAL ACCOUNTS ============
+
+export async function addHospitalAccount(acc: any): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: `INSERT INTO hospital_accounts (email, password, hospital_name, pic_name, status, surat_tugas_filename, surat_tugas_data, registered_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        acc.email,
+        acc.password,
+        acc.hospitalName,
+        acc.picName,
+        acc.status,
+        acc.suratTugasFileName || "",
+        acc.suratTugasData || "",
+        acc.registeredAt || new Date().toISOString()
+      ]
+    });
+  } catch (err) {
+    console.error("Add Account Error:", err);
+  }
+}
+
+export async function getAllHospitalAccounts(): Promise<any[]> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return [];
+
+  try {
+    const rs = await db.execute("SELECT * FROM hospital_accounts ORDER BY registered_at DESC");
+    return rs.rows.map((r: any) => ({
+      email: r.email,
+      password: r.password,
+      hospitalName: r.hospital_name,
+      picName: r.pic_name,
+      status: r.status,
+      suratTugasFileName: r.surat_tugas_filename,
+      suratTugasData: r.surat_tugas_data,
+      registeredAt: r.registered_at
+    }));
+  } catch (err) {
+    console.error("Get Accounts Error:", err);
+    return [];
+  }
+}
+
+export async function updateAccountStatus(email: string, status: string): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: "UPDATE hospital_accounts SET status = ? WHERE email = ?",
+      args: [status, email]
+    });
+  } catch (err) {
+    console.error("Update Account Status Error:", err);
+  }
+}
+
+// ============ SUBMISSIONS (ADMIN DASHBOARD) ============
+
+export async function addSubmission(submission: any): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: `INSERT INTO submissions (id, hospital_name, specialty, pic_name, submitted_date, status, scores, details)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        submission.id,
+        submission.hospitalName,
+        submission.specialty,
+        submission.picName,
+        submission.submittedDate,
+        submission.status,
+        JSON.stringify(submission.scores),
+        JSON.stringify(submission.details || {})
+      ]
+    });
+  } catch (err) {
+    console.error("Add Submission Error:", err);
+  }
+}
+
+export async function getAllSubmissions(): Promise<any[]> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return [];
+
+  try {
+    const rs = await db.execute("SELECT * FROM submissions ORDER BY created_at DESC");
+    return rs.rows.map((r: any) => ({
+      id: r.id,
+      hospitalName: r.hospital_name,
+      specialty: r.specialty,
+      picName: r.pic_name,
+      submittedDate: r.submitted_date,
+      status: r.status,
+      scores: JSON.parse(r.scores as string),
+      details: r.details ? JSON.parse(r.details as string) : {}
+    }));
+  } catch (err) {
+    console.error("Get Submissions Error:", err);
+    return [];
+  }
+}
+
+export async function updateSubmissionStatus(id: string, status: string): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: "UPDATE submissions SET status = ? WHERE id = ?",
+      args: [status, id]
+    });
+  } catch (err) {
+    console.error("Update Status Error:", err);
   }
 }
 
@@ -271,28 +428,58 @@ export async function saveDraft(
   }
 }
 
-export async function getDraft(
-  type: "clinical-audit" | "patient-report",
-  hospitalCode: string,
-  specialty: string
-): Promise<any | null> {
+export async function saveHospitalDraft(draft: any): Promise<void> {
   await initTursoTables();
   const db = getTurso();
-  if (!db) return null;
+  if (!db) return;
+
+  const dataStr = JSON.stringify(draft);
+  const draftId = draft.draftId;
 
   try {
-    const draftId = `${type}-${hospitalCode}-${specialty}`;
-    const rs = await db.execute({
-      sql: "SELECT data FROM drafts WHERE id = ?",
+    const existing = await db.execute({
+      sql: "SELECT id FROM drafts WHERE id = ?",
       args: [draftId]
     });
-    
-    if (rs.rows.length === 0) return null;
-    return JSON.parse(rs.rows[0].data as string);
+
+    if (existing.rows.length > 0) {
+      await db.execute({
+        sql: "UPDATE drafts SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        args: [dataStr, draftId]
+      });
+    } else {
+      await db.execute({
+        sql: "INSERT INTO drafts (id, type, hospital_code, specialty, data) VALUES (?, ?, ?, ?, ?)",
+        args: [draftId, "hospital-assessment", draft.hospitalName, "Multiple", dataStr]
+      });
+    }
   } catch (err) {
-    console.error("Get Draft Error:", err);
-    return null;
+    console.error("Save Hospital Draft Error:", err);
   }
+}
+
+export async function getAllHospitalDrafts(): Promise<any[]> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return [];
+
+  try {
+    const rs = await db.execute("SELECT data FROM drafts WHERE type = 'hospital-assessment' ORDER BY updated_at DESC");
+    return rs.rows.map((r: any) => JSON.parse(r.data as string));
+  } catch (err) {
+    console.error("Get All Hospital Drafts Error:", err);
+    return [];
+  }
+}
+
+export async function deleteHospitalDraft(draftId: string): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+  await db.execute({
+    sql: "DELETE FROM drafts WHERE id = ?",
+    args: [draftId]
+  });
 }
 
 export async function bulkAddSurveys(hospitalCode: string, specialty: string, surveys: any[]): Promise<void> {
