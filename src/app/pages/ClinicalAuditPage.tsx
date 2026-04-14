@@ -8,9 +8,9 @@ import * as api from "../utils/api";
 
 // Audit compliance options
 const AUDIT_OPTIONS = [
-  { value: "sesuai", label: "Sesuai (Dilaksanakan)" },
-  { value: "tidak-sesuai-pengecualian", label: "Tidak Sesuai, namun Sesuai dengan Pengecualian Klinis" },
-  { value: "tidak-sesuai", label: "Tidak Sesuai dan Tidak Sesuai dengan Pengecualian Klinis" },
+  { value: "sesuai", label: "sesuai" },
+  { value: "tidak-sesuai-pengecualian", label: "tidak sesuai dengan perkecualian klinis" },
+  { value: "tidak-sesuai", label: "tidak sesuai" },
 ];
 
 // Scoring: sesuai = 1, tidak-sesuai-pengecualian = 1 (tetap 1, warna hijau), tidak-sesuai = 0
@@ -411,16 +411,16 @@ export function ClinicalAuditPage() {
               </p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-start gap-2">
-                  <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap mt-0.5">Sesuai</span>
+                  <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap mt-0.5">sesuai</span>
                   <span className="text-gray-700">Dilaksanakan sesuai standar protokol klinis (1 poin)</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap mt-0.5">Pengecualian</span>
-                  <span className="text-gray-700">Tidak sesuai, namun memenuhi pengecualian klinis yang valid (tetap 1 poin)</span>
+                  <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap mt-0.5">tidak sesuai dengan perkecualian klinis</span>
+                  <span className="text-gray-700">Tidak sesuai, namun memenuhi perkecualian klinis yang valid (tetap 1 poin)</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap mt-0.5">Tidak Sesuai</span>
-                  <span className="text-gray-700">Tidak sesuai dan tidak ada pengecualian klinis (0 poin)</span>
+                  <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap mt-0.5">tidak sesuai</span>
+                  <span className="text-gray-700">Tidak sesuai dan tidak ada perkecualian klinis (0 poin)</span>
                 </div>
               </div>
             </div>
