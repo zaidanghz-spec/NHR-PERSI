@@ -22,11 +22,19 @@ export function SelectSpecialtyPage() {
     const parsedAuth = JSON.parse(auth);
     setAuthData(parsedAuth);
 
-    // Load drafts
-    const allDrafts = draftManager.getAllDrafts();
-    // Filter drafts for this hospital
-    const hospitalDrafts = allDrafts.filter(d => d.hospitalName === parsedAuth.hospitalName);
-    setDrafts(hospitalDrafts);
+    // Initial load from local
+    const loadLocalDrafts = () => {
+      const allDrafts = draftManager.getAllDrafts();
+      const hospitalDrafts = allDrafts.filter(d => d.hospitalName === parsedAuth.hospitalName);
+      setDrafts(hospitalDrafts);
+    };
+    
+    loadLocalDrafts();
+
+    // Sync with cloud and update state
+    draftManager.syncWithCloud().then(() => {
+      loadLocalDrafts();
+    });
 
     // Load previously selected specialties if any
     const saved = sessionStorage.getItem("selectedSpecialties");
