@@ -71,15 +71,15 @@ export function SiapAdminDashboardPage() {
     approved: submissions.filter(s => s.status === "Approved").length,
     revision: submissions.filter(s => s.status === "Revision Required").length,
     averageScore: submissions.length > 0 
-      ? submissions.reduce((acc, s) => acc + s.scores.final, 0) / submissions.length 
+      ? submissions.reduce((acc, s) => acc + (s.scores?.final || 0), 0) / submissions.length 
       : 0,
   };
 
   const dynamicScoreDistribution = [
-    { range: "85-100 — A (Excellent)", count: submissions.filter(s => s.scores.final >= 85).length, color: "bg-green-500" },
-    { range: "70-84 — B (Good)", count: submissions.filter(s => s.scores.final >= 70 && s.scores.final < 85).length, color: "bg-blue-500" },
-    { range: "55-69 — C (Average)", count: submissions.filter(s => s.scores.final >= 55 && s.scores.final < 70).length, color: "bg-yellow-500" },
-    { range: "0-54 — D (Below Standard)", count: submissions.filter(s => s.scores.final < 55).length, color: "bg-red-500" },
+    { range: "85-100 — A (Excellent)", count: submissions.filter(s => (s.scores?.final || 0) >= 85).length, color: "bg-green-500" },
+    { range: "70-84 — B (Good)", count: submissions.filter(s => (s.scores?.final || 0) >= 70 && (s.scores?.final || 0) < 85).length, color: "bg-blue-500" },
+    { range: "55-69 — C (Average)", count: submissions.filter(s => (s.scores?.final || 0) >= 55 && (s.scores?.final || 0) < 70).length, color: "bg-yellow-500" },
+    { range: "0-54 — D (Below Standard)", count: submissions.filter(s => (s.scores?.final || 0) < 55).length, color: "bg-red-500" },
   ];
 
   const dynamicStatusDistribution = [
@@ -383,7 +383,8 @@ function StatusBadge({ status }: { status: string }) {
     },
   };
 
-  const config = statusConfig[status as keyof typeof statusConfig];
+  const normalizedStatus = status.toLowerCase();
+  const config = statusConfig[normalizedStatus as keyof typeof statusConfig] || statusConfig.pending;
 
   return (
     <div
