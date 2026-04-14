@@ -36,10 +36,11 @@ const mockSubmissions: {
 }[] = [];
 
 const scoreDistribution = [
-  { range: "85-100 — Diamond (Sangat Baik)", count: 0, color: "bg-teal-500" },
-  { range: "70-84 — Gold (Baik)", count: 0, color: "bg-amber-400" },
-  { range: "55-69 — Silver (Menengah)", count: 0, color: "bg-slate-400" },
-  { range: "0-54 — Bronze (Perbaikan)", count: 0, color: "bg-orange-700" },
+  { range: "90-100 — Tier 1: Platinum", count: 0, color: "bg-purple-500" },
+  { range: "80-89 — Tier 2: Outstanding", count: 0, color: "bg-blue-500" },
+  { range: "70-79 — Tier 3: Excellent", count: 0, color: "bg-emerald-500" },
+  { range: "60-69 — Tier 4: Commendable", count: 0, color: "bg-amber-500" },
+  { range: "0-59 — Tier 5: Developing", count: 0, color: "bg-slate-500" },
 ];
 
 const statusDistribution = [
@@ -76,10 +77,11 @@ export function SiapAdminDashboardPage() {
   };
 
   const dynamicScoreDistribution = [
-    { range: "85-100 — Diamond (Sangat Baik)", count: submissions.filter(s => (s.scores?.final || 0) >= 85).length, color: "bg-teal-500" },
-    { range: "70-84 — Gold (Baik)", count: submissions.filter(s => (s.scores?.final || 0) >= 70 && (s.scores?.final || 0) < 85).length, color: "bg-amber-400" },
-    { range: "55-69 — Silver (Menengah)", count: submissions.filter(s => (s.scores?.final || 0) >= 55 && (s.scores?.final || 0) < 70).length, color: "bg-slate-400" },
-    { range: "0-54 — Bronze (Perbaikan)", count: submissions.filter(s => (s.scores?.final || 0) < 55).length, color: "bg-orange-700" },
+    { range: "90-100 — Tier 1: Platinum", count: submissions.filter(s => (s.scores?.final || 0) >= 90).length, color: "bg-purple-500" },
+    { range: "80-89 — Tier 2: Outstanding", count: submissions.filter(s => (s.scores?.final || 0) >= 80 && (s.scores?.final || 0) < 90).length, color: "bg-blue-500" },
+    { range: "70-79 — Tier 3: Excellent", count: submissions.filter(s => (s.scores?.final || 0) >= 70 && (s.scores?.final || 0) < 80).length, color: "bg-emerald-500" },
+    { range: "60-69 — Tier 4: Commendable", count: submissions.filter(s => (s.scores?.final || 0) >= 60 && (s.scores?.final || 0) < 70).length, color: "bg-amber-500" },
+    { range: "0-59 — Tier 5: Developing", count: submissions.filter(s => (s.scores?.final || 0) < 60).length, color: "bg-slate-500" },
   ];
 
   const dynamicStatusDistribution = [
