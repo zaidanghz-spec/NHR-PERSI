@@ -141,7 +141,7 @@ export function SiapPersiResultPage() {
                 <tr className="border-b border-gray-200 bg-teal-50/50">
                   <td className="py-4 px-4">
                     <div className="font-medium text-gray-900">Patient Report (PREM & PROM)</div>
-                    <div className="text-xs text-gray-500">Minimal 30 pasien</div>
+                    <div className="text-xs text-gray-500">Target optimal 30 pasien</div>
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-teal-700">{patientReportScore}</td>
                   <td className="py-4 px-4 text-center text-gray-600">25%</td>
@@ -210,7 +210,7 @@ export function SiapPersiResultPage() {
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
                 <div>
                   <p className="font-semibold text-gray-900">Patient Report (PREM & PROM)</p>
-                  <p className="text-sm text-gray-600">Minimal 30 pasien</p>
+                  <p className="text-sm text-gray-600">Target optimal 30 pasien</p>
                 </div>
               </div>
               <div className="text-right">

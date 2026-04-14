@@ -364,7 +364,7 @@ export function PatientReportPage() {
             Patient Reported Measurement
           </h1>
           <p className="text-gray-600">
-            Daftarkan pasien per penyakit, generate QR code personal, dan kumpulkan data PREM & PROM dari minimal {targetPatientCount} pasien per penyakit - {specData?.name}
+            Daftarkan pasien per penyakit, generate QR code personal, dan kumpulkan data PREM & PROM hingga mencapai target {targetPatientCount} pasien per penyakit - {specData?.name}
           </p>
         </div>
 
