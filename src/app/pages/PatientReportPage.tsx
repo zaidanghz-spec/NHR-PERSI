@@ -16,6 +16,9 @@ import {
   Eye,
   CheckCircle2,
   Loader2,
+  FileUp,
+  UploadCloud,
+  FileText,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { QRCodeDisplay } from "../components/QRCodeGenerator";
@@ -64,18 +67,68 @@ export function PatientReportPage() {
   const [customSurveyUploaded, setCustomSurveyUploaded] = useState(false);
   const [customSurveyFileName, setCustomSurveyFileName] = useState<string>("");
 
-  // Load existing custom survey upload from localStorage on mount
+  const customSurveyKey = `custom-survey-${hospitalCode}-${diseaseSpecialtyKey}`;
+
+  // Load existing custom survey upload from localStorage on mount & disease change
   useEffect(() => {
-    const storageKey = `custom-survey-${hospitalCode}-${specialty || "general"}`;
-    const existing = localStorage.getItem(storageKey);
+    const existing = localStorage.getItem(customSurveyKey);
     if (existing) {
       try {
         const parsed = JSON.parse(existing);
         setCustomSurveyFileName(parsed.fileName || "");
         setCustomSurveyUploaded(true);
       } catch {}
+    } else {
+      setCustomSurveyFileName("");
+      setCustomSurveyUploaded(false);
     }
-  }, [hospitalCode, specialty]);
+  }, [customSurveyKey]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Ukuran file maksimal 2MB. Vercel LocalStorage memiliki kuota yang terbatas.");
+      return;
+    }
+
+    if (file.type !== "application/pdf") {
+      alert("Hanya format PDF yang diperbolehkan");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      const doc = {
+        fileName: file.name,
+        base64,
+        uploadedAt: new Date().toISOString(),
+        hospitalCode,
+        hospitalName,
+        specialty,
+        diseaseName: activeDisease?.diseaseName || ""
+      };
+      
+      try {
+        localStorage.setItem(customSurveyKey, JSON.stringify(doc));
+        setCustomSurveyFileName(file.name);
+        setCustomSurveyUploaded(true);
+        alert(`File PDF survei internal untuk jenis penyakit ${activeDisease?.diseaseName} berhasil diunggah!`);
+      } catch (err) {
+        alert("Gagal mengunggah file. Mungkin ukuran terlalu besar (Storage Penuh/Melebihi Kuota).");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveFile = () => {
+    localStorage.removeItem(customSurveyKey);
+    setCustomSurveyFileName("");
+    setCustomSurveyUploaded(false);
+  };
+
   const targetPatientCount = 30;
   // Range-based validity weight (fair scoring)
   // 1-5  patients = 80% validity,  6-10 = 85%, 11-20 = 92%, 21-30 = 100%
@@ -385,6 +438,64 @@ export function PatientReportPage() {
               ✓ Bobot validitas saat ini: <strong>{(getSampleValidityWeight(patientCount) * 100).toFixed(0)}%</strong> — {getSampleLabel(patientCount)}
             </p>
           )}
+        </div>
+
+        {/* ========== CUSTOM SURVEY UPLOAD SECTION ========== */}
+        <div className="bg-white rounded-2xl border-2 border-[#14B8A6]/30 p-6 md:p-8 mb-6">
+          <div className="flex items-start gap-4 mb-4">
+            <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <FileUp className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-1">
+                Upload Hasil Survei Internal (Opsional)
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Jika rumah sakit Anda sudah memiliki hasil laporan PDF survei PREM/PROM internal khusus <strong>{activeDisease?.diseaseName}</strong>, Anda dapat mengunggahnya secara mandiri (Maks 2MB).
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-teal-50/50 border border-teal-100 rounded-xl p-5">
+            {customSurveyUploaded ? (
+              <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-teal-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 shadow-sm bg-teal-100 rounded-lg">
+                    <FileText className="w-5 h-5 text-teal-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 text-sm">{customSurveyFileName}</h4>
+                    <p className="text-xs text-green-600 font-medium tracking-wide">✓ Tersimpan (Khusus tab {activeDisease?.diseaseName})</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleRemoveFile}
+                  variant="outline"
+                  className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors"
+                  size="sm"
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Hapus File
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-teal-300 rounded-xl p-8 bg-white transition-colors hover:bg-teal-50/60">
+                <UploadCloud className="w-10 h-10 text-teal-500 mb-3" />
+                <p className="font-semibold text-gray-700 mb-1">Pilih file PDF laporan survei Anda</p>
+                <p className="text-xs text-gray-500 mb-4 font-mono">Format: .pdf (Maksimal 2MB)</p>
+                <label className="cursor-pointer inline-flex items-center justify-center px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm">
+                  <FileUp className="w-4 h-4 mr-2" />
+                  Browse File PDF
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ========== PATIENT REGISTRATION SECTION ========== */}

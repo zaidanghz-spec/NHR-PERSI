@@ -294,3 +294,9 @@ export async function getDraft(
     return null;
   }
 }
+
+export async function bulkAddSurveys(hospitalCode: string, specialty: string, surveys: any[]): Promise<void> {
+  for (const survey of surveys) {
+    await submitSurvey(hospitalCode, specialty, survey);
+  }
+}
