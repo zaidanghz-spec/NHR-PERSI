@@ -391,11 +391,13 @@ export function MethodologyPage() {
               formulir assessment.
             </p>
             <p className="leading-relaxed">
-              <strong>Verifikasi:</strong> Setelah RS melakukan submission,
-              seluruh data akan diverifikasi oleh tim reviewer PERSI. Proses
-              review memakan waktu 5-7 hari kerja. Tim reviewer dapat meminta
-              revisi jika data tidak sesuai.
+              <strong>Verifikasi & Audit Validasi:</strong> Setelah RS melakukan submission,
+              seluruh data akan diverifikasi awal oleh tim reviewer. Khusus untuk rumah sakit terbaik, akan diadakan tahapan validasi lanjutan:
             </p>
+            <ul className="list-disc pl-5 mb-4 space-y-2 text-gray-700 leading-relaxed">
+              <li>Untuk <strong>Top 100 Nasional</strong>, akan dilakukan review, audit, dan validasi data secara menyeluruh oleh PERSI Pusat.</li>
+              <li>Untuk <strong>3 Rumah Sakit Terbaik</strong>, akan direview ulang dan melalui proses audit validasi langsung oleh PERSI Wilayah setempat.</li>
+            </ul>
             <p className="leading-relaxed">
               <strong>Publikasi:</strong> Setelah data diverifikasi dan
               di-approve, skor dan ranking RS akan dipublikasikan di halaman
