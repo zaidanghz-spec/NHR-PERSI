@@ -66,6 +66,7 @@ export function PatientReportPage() {
   const [customSurveyFile, setCustomSurveyFile] = useState<File | null>(null);
   const [customSurveyUploaded, setCustomSurveyUploaded] = useState(false);
   const [customSurveyFileName, setCustomSurveyFileName] = useState<string>("");
+  const [customSurveyPatientCount, setCustomSurveyPatientCount] = useState<number>(0);
 
   const customSurveyKey = `custom-survey-${hospitalCode}-${diseaseSpecialtyKey}`;
 
@@ -76,10 +77,12 @@ export function PatientReportPage() {
       try {
         const parsed = JSON.parse(existing);
         setCustomSurveyFileName(parsed.fileName || "");
+        setCustomSurveyPatientCount(parsed.patientCount || 30);
         setCustomSurveyUploaded(true);
       } catch {}
     } else {
       setCustomSurveyFileName("");
+      setCustomSurveyPatientCount(0);
       setCustomSurveyUploaded(false);
     }
   }, [customSurveyKey]);
@@ -98,12 +101,21 @@ export function PatientReportPage() {
       return;
     }
 
+    const countStr = prompt("Berapa jumlah pasien yang disurvei dalam dokumen PDF ini?\n(Maksimal 30)", "30");
+    if (countStr === null) return;
+    const count = parseInt(countStr, 10);
+    if (isNaN(count) || count <= 0) {
+      alert("Jumlah pasien tidak valid.");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
       const doc = {
         fileName: file.name,
         base64,
+        patientCount: Math.min(count, 30),
         uploadedAt: new Date().toISOString(),
         hospitalCode,
         hospitalName,
@@ -126,6 +138,7 @@ export function PatientReportPage() {
   const handleRemoveFile = () => {
     localStorage.removeItem(customSurveyKey);
     setCustomSurveyFileName("");
+    setCustomSurveyPatientCount(0);
     setCustomSurveyUploaded(false);
   };
 
@@ -201,16 +214,25 @@ export function PatientReportPage() {
   });
 
   // Calculate aggregated scores
-  const patientCount = surveyResponses.length;
-  const avgPremScore = patientCount > 0
-    ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / patientCount)
-    : 0;
-  const avgPromScore = patientCount > 0
-    ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / patientCount)
-    : 0;
-  const overallScore = patientCount > 0
-    ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / patientCount)
-    : 0;
+  const patientCount = customSurveyUploaded ? customSurveyPatientCount : surveyResponses.length;
+  
+  const avgPremScore = customSurveyUploaded
+    ? 0 // Menunggu Review
+    : patientCount > 0
+      ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / patientCount)
+      : 0;
+      
+  const avgPromScore = customSurveyUploaded
+    ? 0 // Menunggu Review
+    : patientCount > 0
+      ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / patientCount)
+      : 0;
+      
+  const overallScore = customSurveyUploaded
+    ? 0 // Menunggu Review
+    : patientCount > 0
+      ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / patientCount)
+      : 0;
 
   const progress = Math.min((patientCount / targetPatientCount) * 100, 100);
 
@@ -393,7 +415,7 @@ export function PatientReportPage() {
               />
             </div>
             <div className="flex items-center justify-between mt-2 text-xs text-white/60">
-              <span>{registeredPatients.length} pasien terdaftar</span>
+              <span>{customSurveyUploaded ? "Via Upload internal" : `${registeredPatients.length} pasien terdaftar`}</span>
               <span>{patientCount} survei masuk</span>
             </div>
           </div>
@@ -403,8 +425,14 @@ export function PatientReportPage() {
               <MessageSquare className="w-5 h-5" />
             </div>
             <p className="text-xs text-gray-500 mb-1">Skor PREM</p>
-            <p className="text-3xl font-bold text-[#0F4C81]">{avgPremScore}</p>
-            <p className="text-xs text-gray-400">Bobot 60%</p>
+            {customSurveyUploaded ? (
+              <p className="text-xs font-bold text-gray-400 mt-3 border border-gray-200 py-1.5 px-3 rounded bg-gray-50">Menunggu Tim Review</p>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-[#0F4C81]">{avgPremScore}</p>
+                <p className="text-xs text-gray-400">Bobot 60%</p>
+              </>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
@@ -412,8 +440,14 @@ export function PatientReportPage() {
               <Heart className="w-5 h-5" />
             </div>
             <p className="text-xs text-gray-500 mb-1">Skor PROM</p>
-            <p className="text-3xl font-bold text-[#14B8A6]">{avgPromScore}</p>
-            <p className="text-xs text-gray-400">Bobot 40%</p>
+            {customSurveyUploaded ? (
+              <p className="text-xs font-bold text-gray-400 mt-3 border border-gray-200 py-1.5 px-3 rounded bg-gray-50">Menunggu Tim Review</p>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-[#14B8A6]">{avgPromScore}</p>
+                <p className="text-xs text-gray-400">Bobot 40%</p>
+              </>
+            )}
           </div>
         </div>
 
@@ -499,29 +533,30 @@ export function PatientReportPage() {
         </div>
 
         {/* ========== PATIENT REGISTRATION SECTION ========== */}
-        <div className="bg-white rounded-2xl border-2 border-[#0F4C81] p-6 md:p-8 mb-6">
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-[#0F4C81] rounded-xl flex items-center justify-center flex-shrink-0">
-                <UserPlus className="w-6 h-6 text-white" />
+        {!customSurveyUploaded ? (
+          <div className="bg-white rounded-2xl border-2 border-[#0F4C81] p-6 md:p-8 mb-6">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-[#0F4C81] rounded-xl flex items-center justify-center flex-shrink-0">
+                  <UserPlus className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">
+                    Daftarkan Pasien - {activeDisease?.diseaseName}
+                  </h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Isi data pasien (nama & no. RM), lalu generate QR code personal. Pasien scan QR untuk mengisi survei PREM & PROM khusus penyakit ini.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-1">
-                  Daftarkan Pasien - {activeDisease?.diseaseName}
-                </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  Isi data pasien (nama & no. RM), lalu generate QR code personal. Pasien scan QR untuk mengisi survei PREM & PROM khusus penyakit ini.
-                </p>
-              </div>
+              <Button
+                onClick={() => { setShowRegisterForm(!showRegisterForm); setRegisterError(""); }}
+                className="bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold shrink-0"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Tambah Pasien
+              </Button>
             </div>
-            <Button
-              onClick={() => { setShowRegisterForm(!showRegisterForm); setRegisterError(""); }}
-              className="bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold shrink-0"
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Tambah Pasien
-            </Button>
-          </div>
 
           {/* Registration Form */}
           {showRegisterForm && (
@@ -680,9 +715,31 @@ export function PatientReportPage() {
             </div>
           )}
         </div>
+      ) : (
+          <div className="bg-gray-100 rounded-2xl border-2 border-gray-300 p-6 md:p-8 mb-6 opacity-80">
+            <div className="flex flex-col items-center justify-center text-center py-6">
+              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                <QrCode className="w-8 h-8 text-gray-500" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                Survei Digital (QR Code) Dinonaktifkan
+              </h3>
+              <p className="text-gray-600 max-w-lg leading-relaxed">
+                Fitur pendaftaran dan QR Code dikunci secara otomatis karena Anda telah memilih untuk menggunakan opsi <strong>Upload Hasil Survei Internal (PDF)</strong> untuk penyakit ini.
+              </p>
+              <Button 
+                onClick={handleRemoveFile}
+                variant="outline"
+                className="mt-5 border-gray-300 bg-white"
+              >
+                Gunakan Survei Digital (Hapus PDF)
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Response Table */}
-        {surveyResponses.length > 0 && (
+        {customSurveyUploaded ? null : surveyResponses.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-900">
@@ -816,49 +873,60 @@ export function PatientReportPage() {
         <div className="bg-white rounded-xl border-2 border-[#0F4C81] p-6 mb-6">
           <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Skor PRM - {activeDisease?.diseaseName} (Berbobot)</h3>
           
-          <div className="overflow-x-auto mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-[#0F4C81]">
-                  <th className="text-left py-3 px-4 font-bold text-[#0F4C81]">Komponen</th>
-                  <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Nilai</th>
-                  <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Bobot</th>
-                  <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Nilai Berbobot</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-gray-200 bg-blue-50/50">
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-gray-900">PREM (Patient Reported Experience)</div>
-                    <div className="text-xs text-gray-500">Pengalaman pasien terhadap layanan</div>
-                  </td>
-                  <td className="py-3 px-4 text-center font-bold text-blue-700">{avgPremScore}</td>
-                  <td className="py-3 px-4 text-center text-gray-600">60%</td>
-                  <td className="py-3 px-4 text-center font-bold text-blue-700">{(avgPremScore * 0.6).toFixed(1)}</td>
-                </tr>
-                <tr className="border-b border-gray-200 bg-teal-50/50">
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-gray-900">PROM (Patient Reported Outcome)</div>
-                    <div className="text-xs text-gray-500">Hasil kesehatan menurut pasien</div>
-                  </td>
-                  <td className="py-3 px-4 text-center font-bold text-teal-700">{avgPromScore}</td>
-                  <td className="py-3 px-4 text-center text-gray-600">40%</td>
-                  <td className="py-3 px-4 text-center font-bold text-teal-700">{(avgPromScore * 0.4).toFixed(1)}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr className="bg-[#0F4C81]/10">
-                  <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={3}>Total PRM</td>
-                  <td className="py-3 px-4 text-center font-bold text-[#0F4C81] text-2xl">{overallScore}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          {customSurveyUploaded ? (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+              <p className="font-bold text-yellow-800 text-lg mb-2">Nilai Menunggu Tim Review Pusat</p>
+              <p className="text-yellow-700 text-sm">
+                File survei mandiri (berisi {customSurveyPatientCount} pasien) telah diunggah. Tim validator nasional NHR PERSI akan meninjau dokumen PDF tersebut dan memberikan penilaian akhir secara manual ke dalam dashboard.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-[#0F4C81]">
+                      <th className="text-left py-3 px-4 font-bold text-[#0F4C81]">Komponen</th>
+                      <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Nilai</th>
+                      <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Bobot</th>
+                      <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Nilai Berbobot</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-200 bg-blue-50/50">
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-gray-900">PREM (Patient Reported Experience)</div>
+                        <div className="text-xs text-gray-500">Pengalaman pasien terhadap layanan</div>
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-blue-700">{avgPremScore}</td>
+                      <td className="py-3 px-4 text-center text-gray-600">60%</td>
+                      <td className="py-3 px-4 text-center font-bold text-blue-700">{(avgPremScore * 0.6).toFixed(1)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-200 bg-teal-50/50">
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-gray-900">PROM (Patient Reported Outcome)</div>
+                        <div className="text-xs text-gray-500">Hasil kesehatan menurut pasien</div>
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-teal-700">{avgPromScore}</td>
+                      <td className="py-3 px-4 text-center text-gray-600">40%</td>
+                      <td className="py-3 px-4 text-center font-bold text-teal-700">{(avgPromScore * 0.4).toFixed(1)}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-[#0F4C81]/10">
+                      <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={3}>Total PRM</td>
+                      <td className="py-3 px-4 text-center font-bold text-[#0F4C81] text-2xl">{overallScore}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
 
-          <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-            <p><strong>Rumus:</strong> Total PRM = (PREM x 60%) + (PROM x 40%)</p>
-            <p className="mt-1">Berdasarkan {patientCount} survei pasien {activeDisease?.diseaseName} yang telah terkumpul.</p>
-          </div>
+              <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
+                <p><strong>Rumus:</strong> Total PRM = (PREM x 60%) + (PROM x 40%)</p>
+                <p className="mt-1">Berdasarkan {patientCount} survei pasien {activeDisease?.diseaseName} yang telah terkumpul.</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Action Buttons */}
