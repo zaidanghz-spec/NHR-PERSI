@@ -156,26 +156,22 @@ export async function addHospitalAccount(acc: any): Promise<void> {
   const db = getTurso();
   if (!db) return;
 
-  try {
-    await db.execute({
-      sql: `INSERT INTO hospital_accounts (email, password, hospital_name, pic_name, province, city, status, surat_tugas_filename, surat_tugas_data, registered_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        acc.email,
-        acc.password,
-        acc.hospitalName,
-        acc.picName,
-        acc.province || "",
-        acc.city || "",
-        acc.status,
-        acc.suratTugasFileName || "",
-        acc.suratTugasData || "",
-        acc.registeredAt || new Date().toISOString()
-      ]
-    });
-  } catch (err) {
-    console.error("Add Account Error:", err);
-  }
+  await db.execute({
+    sql: `INSERT INTO hospital_accounts (email, password, hospital_name, pic_name, province, city, status, surat_tugas_filename, surat_tugas_data, registered_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      acc.email,
+      acc.password,
+      acc.hospitalName,
+      acc.picName,
+      acc.province || "",
+      acc.city || "",
+      acc.status,
+      acc.suratTugasFileName || "",
+      acc.suratTugasData || "",
+      acc.registeredAt || new Date().toISOString()
+    ]
+  });
 }
 
 export async function getAllHospitalAccounts(): Promise<any[]> {

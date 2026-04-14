@@ -202,7 +202,7 @@ interface DataContextType {
 
   // Hospital Accounts
   hospitalAccounts: HospitalAccount[];
-  registerHospitalFull: (email: string, password: string, hospitalName: string, picName: string, suratTugasFileName: string, suratTugasData: string, province?: string, city?: string) => boolean;
+  registerHospitalFull: (email: string, password: string, hospitalName: string, picName: string, suratTugasFileName: string, suratTugasData: string, province?: string, city?: string) => Promise<boolean>;
   loginHospital: (email: string, password: string) => HospitalAccount | null;
   activateHospital: (email: string) => void;
   rejectHospital: (email: string) => void;
@@ -384,11 +384,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Hospital Registration (open registration, activation by admin)
-  const registerHospitalFull = useCallback((
+  const registerHospitalFull = useCallback(async (
     email: string, password: string, hospitalName: string, picName: string,
     suratTugasFileName: string, suratTugasData: string,
     province?: string, city?: string
-  ): boolean => {
+  ): Promise<boolean> => {
     let currentAccounts: HospitalAccount[] = hospitalAccounts;
     try {
       const storedAcc = localStorage.getItem("persi_hospital_accounts");
@@ -410,12 +410,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
       suratTugasFileName,
       suratTugasData,
     };
-    const updatedAccounts = [...currentAccounts, account];
-
-    setHospitalAccounts(updatedAccounts);
-    localStorage.setItem("persi_hospital_accounts", JSON.stringify(updatedAccounts));
-    addAccountToDb(account).catch(err => console.error("Cloud account push failed:", err));
-    return true;
+    
+    try {
+      await addAccountToDb(account);
+      const updatedAccounts = [...currentAccounts, account];
+      setHospitalAccounts(updatedAccounts);
+      localStorage.setItem("persi_hospital_accounts", JSON.stringify(updatedAccounts));
+      return true;
+    } catch (err) {
+      console.error("Cloud account push failed:", err);
+      // Let caller know it failed (likely due to Payload Too Large)
+      return false;
+    }
   }, [hospitalAccounts]);
 
   const loginHospital = useCallback((email: string, password: string): HospitalAccount | null => {

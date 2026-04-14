@@ -150,9 +150,9 @@ export function HospitalLoginPage() {
 
     setLoading(true);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const base64Data = reader.result as string;
-      const ok = registerHospitalFull(
+      const ok = await registerHospitalFull(
         regEmail, regPassword, regHospitalName.trim(), regPicName,
         suratTugasFile.name, base64Data, regProvince, regCity
       );
@@ -164,7 +164,7 @@ export function HospitalLoginPage() {
         setRegHospitalName(""); setRegPicName(""); setSuratTugasFile(null);
         setRegProvince(""); setRegCity(""); setProvinceQuery(""); setCityQuery("");
       } else {
-        setError("Registrasi gagal. Email mungkin sudah terdaftar.");
+        setError("Registrasi gagal. Email mungkin sudah terdaftar, atau file terlalu besar untuk sistem.");
       }
       setLoading(false);
     };
