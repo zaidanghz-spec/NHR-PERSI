@@ -55,7 +55,7 @@ export function SiapAdminReviewPage() {
     setCustomSurveyDocs(docs);
   }, []);
 
-  const { submissions, updateSubmissionStatus, publishRanking } = useData();
+  const { submissions, updateSubmissionStatus, publishRanking, hospitalAccounts } = useData();
 
   // Submission data will be loaded from context
   const actualSubmission = submissions.find(s => s.id === id);
@@ -112,16 +112,23 @@ export function SiapAdminReviewPage() {
     if (action === "approve") {
       updateSubmissionStatus(submissionData.id, "Approved", comment);
       
+      // Get province/city from hospital account
+      const hospitalAccount = hospitalAccounts.find(
+        (a) => a.hospitalName === submissionData.hospitalName
+      );
+      const province = hospitalAccount?.province || "—";
+      const city = hospitalAccount?.city || "—";
+      
         publishRanking({
           hospitalName: submissionData.hospitalName,
-          city: "Jakarta Pusat", // Dummy
-          province: "DKI Jakarta", // Dummy
+          city,
+          province,
           specialty: submissionData.specialty === "—" ? "Cardiology" : submissionData.specialty,
           finalScore: submissionData.scores.final,
           rsbkScore: submissionData.scores.rsbk,
           clinicalAuditScore: submissionData.scores.clinicalAudit,
           patientReportScore: submissionData.scores.patientReport,
-          grade: gradeInfo.name, // Use name like "Platinum" for the list tag, or "Tier 1"
+          grade: gradeInfo.name,
           approvedAt: new Date().toISOString(),
           submissionId: submissionData.id,
         });

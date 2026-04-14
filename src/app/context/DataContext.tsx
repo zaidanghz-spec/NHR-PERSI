@@ -40,6 +40,8 @@ export interface HospitalAccount {
   password: string;
   hospitalName: string;
   picName: string;
+  province: string;
+  city: string;
   registeredAt: string;
   status: "pending_activation" | "activated" | "rejected";
   suratTugasFileName?: string;
@@ -191,7 +193,7 @@ interface DataContextType {
 
   // Hospital Accounts
   hospitalAccounts: HospitalAccount[];
-  registerHospitalFull: (email: string, password: string, hospitalName: string, picName: string, suratTugasFileName: string, suratTugasData: string) => boolean;
+  registerHospitalFull: (email: string, password: string, hospitalName: string, picName: string, suratTugasFileName: string, suratTugasData: string, province?: string, city?: string) => boolean;
   loginHospital: (email: string, password: string) => HospitalAccount | null;
   activateHospital: (email: string) => void;
   rejectHospital: (email: string) => void;
@@ -313,7 +315,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Hospital Registration (open registration, activation by admin)
-  const registerHospitalFull = useCallback((email: string, password: string, hospitalName: string, picName: string, suratTugasFileName: string, suratTugasData: string): boolean => {
+  const registerHospitalFull = useCallback((
+    email: string, password: string, hospitalName: string, picName: string,
+    suratTugasFileName: string, suratTugasData: string,
+    province?: string, city?: string
+  ): boolean => {
     let currentAccounts: HospitalAccount[] = hospitalAccounts;
     try {
       const storedAcc = localStorage.getItem("persi_hospital_accounts");
@@ -328,6 +334,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       password,
       hospitalName,
       picName,
+      province: province || "",
+      city: city || "",
       registeredAt: new Date().toISOString(),
       status: "pending_activation",
       suratTugasFileName,

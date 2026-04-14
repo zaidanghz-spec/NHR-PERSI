@@ -90,6 +90,8 @@ export async function initTursoTables() {
         password TEXT NOT NULL,
         hospital_name TEXT NOT NULL,
         pic_name TEXT,
+        province TEXT DEFAULT '',
+        city TEXT DEFAULT '',
         status TEXT,
         surat_tugas_filename TEXT,
         surat_tugas_data TEXT,
@@ -111,13 +113,15 @@ export async function addHospitalAccount(acc: any): Promise<void> {
 
   try {
     await db.execute({
-      sql: `INSERT INTO hospital_accounts (email, password, hospital_name, pic_name, status, surat_tugas_filename, surat_tugas_data, registered_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO hospital_accounts (email, password, hospital_name, pic_name, province, city, status, surat_tugas_filename, surat_tugas_data, registered_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         acc.email,
         acc.password,
         acc.hospitalName,
         acc.picName,
+        acc.province || "",
+        acc.city || "",
         acc.status,
         acc.suratTugasFileName || "",
         acc.suratTugasData || "",
@@ -141,6 +145,8 @@ export async function getAllHospitalAccounts(): Promise<any[]> {
       password: r.password,
       hospitalName: r.hospital_name,
       picName: r.pic_name,
+      province: r.province || "",
+      city: r.city || "",
       status: r.status,
       suratTugasFileName: r.surat_tugas_filename,
       suratTugasData: r.surat_tugas_data,
