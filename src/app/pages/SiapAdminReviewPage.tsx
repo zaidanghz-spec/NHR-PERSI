@@ -320,37 +320,58 @@ export function SiapAdminReviewPage() {
               Detail Hospital Structure (RSBK)
             </h3>
             
-            {/* Medical Staff */}
-            <div className="mb-8">
-              <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                Tenaga Medis
-              </h4>
-              <div className="space-y-2">
-                {submissionData.rsbkDetails.medicalStaff.length > 0 ? (
-                  submissionData.rsbkDetails.medicalStaff.map((item, index) => (
-                    <ParameterRow key={index} item={item} />
-                  ))
-                ) : (
-                  <p className="text-gray-500 italic text-sm">Tidak ada rincian data tenaga medis untuk disajikan.</p>
-                )}
+            <div className="space-y-8">
+              {/* SDM */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                  Sumber Daya Manusia (SDM)
+                </h4>
+                <div className="space-y-2">
+                  {submissionData.rsbkDetails.medicalStaff?.length > 0 ? (
+                    submissionData.rsbkDetails.medicalStaff.map((item, index) => (
+                      <ParameterRow key={index} item={item} />
+                    ))
+                  ) : (
+                    <>
+                      <ParameterRow item={{ name: "Kesesuaian Kualifikasi Dokter Spesialis", value: "1", score: 100 }} />
+                      <ParameterRow item={{ name: "Kecukupan Rasio Perawat Tersertifikasi", value: "1", score: 95 }} />
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Facilities */}
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-teal-500"></div>
-                Fasilitas & Alat Medis
-              </h4>
-              <div className="space-y-2">
-                {submissionData.rsbkDetails.facilities.length > 0 ? (
-                  submissionData.rsbkDetails.facilities.map((item, index) => (
-                    <ParameterRow key={index} item={item} />
-                  ))
-                ) : (
-                  <p className="text-gray-500 italic text-sm">Tidak ada rincian data fasilitas untuk disajikan.</p>
-                )}
+              {/* Sarana Prasarana */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                  Sarana & Prasarana
+                </h4>
+                <div className="space-y-2">
+                  <ParameterRow item={{ name: "Ketersediaan Ruang Perawatan Khusus", value: "1", score: 100 }} />
+                  <ParameterRow item={{ name: "Fasilitas Kamar Operasi / Tindakan Berstandar", value: "1", score: 100 }} />
+                  <ParameterRow item={{ name: "Kesiapan Sistem Gas Medis & Tata Udara", value: "1", score: 90 }} />
+                </div>
+              </div>
+
+              {/* Alat Medis */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                  Alat Medis
+                </h4>
+                <div className="space-y-2">
+                  {submissionData.rsbkDetails.facilities?.length > 0 ? (
+                    submissionData.rsbkDetails.facilities.map((item, index) => (
+                      <ParameterRow key={index} item={item} />
+                    ))
+                  ) : (
+                    <>
+                      <ParameterRow item={{ name: "Kelengkapan Alat Diagnostik Spesialistik", value: "1", score: 90 }} />
+                      <ParameterRow item={{ name: "Kesesuaian & Kalibrasi Alat Life-Support", value: "1", score: 100 }} />
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -360,23 +381,12 @@ export function SiapAdminReviewPage() {
         {activeTab === "audit" && (
           <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h3 className="text-xl font-bold text-gray-900 mb-2">Detail Audit Klinis</h3>
-            <p className="text-gray-500 text-sm mb-6">Hasil evaluasi kepatuhan protokol klinis berdasarkan sampel rekam medis.</p>
+            <p className="text-gray-500 text-sm mb-6">Hasil evaluasi kepatuhan protokol klinis berdasarkan 30 sampel rekam medis.</p>
             
             <div className="space-y-3">
-              <ParameterRow item={{ name: "Kesesuaian Diagnosis dengan ICD-10", value: "1", score: 100 }} />
-              <ParameterRow item={{ name: "Pemberian Terapi Sesuai Protokol", value: "1", score: 95 }} />
-              <ParameterRow item={{ name: "Kepatuhan Clinical Pathway", value: "3", score: submissionData.scores.clinicalAudit }} />
-              <ParameterRow item={{ name: "Triage & Golden Period Response", value: "1", score: 92 }} />
-              
-              <div className="mt-6 p-5 bg-teal-50 border border-teal-100 rounded-xl">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-5 h-5 text-teal-600" />
-                  <h4 className="font-semibold text-teal-900">Catatan Auditor Sistem</h4>
-                </div>
-                <p className="text-teal-800 text-sm leading-relaxed">
-                  Secara umum kepatuhan clinical pathway sudah sangat baik. Namun ditemukan sebagian kecil rekam medis (3 sampel) dengan dokumentasi respon Triage yang sedikit terlambat dari golden period yang ditetapkan.
-                </p>
-              </div>
+              <ParameterRow item={{ name: "Kesesuaian Diagnosis", value: "1", score: 98 }} />
+              <ParameterRow item={{ name: "Kesesuaian Tata Laksana (Terapi & Tindakan)", value: "1", score: 92 }} />
+              <ParameterRow item={{ name: "Capaian Outcome Klinis", value: "3", score: 85 }} />
             </div>
           </div>
         )}
@@ -385,14 +395,12 @@ export function SiapAdminReviewPage() {
         {activeTab === "prm" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
             <div className="bg-white rounded-xl border border-gray-200 p-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Detail Patient Report (PREM & PROM)</h3>
-              <p className="text-gray-500 text-sm mb-6">Evaluasi berdasarkan laporan pengalaman dan outcomes pasien.</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Detail Patient Report (PRM)</h3>
+              <p className="text-gray-500 text-sm mb-6">Evaluasi berdasarkan instrumen laporan survei rumah sakit terkait.</p>
               
               <div className="space-y-3">
-                <ParameterRow item={{ name: "Patient Experience Score (PREM)", value: "1", score: 92 }} />
-                <ParameterRow item={{ name: "Clinical Outcome Score (PROM)", value: "1", score: 88 }} />
-                <ParameterRow item={{ name: "Response Rate Survei Harian", value: "3", score: 75 }} />
-                <ParameterRow item={{ name: "Sistem Komplain dan Resolusi", value: "1", score: 100 }} />
+                <ParameterRow item={{ name: "Hasil Survei PREM (Patient Reported Experience Measures)", value: "1", score: 95 }} />
+                <ParameterRow item={{ name: "Hasil Survei PROM (Patient Reported Outcome Measures)", value: "1", score: 88 }} />
               </div>
             </div>
 
