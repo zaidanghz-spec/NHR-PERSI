@@ -15,8 +15,13 @@ function getTurso() {
     return null;
   }
   
-  tursoClient = createClient({ url, authToken });
-  return tursoClient;
+  try {
+    tursoClient = createClient({ url, authToken });
+    return tursoClient;
+  } catch (err: any) {
+    console.error("Turso Create Client Error:", err);
+    return null;
+  }
 }
 
 // Inisialisasi Tabel secara otomatis (hanya dari sisi Admin saat pertama kali memuat halaman)
@@ -25,7 +30,7 @@ let tablesInitialized = false;
 export async function initTursoTables() {
   if (tablesInitialized) return;
   const db = getTurso();
-  if (!db) return;
+  if (!db) return; // Silent return here, endpoints will handle null db
 
   try {
     await db.execute(
@@ -165,9 +170,9 @@ export async function registerPatient(
   specialty: string,
   patient: any
 ): Promise<{ success: boolean; duplicate?: boolean; patient?: any; error?: string }> {
-  await initTursoTables();
+  try { await initTursoTables(); } catch(e) {}
   const db = getTurso();
-  if (!db) return { success: false, error: "Token Turso (VITE_TURSO_DATABASE_URL / VITE_TURSO_AUTH_TOKEN) belum terbaca. Pastikan sudah diubah dan Anda sudah mengeklik REDEPLOY di Vercel." };
+  if (!db) return { success: false, error: "Koneksi ke Turso Gagal. Pastikan VITE_TURSO_DATABASE_URL valid (harus terdepan libsql://) di Dashboard Vercel lalu REDEPLOY." };
 
   try {
     const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
