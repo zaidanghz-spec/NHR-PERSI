@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import {
   CheckCircle2,
   XCircle,
@@ -10,6 +10,7 @@ import {
   Download,
   ExternalLink,
   Clock,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
@@ -28,6 +29,7 @@ interface CustomSurveyDoc {
 
 export function SiapAdminReviewPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [comment, setComment] = useState("");
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "">("");
@@ -131,6 +133,11 @@ export function SiapAdminReviewPage() {
     }
     console.log(`${action} submission with comment:`, comment);
     setShowApprovalDialog(false);
+    
+    // Success feedback and navigate back
+    setTimeout(() => {
+      navigate("/siap-persi/admin/dashboard");
+    }, 500);
   };
 
   return (

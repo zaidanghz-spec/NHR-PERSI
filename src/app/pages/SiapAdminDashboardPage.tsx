@@ -216,9 +216,9 @@ export function SiapAdminDashboardPage() {
               placeholder="Filter Status"
               options={[
                 { value: "all", label: "Semua Status" },
-                { value: "pending", label: "Pending Review" },
-                { value: "approved", label: "Approved" },
-                { value: "revision", label: "Revision Required" },
+                { value: "Pending", label: "Pending Review" },
+                { value: "Approved", label: "Approved" },
+                { value: "Revision Required", label: "Revision Required" },
               ]}
             />
             <SimpleSelect
@@ -384,7 +384,11 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   const normalizedStatus = status.toLowerCase();
-  const config = statusConfig[normalizedStatus as keyof typeof statusConfig] || statusConfig.pending;
+  const config = 
+    normalizedStatus.includes("pending") ? statusConfig.pending :
+    normalizedStatus.includes("approved") ? statusConfig.approved :
+    normalizedStatus.includes("revision") ? statusConfig.revision :
+    statusConfig.pending;
 
   return (
     <div
