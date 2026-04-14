@@ -316,7 +316,7 @@ export function PatientReportPage() {
 
   const handleContinue = async () => {
     await handleSaveDraft();
-    sessionStorage.setItem("patientReportScore", overallScore.toString());
+    sessionStorage.setItem(`${specialty}_patientReportScore`, overallScore.toString());
     navigate(`/siap-persi/result/${specialty}`);
   };
 

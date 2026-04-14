@@ -200,10 +200,10 @@ interface DataContextType {
   approvedRankings: ApprovedRanking[];
   publishRanking: (ranking: Omit<ApprovedRanking, "id">) => void;
 
-  // Submissions
   submissions: SubmissionType[];
   addSubmission: (submission: Omit<SubmissionType, "id">) => void;
   updateSubmissionStatus: (id: string, status: SubmissionType["status"], notes?: string) => void;
+  unpublishRanking: (submissionId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -365,8 +365,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const unpublishRanking = useCallback((submissionId: string) => {
+    setApprovedRankings(prev => prev.filter(r => r.submissionId !== submissionId));
+  }, []);
+
   const addSubmission = useCallback((sub: Omit<SubmissionType, "id">) => {
-    setSubmissions(prev => [{ ...sub, id: `SUB-${Date.now().toString().slice(-6)}` }, ...prev]);
+    setSubmissions(prev => [
+      { ...sub, id: `SUB-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}` }, 
+      ...prev
+    ]);
   }, []);
 
   const updateSubmissionStatus = useCallback((id: string, status: SubmissionType["status"], notes?: string) => {
@@ -376,7 +383,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       return s;
     }));
-  }, []);
+
+    // Auto-takedown: if changing to Revision Required, remove from rankings
+    if (status === "Revision Required") {
+      unpublishRanking(id);
+    }
+  }, [unpublishRanking]);
 
   return (
     <DataContext.Provider value={{
@@ -385,7 +397,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       hospitalAccounts, registerHospitalFull, loginHospital, activateHospital, rejectHospital,
       isAdmin, adminLogin, adminLogout,
       currentHospital, hospitalLogout,
-      approvedRankings, publishRanking,
+      approvedRankings, publishRanking, unpublishRanking,
       submissions, addSubmission, updateSubmissionStatus,
     }}>
       {children}

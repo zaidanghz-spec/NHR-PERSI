@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Heart, Activity, Brain, ChevronRight, CheckCircle2, Clock, Trash2, Play, Plus } from "lucide-react";
+import { Heart, Activity, Brain, ChevronRight, CheckCircle2, Clock, Trash2, Play, Plus, Users, Layout, MapPin, ArrowRight } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { draftManager, DraftData } from "../utils/draftManager";
@@ -261,63 +261,78 @@ export function SelectSpecialtyPage() {
               </div>
             )}
 
-            {/* Info Banner - Updated */}
-            <div className="bg-gradient-to-r from-blue-500 to-teal-500 rounded-xl p-6 mb-8 text-white">
-              <div className="flex gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 className="w-6 h-6 text-white" />
+            {/* Info Banner - Premium Design */}
+            <div className="relative bg-gradient-to-br from-[#0F4C81] via-[#0F4C81] to-[#14B8A6] rounded-[2.5rem] p-10 mb-12 text-white overflow-hidden shadow-2xl shadow-blue-900/20">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl animate-pulse" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-400/10 rounded-full -ml-24 -mb-24 blur-3xl" />
+              
+              <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center">
+                <div className="w-20 h-20 bg-white/15 backdrop-blur-xl rounded-[1.5rem] flex items-center justify-center flex-shrink-0 shadow-xl border border-white/20">
+                  <Layout className="w-10 h-10 text-white" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-white mb-2 text-xl">
-                    ✨ Sistem Multi-Spesialisasi Paralel
+                <div className="flex-1 text-center md:text-left">
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest mb-4 border border-white/10">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Feature Highlight
+                  </div>
+                  <h3 className="font-black text-white mb-3 text-3xl tracking-tight">
+                    Sistem Multi-Spesialisasi Paralel
                   </h3>
-                  <p className="text-white/90 leading-relaxed mb-3">
-                    Anda dapat memilih <strong>beberapa spesialisasi sekaligus</strong> dan mengisinya dalam satu sesi. 
-                    Misalnya: checklist Kardiologi + Onkologi, lalu sistem akan memandu Anda mengisi kedua spesialisasi 
-                    tersebut secara berurutan tanpa harus kembali ke halaman ini.
+                  <p className="text-white/80 leading-relaxed max-w-2xl text-lg font-medium">
+                    Efisiensi tanpa batas. Pilih beberapa spesialisasi sekaligus dan selesaikan seluruh assessment dalam satu alur kerja yang terintegrasi secara otomatis.
                   </p>
-                  <div className="bg-white/10 rounded-lg p-4 text-sm">
-                    <p className="font-semibold mb-2">Setiap spesialisasi dinilai berdasarkan:</p>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>📋 <strong>RSBK (15%)</strong> - Kemampuan Layanan</div>
-                      <div>🔍 <strong>Clinical Audit (60%)</strong> - 30 Rekam Medis</div>
-                      <div>😊 <strong>Patient Report (25%)</strong> - PREM & PROM</div>
+                </div>
+                <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 border border-white/10">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-blue-400" />
+                      <span className="text-sm font-bold opacity-90">Bobot RSBK: 15%</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-teal-400" />
+                      <span className="text-sm font-bold opacity-90">Bobot Audit: 60%</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-pink-400" />
+                      <span className="text-sm font-bold opacity-90">Patient Report: 25%</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Selection Counter */}
+            {/* Selection Counter - Floating Bar Style */}
             {selectedSpecialties.length > 0 && (
-              <div className="bg-green-50 border-2 border-green-500 rounded-xl p-4 mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-white" />
+              <div className="sticky bottom-8 z-50 animate-in fade-in slide-in-from-bottom-8 duration-500">
+                <div className="bg-[#0F4C81]/95 backdrop-blur-lg border border-white/20 rounded-[2rem] p-4 shadow-2xl flex items-center justify-between gap-6 max-w-4xl mx-auto ring-1 ring-black/5">
+                  <div className="flex items-center gap-5 ml-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/20">
+                      <CheckCircle2 className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-extrabold text-white text-lg">
+                        {selectedSpecialties.length} Spesialisasi Siap Dinilai
+                      </p>
+                      <p className="text-white/70 text-sm font-medium">
+                        {selectedSpecialties.map(id => 
+                          specialties.find(s => s.id === id)?.nameId
+                        ).join(" • ")}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-900">
-                      {selectedSpecialties.length} Spesialisasi Dipilih
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {selectedSpecialties.map(id => 
-                        specialties.find(s => s.id === id)?.nameId
-                      ).join(", ")}
-                    </p>
-                  </div>
+                  <Button
+                    onClick={handleStartAssessment}
+                    className="h-16 px-10 bg-white text-[#0F4C81] hover:bg-gray-50 rounded-[1.5rem] font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all active:scale-95 border-none"
+                  >
+                    Mulai Sekarang
+                    <ArrowRight className="w-6 h-6 ml-3" />
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleStartAssessment}
-                  className="h-12 px-8 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold"
-                >
-                  Mulai Assessment
-                  <ChevronRight className="w-5 h-5 ml-2" />
-                </Button>
               </div>
             )}
 
             {/* Specialty Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch mb-12">
               {specialties.map((specialty) => (
                 <SpecialtyCard
                   key={specialty.id}
@@ -330,11 +345,12 @@ export function SelectSpecialtyPage() {
             </div>
 
             {/* Bottom CTA */}
-            <div className="mt-8 text-center">
+            <div className="text-center pb-12">
               {selectedSpecialties.length === 0 && (
-                <p className="text-gray-500 text-sm">
-                  Klik pada card spesialisasi untuk memilih, atau langsung klik "Mulai Assessment" pada card
-                </p>
+                <div className="inline-flex items-center gap-3 py-3 px-6 bg-white border border-gray-100 rounded-full shadow-sm text-gray-500 text-sm font-medium">
+                  <Layout className="w-4 h-4 text-[#0F4C81]" />
+                  Pilih spesialisasi di atas untuk memulai perjalanan assessment Anda
+                </div>
               )}
             </div>
           </>
@@ -373,70 +389,101 @@ function SpecialtyCard({
   return (
     <button
       onClick={onToggle}
-      className={`bg-white rounded-xl border-2 overflow-hidden hover:shadow-xl transition-all text-left w-full relative flex flex-col h-full ${
+      className={`group bg-white rounded-3xl border-2 overflow-hidden transition-all duration-300 text-left w-full relative flex flex-col h-full shadow-sm hover:shadow-2xl ${
         isSelected
-          ? `${specialty.borderColor} shadow-lg scale-105`
-          : "border-gray-200 hover:border-gray-300"
+          ? `${specialty.borderColor} shadow-blue-100 ring-4 ring-offset-2 ring-blue-50 -translate-y-2`
+          : "border-gray-100 hover:border-gray-200"
       }`}
     >
-      {/* Checkbox Indicator */}
-      <div className="absolute top-4 right-4 z-10">
+      {/* Checkbox Indicator - Premium Style */}
+      <div className="absolute top-5 right-5 z-20">
         <div
-          className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
+          className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 transform ${
             isSelected
-              ? `${specialty.borderColor} bg-gradient-to-br ${specialty.color}`
-              : "border-gray-300 bg-white"
+              ? `bg-white text-[#0F4C81] scale-110 shadow-lg`
+              : "bg-white/30 backdrop-blur-md border border-white/40 text-transparent scale-100"
           }`}
         >
-          {isSelected && <CheckCircle2 className="w-5 h-5 text-white" />}
+          <CheckCircle2 className={`w-6 h-6 ${isSelected ? "opacity-100" : "opacity-0"}`} />
         </div>
       </div>
 
-      {/* Header with Icon */}
-      <div className={`bg-gradient-to-br ${specialty.color} p-8 text-white relative`}>
-        <div className="absolute top-4 right-16 opacity-20">
-          {specialty.icon}
+      {/* Header with Visual Richness */}
+      <div className={`relative bg-gradient-to-br ${specialty.color} p-8 text-white overflow-hidden`}>
+        {/* Abstract Background Shapes */}
+        <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
+        <div className="absolute -left-4 -bottom-4 w-24 h-24 bg-black/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+        
+        <div className="relative z-10">
+          <div className={`${specialty.bgLight} w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-inner backdrop-blur-sm`}>
+            <div className={`${specialty.textColor} transform group-hover:scale-110 transition-transform w-8 h-8 [&>svg]:w-full [&>svg]:h-full`}>
+              {specialty.icon}
+            </div>
+          </div>
+          <h3 className="text-3xl font-extrabold mb-1 tracking-tight">{specialty.nameId}</h3>
+          <p className="text-white/80 font-medium tracking-wide uppercase text-xs">{specialty.name}</p>
         </div>
-        <div className={`${specialty.bgLight} w-16 h-16 rounded-xl flex items-center justify-center mb-4`}>
-          <div className={specialty.textColor}>{specialty.icon}</div>
-        </div>
-        <h3 className="text-2xl font-bold mb-1">{specialty.nameId}</h3>
-        <p className="text-white/90 text-sm">{specialty.name}</p>
       </div>
 
-      {/* Content */}
-      <div className="p-6 flex flex-col flex-1">
-        <p className="text-gray-700 text-sm leading-relaxed mb-6">
+      {/* Content Section */}
+      <div className="p-8 flex flex-col flex-1 bg-white">
+        <p className="text-gray-600 text-sm leading-relaxed mb-6 opacity-90 group-hover:text-gray-900 transition-colors">
           {specialty.description}
         </p>
 
-        {/* Stats */}
-        <div className="space-y-3 flex-1">
-          <StatItem label="Tenaga Medis" value={specialty.stats.doctors} />
-          <StatItem label="Indikator Audit" value={specialty.stats.indicators} />
-          <StatItem label="Alat Medis" value={specialty.stats.equipment} />
-        </div>
-
-        {/* Selection Status */}
-        {isSelected && (
-          <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-            <p className="text-sm font-semibold text-green-700">
-              ✓ Dipilih untuk Assessment
-            </p>
+        <div className="mt-auto">
+          {/* Dynamic Stats Grid */}
+          <div className="space-y-4 mb-8">
+            <StatItem 
+              icon={<Users className="w-4 h-4" />} 
+              label="Tenaga Medis" 
+              value={specialty.stats.doctors} 
+              themeColor={specialty.textColor}
+            />
+            <StatItem 
+              icon={<Activity className="w-4 h-4" />} 
+              label="Indikator Audit" 
+              value={specialty.stats.indicators} 
+              themeColor={specialty.textColor}
+            />
+            <StatItem 
+              icon={<Plus className="w-4 h-4" />} 
+              label="Alat Medis" 
+              value={specialty.stats.equipment} 
+              themeColor={specialty.textColor}
+            />
           </div>
-        )}
 
-
+          {/* Footer Interaction */}
+          <div className="pt-6 border-t border-gray-100 flex items-center justify-between">
+            <span className={`text-xs font-bold uppercase tracking-widest ${isSelected ? specialty.textColor : "text-gray-400 group-hover:text-gray-600"} transition-colors`}>
+              {isSelected ? "Terpilih" : "Belum Dipilih"}
+            </span>
+            <div className={`p-2 rounded-xl transition-all ${isSelected ? specialty.bgLight : "bg-gray-50 group-hover:bg-gray-100"}`}>
+               <ChevronRight className={`w-5 h-5 ${isSelected ? specialty.textColor : "text-gray-400"}`} />
+            </div>
+          </div>
+        </div>
       </div>
     </button>
   );
 }
 
-function StatItem({ label, value }: { label: string; value: string }) {
+function StatItem({ icon, label, value, themeColor }: { icon: React.ReactNode; label: string; value: string; themeColor: string }) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-gray-600">{label}</span>
-      <span className="font-semibold text-gray-900">{value}</span>
+    <div className="flex items-center gap-4 group/item">
+      <div className={`w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center transition-colors group-hover/item:bg-white group-hover/item:shadow-sm`}>
+        <div className="text-gray-400 group-hover:text-gray-600">{icon}</div>
+      </div>
+      <div className="flex-1">
+        <div className="flex justify-between items-baseline">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-tight">{label}</span>
+          <span className="text-sm font-bold text-gray-900">{value}</span>
+        </div>
+        <div className="w-full bg-gray-100 h-1 rounded-full mt-1 overflow-hidden">
+          <div className="bg-gray-200 h-full w-2/3 group-hover:w-full transition-all duration-500" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -477,114 +524,96 @@ function DraftCard({
   };
 
   return (
-    <div className="bg-white rounded-xl border-2 border-gray-200 hover:border-[#0F4C81] hover:shadow-lg transition-all p-6">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-yellow-600" />
+    <div className="group bg-white rounded-[2rem] border-2 border-gray-100 hover:border-[#0F4C81] hover:shadow-2xl transition-all duration-500 overflow-hidden">
+      <div className="p-8">
+        <div className="flex items-start justify-between mb-8">
+          <div className="flex gap-5">
+            <div className="w-16 h-16 bg-yellow-50 rounded-[1.5rem] flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
+              <Clock className="w-8 h-8 text-yellow-600" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Draft Assessment</h3>
-              <p className="text-sm text-gray-500">
-                Terakhir diubah: {formatDate(draft.updatedAt)}
+              <div className="flex items-center gap-3 mb-1">
+                <h3 className="text-2xl font-black text-gray-900">Draft Assessment</h3>
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-[10px] font-black uppercase tracking-widest rounded-full">In Progress</span>
+              </div>
+              <p className="text-gray-400 text-sm font-medium flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Dibuat {formatDate(draft.updatedAt)}
               </p>
             </div>
           </div>
+          <button
+            onClick={onDelete}
+            className="w-12 h-12 flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300"
+          >
+            <Trash2 className="w-6 h-6" />
+          </button>
         </div>
-        <button
-          onClick={onDelete}
-          className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
-      </div>
 
-      {/* Progress Bar */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">Progress Overall</span>
-          <span className="text-sm font-bold text-[#0F4C81]">{progress.percentage}%</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
-          <div
-            className="bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] h-3 rounded-full transition-all duration-500"
-            style={{ width: `${progress.percentage}%` }}
-          />
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          {progress.completedStages} dari {progress.totalStages} tahapan selesai
-        </p>
-      </div>
-
-      {/* Specialties */}
-      <div className="mb-4">
-        <p className="text-sm font-medium text-gray-700 mb-2">Spesialisasi:</p>
-        <div className="flex flex-wrap gap-2">
-          {draft.selectedSpecialties.map((spec) => (
-            <div
-              key={spec}
-              className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-sm"
-            >
-              {specialtyIcons[spec]}
-              <span className="font-medium text-gray-800">{specialtyNames[spec]}</span>
+        {/* Progress Bar - Modern Card Style */}
+        <div className="bg-gray-50 rounded-2xl p-6 mb-8 border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Layout className="w-5 h-5 text-[#0F4C81]" />
+              <span className="text-sm font-black text-gray-700 uppercase tracking-tight">Performa Draft</span>
             </div>
-          ))}
+            <span className="text-2xl font-black text-[#0F4C81]">{progress.percentage}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
+            <div
+              className="absolute top-0 left-0 bg-gradient-to-r from-[#0F4C81] via-[#14B8A6] to-[#0F4C81] bg-[length:200%_auto] h-full rounded-full transition-all duration-1000 animate-gradient"
+              style={{ width: `${progress.percentage}%` }}
+            />
+          </div>
+          <div className="mt-4 flex justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-widest">
+            <span>{progress.completedStages} Tahap Selesai</span>
+            <span>{progress.totalStages} Tahap Total</span>
+          </div>
         </div>
-      </div>
 
-      {/* Detailed Progress per Specialty */}
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-        <p className="text-xs font-semibold text-gray-600 mb-3">Progress Detail:</p>
-        <div className="space-y-2">
-          {draft.selectedSpecialties.map((spec) => {
-            const specProgress = draft.progress[spec];
-            if (!specProgress) return null;
-
-            return (
-              <div key={spec} className="text-xs">
-                <p className="font-semibold text-gray-700 mb-1">{specialtyNames[spec]}</p>
-                <div className="grid grid-cols-3 gap-2 pl-3">
-                  <div className={`${specProgress.rsbk.completed ? "text-green-600" : "text-gray-400"}`}>
-                    {specProgress.rsbk.completed ? "✓" : "○"} RSBK
-                  </div>
-                  <div className={`${specProgress.clinicalAudit.completed ? "text-green-600" : "text-gray-400"}`}>
-                    {specProgress.clinicalAudit.completed ? "✓" : "○"} Audit
-                  </div>
-                  <div className={`${specProgress.patientReport.completed ? "text-green-600" : "text-gray-400"}`}>
-                    {specProgress.patientReport.completed ? "✓" : "○"} Report
-                  </div>
+        <div className="grid md:grid-cols-2 gap-8 mb-8">
+          {/* Specialties List */}
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Spesialisasi</p>
+            <div className="flex flex-wrap gap-3">
+              {draft.selectedSpecialties.map((spec) => (
+                <div
+                  key={spec}
+                  className="flex items-center gap-3 px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl text-sm font-bold group-hover:border-blue-100 transition-colors"
+                >
+                  <div className="text-[#0F4C81]">{specialtyIcons[spec]}</div>
+                  <span className="text-gray-700">{specialtyNames[spec]}</span>
                 </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          </div>
+
+          {/* Next Steps */}
+          {nextStage && (
+            <div className="bg-[#0F4C81] rounded-2xl p-6 text-white shadow-xl shadow-blue-900/10 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-12 -mt-12 blur-2xl" />
+              <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-2">Langkah Berikutnya</p>
+              <h4 className="text-lg font-bold mb-1">{specialtyNames[nextStage.specialty]}</h4>
+              <p className="text-white/80 text-sm font-medium">
+                {nextStage.stage === "rsbk"
+                  ? "Hospital Structure Form"
+                  : nextStage.stage === "clinicalAudit"
+                  ? "Clinical Audit Assessment"
+                  : "Patient Experience Report"}
+              </p>
+            </div>
+          )}
         </div>
+
+        <Button
+          onClick={onResume}
+          className="w-full h-18 bg-gray-900 hover:bg-black text-white rounded-[1.25rem] font-black text-lg transition-all shadow-xl hover:shadow-2xl hover:scale-[1.01] active:scale-95 border-none py-8"
+        >
+          <Play className="w-6 h-6 mr-3 fill-current" />
+          LANJUTKAN ASSESSMENT
+          <ChevronRight className="w-6 h-6 ml-auto" />
+        </Button>
       </div>
-
-      {/* Next Stage Info */}
-      {nextStage && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-          <p className="text-sm text-gray-700">
-            <strong className="text-blue-700">Selanjutnya:</strong>{" "}
-            {specialtyNames[nextStage.specialty]} -{" "}
-            {nextStage.stage === "rsbk"
-              ? "Hospital Structure Form"
-              : nextStage.stage === "clinicalAudit"
-              ? "Clinical Audit"
-              : "Patient Report"}
-          </p>
-        </div>
-      )}
-
-      {/* Actions */}
-      <Button
-        onClick={onResume}
-        className="w-full h-12 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold"
-      >
-        <Play className="w-5 h-5 mr-2" />
-        Lanjutkan Assessment
-        <ChevronRight className="w-5 h-5 ml-2" />
-      </Button>
     </div>
   );
 }

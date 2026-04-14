@@ -21,10 +21,10 @@ export function SiapPersiResultPage() {
   const isLastSpecialty = currentIndex === selectedSpecialties.length - 1;
   const nextSpecialty = !isLastSpecialty ? selectedSpecialties[currentIndex + 1] : null;
 
-  // Get scores from session
-  const rsbkScore = parseFloat(sessionStorage.getItem("rsbkScore") || "0");
-  const clinicalAuditScore = parseFloat(sessionStorage.getItem("clinicalAuditScore") || "0");
-  const patientReportScore = parseFloat(sessionStorage.getItem("patientReportScore") || "0");
+  // Get scores from session (Specialty Specific)
+  const rsbkScore = parseFloat(sessionStorage.getItem(`${specialty}_rsbkScore`) || "0");
+  const clinicalAuditScore = parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditScore`) || "0");
+  const patientReportScore = parseFloat(sessionStorage.getItem(`${specialty}_patientReportScore`) || "0");
 
   // Calculate weighted total: RSBK 15%, Clinical Audit 60%, Patient Report 25%
   const rsbkWeighted = Number((rsbkScore * 0.15).toFixed(2));
@@ -40,33 +40,42 @@ export function SiapPersiResultPage() {
 
   const handleSubmit = () => {
     const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
-    const specialtiesList = selectedSpecialties.map(spec => {
+    
+    // Loop through all selected specialties and create a submission for each
+    selectedSpecialties.forEach((spec) => {
       const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
-      return {
+      if (!info) return;
+
+      const rsbk = parseFloat(sessionStorage.getItem(`${spec}_rsbkScore`) || "0");
+      const audit = parseFloat(sessionStorage.getItem(`${spec}_clinicalAuditScore`) || "0");
+      const report = parseFloat(sessionStorage.getItem(`${spec}_patientReportScore`) || "0");
+      const final = Number(((rsbk * 0.15) + (audit * 0.60) + (report * 0.25)).toFixed(2));
+
+      addSubmission({
+        hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
+        picName: hospitalAuth.picName || "Unknown PIC",
         specialty: info.name,
         disease: info.disease,
-      };
-    });
+        submittedDate: new Date().toISOString().split("T")[0],
+        status: "Pending",
+        scores: {
+          rsbk,
+          clinicalAudit: audit,
+          patientReport: report,
+          final,
+        },
+        details: { 
+          specialties: [{ specialty: info.name, disease: info.disease }] 
+        },
+      });
 
-    addSubmission({
-      hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
-      picName: hospitalAuth.picName || "Unknown PIC",
-      specialty: specialtiesList[0]?.specialty || "Multiple",
-      disease: specialtiesList[0]?.disease || "Multiple",
-      submittedDate: new Date().toISOString().split("T")[0],
-      status: "Pending",
-      scores: {
-        rsbk: rsbkScore,
-        clinicalAudit: clinicalAuditScore,
-        patientReport: patientReportScore,
-        final: totalSiapScore,
-      },
-      details: { specialties: specialtiesList },
+      // Cleanup specialty-specific scores
+      sessionStorage.removeItem(`${spec}_rsbkScore`);
+      sessionStorage.removeItem(`${spec}_clinicalAuditScore`);
+      sessionStorage.removeItem(`${spec}_patientReportScore`);
     });
     
-    sessionStorage.removeItem("rsbkScore");
-    sessionStorage.removeItem("clinicalAuditScore");
-    sessionStorage.removeItem("patientReportScore");
+    // General cleanup
     sessionStorage.removeItem("currentSpecialty");
     sessionStorage.removeItem("selectedSpecialties");
     

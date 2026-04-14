@@ -110,7 +110,7 @@ export function RsbkFormPage() {
       score: totalRsbkScore,
       completed: true,
     });
-    sessionStorage.setItem("rsbkScore", totalRsbkScore.toString());
+    sessionStorage.setItem(`${specialty}_rsbkScore`, totalRsbkScore.toString());
     sessionStorage.setItem("currentSpecialty", specialty || "");
     navigate(`/siap-persi/clinical-audit/${specialty}`);
   };

@@ -179,7 +179,7 @@ export function ClinicalAuditPage() {
     // Also save draft before navigating
     handleSaveDraft();
     const score = calculateOverallScore();
-    sessionStorage.setItem("clinicalAuditScore", score.toString());
+    sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     navigate(`/siap-persi/patient-report/${specialty}`);
   };
 

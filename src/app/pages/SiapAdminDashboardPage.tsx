@@ -102,36 +102,41 @@ export function SiapAdminDashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
           <StatCard
             title="Total Submissions"
             value={stats.total}
-            icon={<FileText className="w-6 h-6" />}
-            color="blue"
+            icon={<FileText className="w-8 h-8" />}
+            gradient="from-blue-600 to-blue-400"
+            label="Berkas Masuk"
           />
           <StatCard
             title="Pending Review"
             value={stats.pending}
-            icon={<Clock className="w-6 h-6" />}
-            color="yellow"
+            icon={<Clock className="w-8 h-8" />}
+            gradient="from-amber-500 to-orange-400"
+            label="Menunggu"
           />
           <StatCard
             title="Approved"
             value={stats.approved}
-            icon={<CheckCircle2 className="w-6 h-6" />}
-            color="green"
+            icon={<CheckCircle2 className="w-8 h-8" />}
+            gradient="from-emerald-600 to-green-400"
+            label="Disetujui"
           />
           <StatCard
             title="Revision Required"
             value={stats.revision}
-            icon={<AlertCircle className="w-6 h-6" />}
-            color="red"
+            icon={<AlertCircle className="w-8 h-8" />}
+            gradient="from-rose-600 to-red-400"
+            label="Revisi"
           />
           <StatCard
             title="Average Score"
             value={stats.averageScore}
-            icon={<TrendingUp className="w-6 h-6" />}
-            color="purple"
+            icon={<TrendingUp className="w-8 h-8" />}
+            gradient="from-violet-600 to-purple-400"
+            label="Rata-rata"
             isDecimal
           />
         </div>
@@ -332,32 +337,32 @@ function StatCard({
   title,
   value,
   icon,
-  color,
-  isDecimal = false,
+  gradient,
+  label,
+  isDecimal,
 }: {
   title: string;
   value: number;
   icon: React.ReactNode;
-  color: string;
+  gradient: string;
+  label: string;
   isDecimal?: boolean;
 }) {
-  const colorClasses = {
-    blue: "bg-blue-50 text-blue-600",
-    yellow: "bg-yellow-50 text-yellow-600",
-    green: "bg-green-50 text-green-600",
-    red: "bg-red-50 text-red-600",
-    purple: "bg-purple-50 text-purple-600",
-  };
-
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-600">{title}</h3>
-        <div className={`p-2 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
+    <div className="group bg-white rounded-3xl border border-gray-100 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+      {/* Background Accent */}
+      <div className={`absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br ${gradient} opacity-[0.03] rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700`} />
+      
+      <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className={`p-3 rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-lg group-hover:scale-110 transition-transform`}>
           {icon}
         </div>
+        <div className="text-right">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{label}</p>
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-tight">{title}</h3>
+        </div>
       </div>
-      <p className="text-3xl font-bold text-gray-900">
+      <p className="text-4xl font-black text-gray-900 tracking-tight leading-none relative z-10">
         {isDecimal ? value.toFixed(1) : value}
       </p>
     </div>
@@ -368,18 +373,21 @@ function StatusBadge({ status }: { status: string }) {
   const statusConfig = {
     pending: {
       label: "Pending Review",
-      color: "bg-yellow-100 text-yellow-700 border-yellow-200",
-      icon: <Clock className="w-4 h-4" />,
+      color: "bg-amber-50 text-amber-700 border-amber-100",
+      dot: "bg-amber-500",
+      icon: <Clock className="w-3.5 h-3.5" />,
     },
     approved: {
-      label: "Approved",
-      color: "bg-green-100 text-green-700 border-green-200",
-      icon: <CheckCircle2 className="w-4 h-4" />,
+      label: "Disetujui",
+      color: "bg-emerald-50 text-emerald-700 border-emerald-100",
+      dot: "bg-emerald-500",
+      icon: <CheckCircle2 className="w-3.5 h-3.5" />,
     },
     revision: {
-      label: "Revision Required",
-      color: "bg-red-100 text-red-700 border-red-200",
-      icon: <AlertCircle className="w-4 h-4" />,
+      label: "Butuh Revisi",
+      color: "bg-rose-50 text-rose-700 border-rose-100",
+      dot: "bg-rose-500",
+      icon: <AlertCircle className="w-3.5 h-3.5" />,
     },
   };
 
@@ -391,11 +399,10 @@ function StatusBadge({ status }: { status: string }) {
     statusConfig.pending;
 
   return (
-    <div
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium ${config.color}`}
-    >
-      {config.icon}
+    <div className={`inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border text-xs font-black uppercase tracking-widest ${config.color} shadow-sm`}>
+      <span className={`w-2 h-2 rounded-full ${config.dot} animate-pulse`} />
       <span>{config.label}</span>
+      <div className="ml-1 opacity-50">{config.icon}</div>
     </div>
   );
 }
