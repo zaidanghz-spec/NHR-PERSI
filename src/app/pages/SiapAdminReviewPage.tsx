@@ -93,14 +93,15 @@ export function SiapAdminReviewPage() {
     { category: "Patient Report", value: submissionData.scores.patientReport },
   ];
 
-  const getGrade = (score: number) => {
-    if (score >= 85) return { grade: "A", name: "Excellent", color: "text-green-700", bg: "bg-green-50" };
-    if (score >= 70) return { grade: "B", name: "Good", color: "text-blue-700", bg: "bg-blue-50" };
-    if (score >= 55) return { grade: "C", name: "Average", color: "text-yellow-700", bg: "bg-yellow-50" };
-    return { grade: "D", name: "Below Standard", color: "text-red-700", bg: "bg-red-50" };
+  const getTier = (score: number) => {
+    if (score >= 90) return { grade: "Tier 1", name: "Platinum", color: "text-purple-700", bg: "bg-purple-100" };
+    if (score >= 80) return { grade: "Tier 2", name: "Outstanding", color: "text-blue-700", bg: "bg-blue-100" };
+    if (score >= 70) return { grade: "Tier 3", name: "Excellent", color: "text-emerald-700", bg: "bg-emerald-100" };
+    if (score >= 60) return { grade: "Tier 4", name: "Commendable", color: "text-amber-700", bg: "bg-amber-100" };
+    return { grade: "Tier 5", name: "Developing", color: "text-slate-600", bg: "bg-gray-100" };
   };
 
-  const gradeInfo = getGrade(submissionData.scores.final);
+  const gradeInfo = getTier(submissionData.scores.final);
 
   const handleAction = (actionType: "approve" | "reject") => {
     setAction(actionType);
@@ -111,19 +112,19 @@ export function SiapAdminReviewPage() {
     if (action === "approve") {
       updateSubmissionStatus(submissionData.id, "Approved", comment);
       
-      publishRanking({
-        hospitalName: submissionData.hospitalName,
-        city: "Jakarta Pusat", // Dummy
-        province: "DKI Jakarta", // Dummy
-        specialty: submissionData.specialty === "—" ? "Cardiology" : submissionData.specialty,
-        finalScore: submissionData.scores.final,
-        rsbkScore: submissionData.scores.rsbk,
-        clinicalAuditScore: submissionData.scores.clinicalAudit,
-        patientReportScore: submissionData.scores.patientReport,
-        grade: gradeInfo.grade,
-        approvedAt: new Date().toISOString(),
-        submissionId: submissionData.id,
-      });
+        publishRanking({
+          hospitalName: submissionData.hospitalName,
+          city: "Jakarta Pusat", // Dummy
+          province: "DKI Jakarta", // Dummy
+          specialty: submissionData.specialty === "—" ? "Cardiology" : submissionData.specialty,
+          finalScore: submissionData.scores.final,
+          rsbkScore: submissionData.scores.rsbk,
+          clinicalAuditScore: submissionData.scores.clinicalAudit,
+          patientReportScore: submissionData.scores.patientReport,
+          grade: gradeInfo.name, // Use name like "Platinum" for the list tag, or "Tier 1"
+          approvedAt: new Date().toISOString(),
+          submissionId: submissionData.id,
+        });
     } else if (action === "reject") {
       updateSubmissionStatus(submissionData.id, "Revision Required", comment);
     }

@@ -22,14 +22,15 @@ export function SiapPersiOverviewPage() {
     lastUpdated: "10 Maret 2026",
   });
 
-  const getGrade = (score: number) => {
-    if (score >= 85) return { grade: "A", name: "Excellent", color: "text-green-700", bg: "bg-green-50" };
-    if (score >= 70) return { grade: "B", name: "Good", color: "text-blue-700", bg: "bg-blue-50" };
-    if (score >= 55) return { grade: "C", name: "Average", color: "text-yellow-700", bg: "bg-yellow-50" };
-    return { grade: "D", name: "Below Standard", color: "text-red-700", bg: "bg-red-50" };
+  const getTier = (score: number) => {
+    if (score >= 90) return { grade: "Tier 1", name: "Platinum", color: "text-purple-700", bg: "bg-purple-50" };
+    if (score >= 80) return { grade: "Tier 2", name: "Outstanding", color: "text-blue-700", bg: "bg-blue-50" };
+    if (score >= 70) return { grade: "Tier 3", name: "Excellent", color: "text-emerald-700", bg: "bg-emerald-50" };
+    if (score >= 60) return { grade: "Tier 4", name: "Commendable", color: "text-amber-700", bg: "bg-amber-50" };
+    return { grade: "Tier 5", name: "Developing", color: "text-slate-600", bg: "bg-slate-50" };
   };
 
-  const finalGrade = getGrade(assessmentData.finalScore);
+  const finalGrade = getTier(assessmentData.finalScore);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
