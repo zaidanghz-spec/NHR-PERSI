@@ -8,7 +8,13 @@ import {
   updateAccountStatus as updateAccountStatusInDb,
   publishRankingToDb,
   unpublishRankingFromDb,
-  getAllRankingsFromDb
+  getAllRankingsFromDb,
+  addNewsToDb,
+  deleteNewsFromDb,
+  getAllNews,
+  addEventToDb,
+  deleteEventFromDb,
+  getAllEvents
 } from "../utils/api";
 import { draftManager } from "../utils/draftManager";
 
@@ -292,11 +298,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     syncRankings();
     
+    async function syncNewsAndEvents() {
+      try {
+        const dbNews = await getAllNews();
+        if (dbNews.length > 0) {
+          setNews(dbNews);
+          localStorage.setItem("persi_news", JSON.stringify(dbNews));
+        }
+        
+        const dbEvents = await getAllEvents();
+        if (dbEvents.length > 0) {
+          setEvents(dbEvents);
+          localStorage.setItem("persi_events", JSON.stringify(dbEvents));
+        }
+      } catch (err) {
+        console.error("Failed to sync news/events:", err);
+      }
+    }
+    syncNewsAndEvents();
+    
     // Polling for updates (every 10 seconds for real-time feel)
     const interval = setInterval(() => {
       syncSubmissions();
       syncAccounts();
       syncRankings();
+      syncNewsAndEvents();
       draftManager.syncWithCloud();
     }, 10000);
     return () => clearInterval(interval);
@@ -311,24 +337,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // News
   const addNews = useCallback((item: Omit<NewsItem, "id">) => {
-    setNews(prev => [{ ...item, id: `news-${Date.now()}` }, ...prev]);
+    const newItem = { ...item, id: `news-${Date.now()}` };
+    setNews((prev) => {
+      const updated = [newItem, ...prev];
+      localStorage.setItem("persi_news", JSON.stringify(updated));
+      return updated;
+    });
+    addNewsToDb(newItem).catch(console.error);
   }, []);
+
   const updateNews = useCallback((id: string, item: Partial<NewsItem>) => {
     setNews(prev => prev.map(n => n.id === id ? { ...n, ...item } : n));
   }, []);
+
   const deleteNews = useCallback((id: string) => {
-    setNews(prev => prev.filter(n => n.id !== id));
+    setNews((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      localStorage.setItem("persi_news", JSON.stringify(updated));
+      return updated;
+    });
+    deleteNewsFromDb(id).catch(console.error);
   }, []);
 
   // Events
   const addEvent = useCallback((item: Omit<EventItem, "id">) => {
-    setEvents(prev => [{ ...item, id: `event-${Date.now()}` }, ...prev]);
+    const newItem = { ...item, id: `event-${Date.now()}` };
+    setEvents((prev) => {
+      const updated = [newItem, ...prev];
+      localStorage.setItem("persi_events", JSON.stringify(updated));
+      return updated;
+    });
+    addEventToDb(newItem).catch(console.error);
   }, []);
+
   const updateEvent = useCallback((id: string, item: Partial<EventItem>) => {
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...item } : e));
   }, []);
+
   const deleteEvent = useCallback((id: string) => {
-    setEvents(prev => prev.filter(e => e.id !== id));
+    setEvents((prev) => {
+      const updated = prev.filter((e) => e.id !== id);
+      localStorage.setItem("persi_events", JSON.stringify(updated));
+      return updated;
+    });
+    deleteEventFromDb(id).catch(console.error);
   }, []);
 
   // Hospital Registration (open registration, activation by admin)

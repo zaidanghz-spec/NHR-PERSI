@@ -114,6 +114,35 @@ export async function initTursoTables() {
         submission_id TEXT
       )`
     );
+    await db.execute(
+      `CREATE TABLE IF NOT EXISTS news (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        excerpt TEXT,
+        content TEXT,
+        category TEXT,
+        image_url TEXT,
+        author TEXT,
+        published_at TEXT,
+        featured BOOLEAN,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    );
+    await db.execute(
+      `CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        date TEXT,
+        end_date TEXT,
+        location TEXT,
+        type TEXT,
+        image_url TEXT,
+        registration_url TEXT,
+        featured BOOLEAN,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    );
     tablesInitialized = true;
   } catch (err) {
     console.warn("Failed to init Turso tables:", err);
@@ -336,6 +365,128 @@ export async function getAllRankingsFromDb(): Promise<any[]> {
     }));
   } catch (err) {
     console.error("Get All Rankings Error:", err);
+    return [];
+  }
+}
+
+// ============ NEWS ============
+
+export async function addNewsToDb(news: any): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: `INSERT INTO news (id, title, excerpt, content, category, image_url, author, published_at, featured)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        news.id, news.title, news.excerpt, news.content, news.category,
+        news.imageUrl, news.author, news.publishedAt, news.featured ? 1 : 0
+      ]
+    });
+  } catch (err) {
+    console.error("Add News Error:", err);
+  }
+}
+
+export async function deleteNewsFromDb(id: string): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+  try {
+    await db.execute({
+      sql: "DELETE FROM news WHERE id = ?",
+      args: [id]
+    });
+  } catch (err) {
+    console.error("Delete News Error:", err);
+  }
+}
+
+export async function getAllNews(): Promise<any[]> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return [];
+
+  try {
+    const rs = await db.execute("SELECT * FROM news ORDER BY published_at DESC");
+    return rs.rows.map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      excerpt: r.excerpt,
+      content: r.content,
+      category: r.category,
+      imageUrl: r.image_url,
+      author: r.author,
+      publishedAt: r.published_at,
+      featured: r.featured === 1,
+      createdAt: r.created_at
+    }));
+  } catch (err) {
+    console.error("Get All News Error:", err);
+    return [];
+  }
+}
+
+// ============ EVENTS ============
+
+export async function addEventToDb(event: any): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: `INSERT INTO events (id, title, description, date, end_date, location, type, image_url, registration_url, featured)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        event.id, event.title, event.description, event.date, event.endDate || "",
+        event.location, event.type, event.imageUrl, event.registrationUrl || "",
+        event.featured ? 1 : 0
+      ]
+    });
+  } catch (err) {
+    console.error("Add Event Error:", err);
+  }
+}
+
+export async function deleteEventFromDb(id: string): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+  try {
+    await db.execute({
+      sql: "DELETE FROM events WHERE id = ?",
+      args: [id]
+    });
+  } catch (err) {
+    console.error("Delete Event Error:", err);
+  }
+}
+
+export async function getAllEvents(): Promise<any[]> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return [];
+
+  try {
+    const rs = await db.execute("SELECT * FROM events ORDER BY date ASC");
+    return rs.rows.map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      date: r.date,
+      endDate: r.end_date,
+      location: r.location,
+      type: r.type,
+      imageUrl: r.image_url,
+      registrationUrl: r.registration_url,
+      featured: r.featured === 1,
+      createdAt: r.created_at
+    }));
+  } catch (err) {
+    console.error("Get All Events Error:", err);
     return [];
   }
 }
