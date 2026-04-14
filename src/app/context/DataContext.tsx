@@ -257,11 +257,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setIsCloudSyncing(true);
       try {
         const dbSubs = await getAllSubmissions();
-        if (dbSubs.length > 0) {
-          // Merge logic: simpler for now, trust DB
-          setSubmissions(dbSubs);
-          localStorage.setItem("persi_submissions", JSON.stringify(dbSubs));
-        }
+        // Unconditional sync: if it hits this block, DB is available. (0 length means it's properly empty)
+        setSubmissions(dbSubs);
+        localStorage.setItem("persi_submissions", JSON.stringify(dbSubs));
       } catch (err) {
         console.error("Failed to sync from cloud:", err);
       } finally {
@@ -274,10 +272,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async function syncAccounts() {
       try {
         const dbAccs = await getAllHospitalAccounts();
-        if (dbAccs.length > 0) {
-          setHospitalAccounts(dbAccs);
-          localStorage.setItem("persi_hospital_accounts", JSON.stringify(dbAccs));
-        }
+        setHospitalAccounts(dbAccs);
+        localStorage.setItem("persi_hospital_accounts", JSON.stringify(dbAccs));
       } catch (err) {
         console.error("Failed to sync accounts:", err);
       }
@@ -288,10 +284,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async function syncRankings() {
       try {
         const dbRankings = await getAllRankingsFromDb();
-        if (dbRankings.length > 0) {
-          setApprovedRankings(dbRankings);
-          localStorage.setItem("persi_rankings", JSON.stringify(dbRankings));
-        }
+        setApprovedRankings(dbRankings);
+        localStorage.setItem("persi_rankings", JSON.stringify(dbRankings));
       } catch (err) {
         console.error("Failed to sync rankings:", err);
       }
@@ -301,16 +295,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async function syncNewsAndEvents() {
       try {
         const dbNews = await getAllNews();
-        if (dbNews.length > 0) {
-          setNews(dbNews);
-          localStorage.setItem("persi_news", JSON.stringify(dbNews));
-        }
+        setNews(dbNews);
+        localStorage.setItem("persi_news", JSON.stringify(dbNews));
         
         const dbEvents = await getAllEvents();
-        if (dbEvents.length > 0) {
-          setEvents(dbEvents);
-          localStorage.setItem("persi_events", JSON.stringify(dbEvents));
-        }
+        setEvents(dbEvents);
+        localStorage.setItem("persi_events", JSON.stringify(dbEvents));
       } catch (err) {
         console.error("Failed to sync news/events:", err);
       }
