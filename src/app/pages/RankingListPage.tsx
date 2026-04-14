@@ -180,11 +180,11 @@ export function RankingListPage() {
                       <td className="px-6 py-4">
                         <span
                           className={`px-3 py-1 rounded-lg text-xs font-[600] ${
-                            r.grade === "Platinum" || r.grade === "Outstanding"
+                            r.grade === "A"
                               ? "bg-green-100 text-green-700"
-                              : r.grade === "Excellent"
+                              : r.grade === "B"
                               ? "bg-blue-100 text-blue-700"
-                              : r.grade === "Commendable"
+                              : r.grade === "C"
                               ? "bg-yellow-100 text-yellow-700"
                               : "bg-red-100 text-red-700"
                           }`}

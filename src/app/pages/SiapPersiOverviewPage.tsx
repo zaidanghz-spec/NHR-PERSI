@@ -23,11 +23,10 @@ export function SiapPersiOverviewPage() {
   });
 
   const getGrade = (score: number) => {
-    if (score >= 90) return { grade: "Platinum", color: "text-purple-700", bg: "bg-purple-50" };
-    if (score >= 80) return { grade: "Outstanding", color: "text-green-700", bg: "bg-green-50" };
-    if (score >= 70) return { grade: "Excellent", color: "text-blue-700", bg: "bg-blue-50" };
-    if (score >= 60) return { grade: "Commendable", color: "text-teal-700", bg: "bg-teal-50" };
-    return { grade: "Developing", color: "text-amber-700", bg: "bg-amber-50" };
+    if (score >= 85) return { grade: "A", name: "Excellent", color: "text-green-700", bg: "bg-green-50" };
+    if (score >= 70) return { grade: "B", name: "Good", color: "text-blue-700", bg: "bg-blue-50" };
+    if (score >= 55) return { grade: "C", name: "Average", color: "text-yellow-700", bg: "bg-yellow-50" };
+    return { grade: "D", name: "Below Standard", color: "text-red-700", bg: "bg-red-50" };
   };
 
   const finalGrade = getGrade(assessmentData.finalScore);

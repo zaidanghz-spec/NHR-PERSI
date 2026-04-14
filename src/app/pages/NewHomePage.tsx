@@ -261,11 +261,13 @@ export function NewHomePage() {
                     <td className="px-6 py-4">
                       <span
                         className={`px-2.5 py-1 rounded-md text-xs font-[600] ${
-                          r.grade === "Platinum" || r.grade === "Outstanding"
+                          r.grade === "A"
                             ? "bg-green-100 text-green-700"
-                            : r.grade === "Excellent"
+                            : r.grade === "B"
                             ? "bg-blue-100 text-blue-700"
-                            : "bg-yellow-100 text-yellow-700"
+                            : r.grade === "C"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-red-100 text-red-700"
                         }`}
                       >
                         {r.grade}

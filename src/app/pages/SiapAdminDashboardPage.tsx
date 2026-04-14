@@ -35,11 +35,10 @@ const mockSubmissions: {
 }[] = [];
 
 const scoreDistribution = [
-  { range: "90-100 — Platinum", count: 0, color: "bg-purple-500" },
-  { range: "80-89 — Outstanding", count: 0, color: "bg-green-500" },
-  { range: "70-79 — Excellent", count: 0, color: "bg-blue-500" },
-  { range: "60-69 — Commendable", count: 0, color: "bg-teal-500" },
-  { range: "0-59 — Developing", count: 0, color: "bg-amber-500" },
+  { range: "85-100 — A (Excellent)", count: 0, color: "bg-green-500" },
+  { range: "70-84 — B (Good)", count: 0, color: "bg-blue-500" },
+  { range: "55-69 — C (Average)", count: 0, color: "bg-yellow-500" },
+  { range: "0-54 — D (Below Standard)", count: 0, color: "bg-red-500" },
 ];
 
 const statusDistribution = [
