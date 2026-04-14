@@ -15,6 +15,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { useData } from "../context/DataContext";
+import { specialtyAuditData } from "../data/specialtyAuditData";
 
 // Type for uploaded custom survey document
 interface CustomSurveyDoc {
