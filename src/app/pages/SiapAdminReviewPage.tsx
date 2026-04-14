@@ -330,12 +330,15 @@ export function SiapAdminReviewPage() {
                 <div className="space-y-2">
                   {submissionData.rsbkDetails.medicalStaff?.length > 0 ? (
                     submissionData.rsbkDetails.medicalStaff.map((item, index) => (
-                      <ParameterRow key={index} item={item} />
+                      <ParameterRow 
+                        key={index} 
+                        item={{...item, detail: `${item.score >= 90 ? "Kecukupan Terpenuhi" : "Kurang"} • 6 Personel Utama`}} 
+                      />
                     ))
                   ) : (
                     <>
-                      <ParameterRow item={{ name: "Kesesuaian Kualifikasi Dokter Spesialis", value: "1", score: 100 }} />
-                      <ParameterRow item={{ name: "Kecukupan Rasio Perawat Tersertifikasi", value: "1", score: 95 }} />
+                      <ParameterRow item={{ name: "Kesesuaian Kualifikasi Dokter Spesialis", value: "1", score: 100, detail: "Dokter Spesialis Kemuhammadiyahan • Aktif STR/SIP" }} />
+                      <ParameterRow item={{ name: "Kecukupan Rasio Perawat Tersertifikasi", value: "1", score: 95, detail: "Ratio 1:2 • 14 Perawat Bersertifikat" }} />
                     </>
                   )}
                 </div>
@@ -348,9 +351,9 @@ export function SiapAdminReviewPage() {
                   Sarana & Prasarana
                 </h4>
                 <div className="space-y-2">
-                  <ParameterRow item={{ name: "Ketersediaan Ruang Perawatan Khusus", value: "1", score: 100 }} />
-                  <ParameterRow item={{ name: "Fasilitas Kamar Operasi / Tindakan Berstandar", value: "1", score: 100 }} />
-                  <ParameterRow item={{ name: "Kesiapan Sistem Gas Medis & Tata Udara", value: "1", score: 90 }} />
+                  <ParameterRow item={{ name: "Ketersediaan Ruang Perawatan Khusus", value: "1", score: 100, detail: "HCU/ICU/ICCU • 4 Tempat Tidur Standard" }} />
+                  <ParameterRow item={{ name: "Fasilitas Kamar Operasi / Tindakan Berstandar", value: "1", score: 100, detail: "1 Kamar Operasi Utama • HEPA Filter OK" }} />
+                  <ParameterRow item={{ name: "Kesiapan Sistem Gas Medis & Tata Udara", value: "1", score: 90, detail: "Sentral Gas Medis • Maintenance Terjadwal" }} />
                 </div>
               </div>
 
@@ -363,12 +366,15 @@ export function SiapAdminReviewPage() {
                 <div className="space-y-2">
                   {submissionData.rsbkDetails.facilities?.length > 0 ? (
                     submissionData.rsbkDetails.facilities.map((item, index) => (
-                      <ParameterRow key={index} item={item} />
+                      <ParameterRow 
+                        key={index} 
+                        item={{...item, detail: "Unit Terkalibrasi • Ready-to-Use"}} 
+                      />
                     ))
                   ) : (
                     <>
-                      <ParameterRow item={{ name: "Kelengkapan Alat Diagnostik Spesialistik", value: "1", score: 90 }} />
-                      <ParameterRow item={{ name: "Kesesuaian & Kalibrasi Alat Life-Support", value: "1", score: 100 }} />
+                      <ParameterRow item={{ name: "Kelengkapan Alat Diagnostik Spesialistik", value: "1", score: 90, detail: "8 Jenis Alat Utama • Terkalibrasi BPFK" }} />
+                      <ParameterRow item={{ name: "Kesesuaian & Kalibrasi Alat Life-Support", value: "1", score: 100, detail: "Defibrillator/Ventilator • Backup Battery OK" }} />
                     </>
                   )}
                 </div>
@@ -384,9 +390,9 @@ export function SiapAdminReviewPage() {
             <p className="text-gray-500 text-sm mb-6">Hasil evaluasi kepatuhan protokol klinis berdasarkan 30 sampel rekam medis.</p>
             
             <div className="space-y-3">
-              <ParameterRow item={{ name: "Kesesuaian Diagnosis", value: "1", score: 98 }} />
-              <ParameterRow item={{ name: "Kesesuaian Tata Laksana (Terapi & Tindakan)", value: "1", score: 92 }} />
-              <ParameterRow item={{ name: "Capaian Outcome Klinis", value: "3", score: 85 }} />
+              <ParameterRow item={{ name: "Kesesuaian Diagnosis", value: "1", score: 98, detail: "30/30 Rekam Medis Sesuai ICD-10" }} />
+              <ParameterRow item={{ name: "Kesesuaian Tata Laksana (Terapi & Tindakan)", value: "1", score: 92, detail: "28/30 Rekam Medis Sesuai Clinical Pathway" }} />
+              <ParameterRow item={{ name: "Capaian Outcome Klinis", value: "3", score: 85, detail: "Indikator Mortalitas & Morbiditas Terpenuhi" }} />
             </div>
           </div>
         )}
@@ -399,8 +405,8 @@ export function SiapAdminReviewPage() {
               <p className="text-gray-500 text-sm mb-6">Evaluasi berdasarkan instrumen laporan survei rumah sakit terkait.</p>
               
               <div className="space-y-3">
-                <ParameterRow item={{ name: "Hasil Survei PREM (Patient Reported Experience Measures)", value: "1", score: 95 }} />
-                <ParameterRow item={{ name: "Hasil Survei PROM (Patient Reported Outcome Measures)", value: "1", score: 88 }} />
+                <ParameterRow item={{ name: "Hasil Survei PREM (Patient Reported Experience Measures)", value: "1", score: 95, detail: "Skor Kepuasan 4.8/5.0 • 124 Responden Pasien" }} />
+                <ParameterRow item={{ name: "Hasil Survei PROM (Patient Reported Outcome Measures)", value: "1", score: 88, detail: "Perbaikan Fungsional 92% • 98 Laporan Outcomes" }} />
               </div>
             </div>
 
@@ -583,24 +589,34 @@ function ScoreRow({
 function ParameterRow({
   item,
 }: {
-  item: { name: string; value: string; score: number };
+  item: { name: string; value: string; score: number; detail?: string };
 }) {
   const getValueLabel = (value: string) => {
-    if (value === "1") return { label: "Tersedia", color: "bg-green-100 text-green-700" };
-    if (value === "2") return { label: "Tidak Tersedia", color: "bg-red-100 text-red-700" };
-    return { label: "Sebagian", color: "bg-yellow-100 text-yellow-700" };
+    if (value === "1") return { label: "Tersedia", color: "bg-emerald-100 text-emerald-700" };
+    if (value === "2") return { label: "Tidak Tersedia", color: "bg-rose-100 text-rose-700" };
+    return { label: "Sebagian", color: "bg-amber-100 text-amber-700" };
   };
 
   const valueInfo = getValueLabel(item.value);
 
   return (
-    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-sm">
-      <span className="text-gray-900">{item.name}</span>
-      <div className="flex items-center gap-3">
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${valueInfo.color}`}>
+    <div className="flex items-center justify-between p-4 bg-gray-50/50 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-100 rounded-xl transition-all group/row">
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-bold text-gray-800 group-hover/row:text-[#0F4C81] transition-colors">{item.name}</span>
+        {item.detail && (
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover/row:text-gray-500">
+            {item.detail}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-6">
+        <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${valueInfo.color}`}>
           {valueInfo.label}
         </span>
-        <span className="font-bold text-gray-900 w-12 text-right">{item.score}</span>
+        <div className="text-right min-w-[60px]">
+          <span className="text-lg font-black text-gray-900">{item.score}</span>
+          <span className="text-[8px] block font-black text-gray-400 -mt-1 uppercase">Points</span>
+        </div>
       </div>
     </div>
   );
