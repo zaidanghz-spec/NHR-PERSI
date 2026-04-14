@@ -98,6 +98,22 @@ export async function initTursoTables() {
         registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
     );
+    await db.execute(
+      `CREATE TABLE IF NOT EXISTS rankings (
+        id TEXT PRIMARY KEY,
+        hospital_name TEXT NOT NULL,
+        city TEXT,
+        province TEXT,
+        specialty TEXT,
+        final_score REAL,
+        rsbk_score REAL,
+        clinical_audit_score REAL,
+        patient_report_score REAL,
+        grade TEXT,
+        approved_at TEXT,
+        submission_id TEXT
+      )`
+    );
     tablesInitialized = true;
   } catch (err) {
     console.warn("Failed to init Turso tables:", err);
@@ -235,6 +251,92 @@ export async function updateSubmissionStatus(id: string, status: string): Promis
     });
   } catch (err) {
     console.error("Update Status Error:", err);
+  }
+}
+
+// ============ RANKINGS ============
+
+export async function publishRankingToDb(ranking: any): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    // Check if duplicate submission ID
+    const existing = await db.execute({
+      sql: "SELECT id FROM rankings WHERE submission_id = ?",
+      args: [ranking.submissionId]
+    });
+
+    if (existing.rows.length > 0) {
+      await db.execute({
+        sql: `UPDATE rankings SET 
+                hospital_name = ?, city = ?, province = ?, specialty = ?, 
+                final_score = ?, rsbk_score = ?, clinical_audit_score = ?, 
+                patient_report_score = ?, grade = ?, approved_at = ? 
+              WHERE submission_id = ?`,
+        args: [
+          ranking.hospitalName, ranking.city, ranking.province, ranking.specialty,
+          ranking.finalScore, ranking.rsbkScore, ranking.clinicalAuditScore,
+          ranking.patientReportScore, ranking.grade, ranking.approvedAt,
+          ranking.submissionId
+        ]
+      });
+    } else {
+      await db.execute({
+        sql: `INSERT INTO rankings (id, hospital_name, city, province, specialty, final_score, rsbk_score, clinical_audit_score, patient_report_score, grade, approved_at, submission_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          ranking.id, ranking.hospitalName, ranking.city, ranking.province, ranking.specialty,
+          ranking.finalScore, ranking.rsbkScore, ranking.clinicalAuditScore,
+          ranking.patientReportScore, ranking.grade, ranking.approvedAt, ranking.submissionId
+        ]
+      });
+    }
+  } catch (err) {
+    console.error("Publish Ranking Error:", err);
+  }
+}
+
+export async function unpublishRankingFromDb(submissionId: string): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: "DELETE FROM rankings WHERE submission_id = ?",
+      args: [submissionId]
+    });
+  } catch (err) {
+    console.error("Unpublish Ranking Error:", err);
+  }
+}
+
+export async function getAllRankingsFromDb(): Promise<any[]> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return [];
+
+  try {
+    const rs = await db.execute("SELECT * FROM rankings ORDER BY final_score DESC");
+    return rs.rows.map((r: any) => ({
+      id: r.id,
+      hospitalName: r.hospital_name,
+      city: r.city,
+      province: r.province,
+      specialty: r.specialty,
+      finalScore: r.final_score,
+      rsbkScore: r.rsbk_score,
+      clinicalAuditScore: r.clinical_audit_score,
+      patientReportScore: r.patient_report_score,
+      grade: r.grade,
+      approvedAt: r.approved_at,
+      submissionId: r.submission_id
+    }));
+  } catch (err) {
+    console.error("Get All Rankings Error:", err);
+    return [];
   }
 }
 

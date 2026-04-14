@@ -5,7 +5,10 @@ import {
   updateSubmissionStatus as updateStatusInDb,
   getAllHospitalAccounts,
   addHospitalAccount as addAccountToDb,
-  updateAccountStatus as updateAccountStatusInDb 
+  updateAccountStatus as updateAccountStatusInDb,
+  publishRankingToDb,
+  unpublishRankingFromDb,
+  getAllRankingsFromDb
 } from "../utils/api";
 import { draftManager } from "../utils/draftManager";
 
@@ -275,11 +278,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     syncAccounts();
     draftManager.syncWithCloud();
+
+    async function syncRankings() {
+      try {
+        const dbRankings = await getAllRankingsFromDb();
+        if (dbRankings.length > 0) {
+          setApprovedRankings(dbRankings);
+          localStorage.setItem("persi_rankings", JSON.stringify(dbRankings));
+        }
+      } catch (err) {
+        console.error("Failed to sync rankings:", err);
+      }
+    }
+    syncRankings();
     
     // Polling for updates (every 10 seconds for real-time feel)
     const interval = setInterval(() => {
       syncSubmissions();
       syncAccounts();
+      syncRankings();
       draftManager.syncWithCloud();
     }, 10000);
     return () => clearInterval(interval);
@@ -419,18 +436,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Rankings
   const publishRanking = useCallback((ranking: Omit<ApprovedRanking, "id">) => {
     setApprovedRankings(prev => {
+      let finalRanking = { ...ranking, id: "" };
       const existing = prev.findIndex(r => r.submissionId === ranking.submissionId);
       if (existing >= 0) {
+        finalRanking.id = prev[existing].id;
         const updated = [...prev];
-        updated[existing] = { ...ranking, id: prev[existing].id };
+        updated[existing] = finalRanking as ApprovedRanking;
+        
+        // Push to cloud background
+        publishRankingToDb(finalRanking).catch(console.error);
         return updated;
       }
-      return [...prev, { ...ranking, id: `rank-${Date.now()}` }].sort((a, b) => b.finalScore - a.finalScore);
+      
+      finalRanking.id = `rank-${Date.now()}`;
+      
+      // Push to cloud background
+      publishRankingToDb(finalRanking).catch(console.error);
+      
+      return [...prev, finalRanking as ApprovedRanking].sort((a, b) => b.finalScore - a.finalScore);
     });
   }, []);
 
   const unpublishRanking = useCallback((submissionId: string) => {
     setApprovedRankings(prev => prev.filter(r => r.submissionId !== submissionId));
+    // Remove from cloud background
+    unpublishRankingFromDb(submissionId).catch(console.error);
   }, []);
 
   const addSubmission = useCallback(async (sub: Omit<SubmissionType, "id">) => {
