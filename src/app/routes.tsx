@@ -21,6 +21,7 @@ import { PerformanceSubmissionPage } from "./pages/PerformanceSubmissionPage";
 import { NewsPage, NewsDetailPage } from "./pages/NewsPage";
 import { EventsPage } from "./pages/EventsPage";
 import { HospitalDetailPage } from "./pages/HospitalDetailPage";
+import { HospitalReviewResultPage } from "./pages/HospitalReviewResultPage";
 import { Root } from "./components/Root";
 import { DataProvider } from "./context/DataContext";
 
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
           { path: "hospital-login", Component: HospitalLoginPage },
           { path: "submit", Component: HospitalSubmissionPage },
           { path: "submit-performance", Component: PerformanceSubmissionPage },
+          { path: "hospital/hasil-penilaian", Component: HospitalReviewResultPage },
 
           // Admin
           { path: "admin/login", Component: AdminLoginPage },

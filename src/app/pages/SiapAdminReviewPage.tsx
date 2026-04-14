@@ -111,7 +111,7 @@ export function SiapAdminReviewPage() {
 
   const confirmAction = () => {
     if (action === "approve") {
-      updateSubmissionStatus(submissionData.id, "Approved");
+      updateSubmissionStatus(submissionData.id, "Approved", comment);
       
       publishRanking({
         hospitalName: submissionData.hospitalName,
@@ -127,7 +127,7 @@ export function SiapAdminReviewPage() {
         submissionId: submissionData.id,
       });
     } else if (action === "reject") {
-      updateSubmissionStatus(submissionData.id, "Revision Required");
+      updateSubmissionStatus(submissionData.id, "Revision Required", comment);
     }
     console.log(`${action} submission with comment:`, comment);
     setShowApprovalDialog(false);

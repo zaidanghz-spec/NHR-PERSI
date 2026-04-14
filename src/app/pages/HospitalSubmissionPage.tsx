@@ -9,6 +9,7 @@ import {
   Shield,
   ClipboardCheck,
   Calendar,
+  FileText,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { useData } from "../context/DataContext";
@@ -115,7 +116,7 @@ export function HospitalSubmissionPage() {
         </div>
 
         {/* NHR PERSI Assessment CTA */}
-        <div className="bg-white rounded-2xl border-2 border-[#14B8A6] p-8 mb-8 hover:shadow-xl transition-all">
+        <div className="bg-white rounded-2xl border-2 border-[#14B8A6] p-8 mb-6 hover:shadow-xl transition-all">
           <div className="flex items-start gap-6">
             <div className="w-16 h-16 bg-gradient-to-br from-[#0F4C81] to-[#14B8A6] rounded-2xl flex items-center justify-center flex-shrink-0">
               <ClipboardCheck className="w-8 h-8 text-white" />
@@ -151,6 +152,25 @@ export function HospitalSubmissionPage() {
                 <ArrowRight className="w-6 h-6 ml-3" />
               </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Hasil Penilaian CTA */}
+        <div 
+          onClick={() => navigate("/hospital/hasil-penilaian")}
+          className="bg-white rounded-2xl border border-gray-200 p-6 mb-8 flex items-center justify-between hover:shadow-md hover:border-[#0F4C81] transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-5">
+            <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+              <FileText className="w-7 h-7 text-[#0F4C81]" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-[#0F4C81] transition-colors">Hasil Penilaian & Review</h3>
+              <p className="text-sm text-gray-600">Pantau status submission dan lihat catatan revisi dari tim validator</p>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-[#0F4C81] transition-colors">
+            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-white" />
           </div>
         </div>
 

@@ -67,6 +67,7 @@ export interface SubmissionType {
     final: number;
   };
   details: any;
+  reviewerNotes?: string;
 }
 
 // ============ DEFAULT DATA ============
@@ -202,7 +203,7 @@ interface DataContextType {
   // Submissions
   submissions: SubmissionType[];
   addSubmission: (submission: Omit<SubmissionType, "id">) => void;
-  updateSubmissionStatus: (id: string, status: SubmissionType["status"]) => void;
+  updateSubmissionStatus: (id: string, status: SubmissionType["status"], notes?: string) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -368,8 +369,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSubmissions(prev => [{ ...sub, id: `SUB-${Date.now().toString().slice(-6)}` }, ...prev]);
   }, []);
 
-  const updateSubmissionStatus = useCallback((id: string, status: SubmissionType["status"]) => {
-    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+  const updateSubmissionStatus = useCallback((id: string, status: SubmissionType["status"], notes?: string) => {
+    setSubmissions(prev => prev.map(s => {
+      if (s.id === id) {
+        return { ...s, status, ...(notes !== undefined ? { reviewerNotes: notes } : {}) };
+      }
+      return s;
+    }));
   }, []);
 
   return (
