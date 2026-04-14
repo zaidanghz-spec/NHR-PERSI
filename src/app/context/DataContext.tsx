@@ -52,6 +52,23 @@ export interface ApprovedRanking {
   submissionId: string;
 }
 
+export interface SubmissionType {
+  id: string;
+  hospitalName: string;
+  picName: string;
+  specialty: string;
+  disease: string;
+  submittedDate: string;
+  status: "Pending" | "Approved" | "Revision Required";
+  scores: {
+    rsbk: number;
+    clinicalAudit: number;
+    patientReport: number;
+    final: number;
+  };
+  details: any;
+}
+
 // ============ DEFAULT DATA ============
 const defaultNews: NewsItem[] = [
   {
@@ -181,6 +198,11 @@ interface DataContextType {
   // Rankings
   approvedRankings: ApprovedRanking[];
   publishRanking: (ranking: Omit<ApprovedRanking, "id">) => void;
+
+  // Submissions
+  submissions: SubmissionType[];
+  addSubmission: (submission: Omit<SubmissionType, "id">) => void;
+  updateSubmissionStatus: (id: string, status: SubmissionType["status"]) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -205,12 +227,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return stored ? JSON.parse(stored) : null;
   });
   const [approvedRankings, setApprovedRankings] = useState<ApprovedRanking[]>(() => loadFromStorage("persi_rankings", []));
+  const [submissions, setSubmissions] = useState<SubmissionType[]>(() => loadFromStorage("persi_submissions", []));
 
   // Persist to localStorage
   useEffect(() => { localStorage.setItem("persi_news", JSON.stringify(news)); }, [news]);
   useEffect(() => { localStorage.setItem("persi_events", JSON.stringify(events)); }, [events]);
   useEffect(() => { localStorage.setItem("persi_hospital_accounts", JSON.stringify(hospitalAccounts)); }, [hospitalAccounts]);
   useEffect(() => { localStorage.setItem("persi_rankings", JSON.stringify(approvedRankings)); }, [approvedRankings]);
+  useEffect(() => { localStorage.setItem("persi_submissions", JSON.stringify(submissions)); }, [submissions]);
 
   // News
   const addNews = useCallback((item: Omit<NewsItem, "id">) => {
@@ -340,6 +364,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const addSubmission = useCallback((sub: Omit<SubmissionType, "id">) => {
+    setSubmissions(prev => [{ ...sub, id: `SUB-${Date.now().toString().slice(-6)}` }, ...prev]);
+  }, []);
+
+  const updateSubmissionStatus = useCallback((id: string, status: SubmissionType["status"]) => {
+    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+  }, []);
+
   return (
     <DataContext.Provider value={{
       news, addNews, updateNews, deleteNews,
@@ -348,6 +380,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       isAdmin, adminLogin, adminLogout,
       currentHospital, hospitalLogout,
       approvedRankings, publishRanking,
+      submissions, addSubmission, updateSubmissionStatus,
     }}>
       {children}
     </DataContext.Provider>

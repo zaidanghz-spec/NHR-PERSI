@@ -3,10 +3,12 @@ import { CheckCircle2, Clock, FileText, ChevronRight, ArrowRight } from "lucide-
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
+import { useData } from "../context/DataContext";
 
 export function SiapPersiResultPage() {
   const { specialty } = useParams<{ specialty: string }>();
   const navigate = useNavigate();
+  const { addSubmission } = useData();
   const specialtyInfo = specialtyAuditData[specialty as keyof typeof specialtyAuditData];
 
   // Get selected specialties
@@ -37,20 +39,30 @@ export function SiapPersiResultPage() {
   };
 
   const handleSubmit = () => {
-    const submissionData = {
-      hospitalName: JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}").hospitalName,
-      specialties: selectedSpecialties.map(spec => {
-        const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
-        return {
-          specialty: info.name,
-          disease: info.disease,
-        };
-      }),
-      submittedAt: new Date().toISOString(),
-      status: "Under Review",
-    };
-    
-    console.log("Submitting:", submissionData);
+    const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
+    const specialtiesList = selectedSpecialties.map(spec => {
+      const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+      return {
+        specialty: info.name,
+        disease: info.disease,
+      };
+    });
+
+    addSubmission({
+      hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
+      picName: hospitalAuth.picName || "Unknown PIC",
+      specialty: specialtiesList[0]?.specialty || "Multiple",
+      disease: specialtiesList[0]?.disease || "Multiple",
+      submittedDate: new Date().toISOString().split("T")[0],
+      status: "Pending",
+      scores: {
+        rsbk: rsbkScore,
+        clinicalAudit: clinicalAuditScore,
+        patientReport: patientReportScore,
+        final: totalSiapScore,
+      },
+      details: { specialties: specialtiesList },
+    });
     
     sessionStorage.removeItem("rsbkScore");
     sessionStorage.removeItem("clinicalAuditScore");

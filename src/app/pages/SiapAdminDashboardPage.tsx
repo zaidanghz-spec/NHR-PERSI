@@ -23,6 +23,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { SimpleSelect } from "../components/SimpleSelect";
+import { useData } from "../context/DataContext";
 
 // Submissions will be loaded from server in production
 const mockSubmissions: {
@@ -51,27 +52,9 @@ export function SiapAdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
-  const [surveyDocs, setSurveyDocs] = useState<CustomSurveyDoc[]>([]);
+  const { submissions } = useData();
 
-  // Load uploaded custom survey PDFs from localStorage
-  useEffect(() => {
-    const docs: CustomSurveyDoc[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("custom-survey-")) {
-        try {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            docs.push(parsed);
-          }
-        } catch {}
-      }
-    }
-    setSurveyDocs(docs);
-  }, []);
-
-  const filteredSubmissions = mockSubmissions.filter((submission) => {
+  const filteredSubmissions = submissions.filter((submission) => {
     const matchesSearch =
       submission.hospitalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       submission.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -83,12 +66,27 @@ export function SiapAdminDashboardPage() {
   });
 
   const stats = {
-    total: 0,
-    pending: 0,
-    approved: 0,
-    revision: 0,
-    averageScore: 0,
+    total: submissions.length,
+    pending: submissions.filter(s => s.status === "Pending").length,
+    approved: submissions.filter(s => s.status === "Approved").length,
+    revision: submissions.filter(s => s.status === "Revision Required").length,
+    averageScore: submissions.length > 0 
+      ? submissions.reduce((acc, s) => acc + s.scores.final, 0) / submissions.length 
+      : 0,
   };
+
+  const dynamicScoreDistribution = [
+    { range: "85-100 — A (Excellent)", count: submissions.filter(s => s.scores.final >= 85).length, color: "bg-green-500" },
+    { range: "70-84 — B (Good)", count: submissions.filter(s => s.scores.final >= 70 && s.scores.final < 85).length, color: "bg-blue-500" },
+    { range: "55-69 — C (Average)", count: submissions.filter(s => s.scores.final >= 55 && s.scores.final < 70).length, color: "bg-yellow-500" },
+    { range: "0-54 — D (Below Standard)", count: submissions.filter(s => s.scores.final < 55).length, color: "bg-red-500" },
+  ];
+
+  const dynamicStatusDistribution = [
+    { name: "Pending", value: stats.pending, color: "#F59E0B" },
+    { name: "Approved", value: stats.approved, color: "#10B981" },
+    { name: "Revision Required", value: stats.revision, color: "#EF4444" },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -148,7 +146,7 @@ export function SiapAdminDashboardPage() {
               Distribusi Skor
             </h3>
             <div className="space-y-4">
-              {scoreDistribution.map((item) => (
+              {dynamicScoreDistribution.map((item) => (
                 <div key={item.range}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700">{item.range}</span>
@@ -157,7 +155,7 @@ export function SiapAdminDashboardPage() {
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
                       className={`${item.color} h-3 rounded-full transition-all duration-500`}
-                      style={{ width: item.count > 0 ? `${(item.count / 60) * 100}%` : "2%" }}
+                      style={{ width: stats.total > 0 && item.count > 0 ? `${(item.count / stats.total) * 100}%` : "0%" }}
                     />
                   </div>
                 </div>
@@ -171,7 +169,7 @@ export function SiapAdminDashboardPage() {
               Status Submission
             </h3>
             <div className="space-y-4">
-              {statusDistribution.map((item) => (
+              {dynamicStatusDistribution.map((item) => (
                 <div key={item.name} className="flex items-center gap-4">
                   <div
                     className="w-4 h-4 rounded-full flex-shrink-0"
@@ -187,7 +185,7 @@ export function SiapAdminDashboardPage() {
                         className="h-2 rounded-full transition-all duration-500"
                         style={{
                           backgroundColor: item.color,
-                          width: item.value > 0 ? `${Math.min((item.value / 74) * 100, 100)}%` : "2%",
+                          width: stats.total > 0 && item.value > 0 ? `${(item.value / stats.total) * 100}%` : "0%",
                           opacity: item.value > 0 ? 1 : 0.3,
                         }}
                       />
@@ -198,47 +196,6 @@ export function SiapAdminDashboardPage() {
             </div>
           </div>
         </div>
-
-                {/* Custom Survey Documents List */}
-        {surveyDocs.length > 0 && (
-          <div className="bg-white rounded-xl border-2 border-indigo-200 p-6 mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Survei PREM/PROM Internal RS</h3>
-                <p className="text-sm text-gray-500">Dokumen survei yang diupload oleh rumah sakit</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {surveyDocs.map((doc, i) => (
-                <div key={i} className="flex items-start gap-4 p-4 border border-indigo-100 rounded-xl bg-indigo-50/20 hover:bg-indigo-50 transition-colors">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <FileText className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                        {doc.hospitalName}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                        {doc.specialty}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <a href={doc.base64} target="_blank" rel="noopener noreferrer" className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors">
-                      <ExternalLink className="w-5 h-5" />
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Filters */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
@@ -346,7 +303,7 @@ export function SiapAdminDashboardPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-lg font-bold text-[#0F4C81]">{submission.finalScore}</span>
+                        <span className="text-lg font-bold text-[#0F4C81]">{submission.scores?.final?.toFixed(1) || 0}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={submission.status} />

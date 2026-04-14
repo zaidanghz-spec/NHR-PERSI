@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
+import { useData } from "../context/DataContext";
 
 // Type for uploaded custom survey document
 interface CustomSurveyDoc {
@@ -50,14 +51,27 @@ export function SiapAdminReviewPage() {
     setCustomSurveyDocs(docs);
   }, []);
 
+  const { submissions, updateSubmissionStatus, publishRanking } = useData();
+
   // Submission data will be loaded from server based on submission ID
-  // Empty placeholder for production launch
-  const submissionData = {
+  const actualSubmission = submissions.find(s => s.id === id);
+
+  const submissionData = actualSubmission ? {
+    id: actualSubmission.id,
+    hospitalName: actualSubmission.hospitalName,
+    specialty: actualSubmission.specialty,
+    submittedDate: actualSubmission.submittedDate,
+    picName: actualSubmission.picName,
+    scores: actualSubmission.scores,
+    status: actualSubmission.status,
+    rsbkDetails: { medicalStaff: [], facilities: [] }
+  } : {
     id: id || "—",
     hospitalName: "Menunggu data dari server...",
     specialty: "—",
     submittedDate: "—",
     picName: "—",
+    status: "Pending",
     scores: {
       rsbk: 0,
       clinicalAudit: 0,
@@ -69,6 +83,11 @@ export function SiapAdminReviewPage() {
       facilities: [] as { name: string; value: string; score: number }[],
     },
   };
+
+  const filteredDocs = customSurveyDocs.filter(d => 
+    d.hospitalName === submissionData.hospitalName && 
+    (submissionData.specialty === "Multiple" || d.specialty === submissionData.specialty)
+  );
 
   const radarData = [
     { category: "Hospital Structure", value: submissionData.scores.rsbk },
@@ -91,7 +110,25 @@ export function SiapAdminReviewPage() {
   };
 
   const confirmAction = () => {
-    // Handle approval/rejection logic
+    if (action === "approve") {
+      updateSubmissionStatus(submissionData.id, "Approved");
+      
+      publishRanking({
+        hospitalName: submissionData.hospitalName,
+        city: "Jakarta Pusat", // Dummy
+        province: "DKI Jakarta", // Dummy
+        specialty: submissionData.specialty === "—" ? "Cardiology" : submissionData.specialty,
+        finalScore: submissionData.scores.final,
+        rsbkScore: submissionData.scores.rsbk,
+        clinicalAuditScore: submissionData.scores.clinicalAudit,
+        patientReportScore: submissionData.scores.patientReport,
+        grade: gradeInfo.grade,
+        approvedAt: new Date().toISOString(),
+        submissionId: submissionData.id,
+      });
+    } else if (action === "reject") {
+      updateSubmissionStatus(submissionData.id, "Revision Required");
+    }
     console.log(`${action} submission with comment:`, comment);
     setShowApprovalDialog(false);
   };
@@ -229,6 +266,47 @@ export function SiapAdminReviewPage() {
             </div>
           </div>
         </div>
+
+        {/* Custom Survey Documents List */}
+        {filteredDocs.length > 0 && (
+          <div className="bg-white rounded-xl border-2 border-indigo-200 p-8 mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <FileText className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Survei PREM/PROM Internal RS</h3>
+                <p className="text-sm text-gray-500">Dokumen survei yang diupload oleh rumah sakit</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredDocs.map((doc, i) => (
+                <div key={i} className="flex items-start gap-4 p-4 border border-indigo-100 rounded-xl bg-indigo-50/20 hover:bg-indigo-50 transition-colors">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                        {doc.hospitalName}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                        {doc.specialty}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <a href={doc.base64} target="_blank" rel="noopener noreferrer" className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors">
+                      <ExternalLink className="w-5 h-5" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* RSBK Details */}
         <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8">
