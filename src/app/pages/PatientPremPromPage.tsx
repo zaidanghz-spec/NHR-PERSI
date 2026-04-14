@@ -253,7 +253,9 @@ export function PatientPremPromPage() {
                 key={opt.value}
                 className={`rounded-xl p-3 md:p-4 text-center border-2 ${
                   opt.color === "green" ? "bg-green-50 border-green-200" :
+                  opt.color === "teal" ? "bg-teal-50 border-teal-200" :
                   opt.color === "yellow" ? "bg-yellow-50 border-yellow-200" :
+                  opt.color === "orange" ? "bg-orange-50 border-orange-200" :
                   "bg-red-50 border-red-200"
                 }`}
               >
@@ -373,7 +375,9 @@ function SurveyQuestion({
               const isSelected = value === opt.value;
               const colorMap: Record<string, { selected: string; hover: string }> = {
                 green: { selected: "border-green-500 bg-green-50 ring-2 ring-green-200", hover: "hover:border-green-300" },
+                teal: { selected: "border-teal-500 bg-teal-50 ring-2 ring-teal-200", hover: "hover:border-teal-300" },
                 yellow: { selected: "border-yellow-500 bg-yellow-50 ring-2 ring-yellow-200", hover: "hover:border-yellow-300" },
+                orange: { selected: "border-orange-500 bg-orange-50 ring-2 ring-orange-200", hover: "hover:border-orange-300" },
                 red: { selected: "border-red-500 bg-red-50 ring-2 ring-red-200", hover: "hover:border-red-300" },
               };
               const colors = colorMap[opt.color];
