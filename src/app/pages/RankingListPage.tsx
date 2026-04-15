@@ -14,6 +14,7 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useData } from "../context/DataContext";
+import { motion } from "framer-motion";
 
 export function RankingListPage() {
   const { approvedRankings } = useData();
@@ -135,9 +136,23 @@ export function RankingListPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <motion.tbody 
+                  className="divide-y divide-gray-100"
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    visible: { transition: { staggerChildren: 0.05 } },
+                  }}
+                >
                   {filtered.map((r, idx) => (
-                    <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                    <motion.tr 
+                      key={r.id} 
+                      className="hover:bg-gray-50 transition-colors"
+                      variants={{
+                        hidden: { opacity: 0, y: 15 },
+                        visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+                      }}
+                    >
                       <td className="px-6 py-4">
                         <span
                           className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-[700] text-sm ${
@@ -194,9 +209,9 @@ export function RankingListPage() {
                           {r.grade}
                         </span>
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
-                </tbody>
+                </motion.tbody>
               </table>
 
               {filtered.length === 0 && (

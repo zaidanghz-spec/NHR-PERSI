@@ -25,6 +25,7 @@ import { Button } from "../components/ui/button";
 import { useState } from "react";
 import { useData } from "../context/DataContext";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { motion } from "framer-motion";
 
 export function NewHomePage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -335,52 +336,67 @@ export function NewHomePage() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <motion.div 
+            className="grid md:grid-cols-3 gap-6"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+          >
             {latestNews.map((item) => (
-              <Link to={`/news/${item.id}`} key={item.id} className="group">
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all h-full flex flex-col">
-                  <div className="aspect-[16/10] overflow-hidden">
-                    <ImageWithFallback
-                      src={item.imageUrl}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="p-5 flex-1 flex flex-col">
-                    <span
-                      className={`inline-block w-fit text-[10px] font-[600] uppercase px-2 py-0.5 rounded mb-2 ${
-                        item.category === "berita"
-                          ? "bg-blue-100 text-blue-700"
-                          : item.category === "publikasi"
-                          ? "bg-green-100 text-green-700"
-                          : item.category === "regulasi"
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-orange-100 text-orange-700"
-                      }`}
-                    >
-                      {item.category}
-                    </span>
-                    <h3 className="font-[600] text-gray-900 mb-2 group-hover:text-[#1E3A8A] transition-colors line-clamp-2 leading-snug flex-1">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 line-clamp-2 mb-3">
-                      {item.excerpt}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-auto">
-                      <span>{item.author}</span>
-                      <span>&bull;</span>
-                      <span>
-                        {new Date(item.publishedAt).toLocaleDateString(
-                          "id-ID",
-                          { day: "numeric", month: "short", year: "numeric" }
-                        )}
+              <motion.div 
+                key={item.id}
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 20 } }
+                }}
+                className="h-full"
+              >
+                <Link to={`/news/${item.id}`} className="group block h-full">
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all h-full flex flex-col">
+                    <div className="aspect-[16/10] overflow-hidden">
+                      <ImageWithFallback
+                        src={item.imageUrl}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                    <div className="p-5 flex-1 flex flex-col">
+                      <span
+                        className={`inline-block w-fit text-[10px] font-[600] uppercase px-2 py-0.5 rounded mb-2 ${
+                          item.category === "berita"
+                            ? "bg-blue-100 text-blue-700"
+                            : item.category === "publikasi"
+                            ? "bg-green-100 text-green-700"
+                            : item.category === "regulasi"
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-orange-100 text-orange-700"
+                        }`}
+                      >
+                        {item.category}
                       </span>
+                      <h3 className="font-[600] text-gray-900 mb-2 group-hover:text-[#1E3A8A] transition-colors line-clamp-2 leading-snug flex-1">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm text-gray-500 line-clamp-2 mb-3">
+                        {item.excerpt}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-auto">
+                        <span>{item.author}</span>
+                        <span>&bull;</span>
+                        <span>
+                          {new Date(item.publishedAt).toLocaleDateString(
+                            "id-ID",
+                            { day: "numeric", month: "short", year: "numeric" }
+                          )}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -404,12 +420,22 @@ export function NewHomePage() {
         </div>
 
         {upcomingEvents.length > 0 ? (
-          <div className="grid md:grid-cols-3 gap-6">
+          <motion.div 
+            className="grid md:grid-cols-3 gap-6"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+          >
             {upcomingEvents.map((event) => {
               const dateObj = new Date(event.date);
               return (
-                <div
+                <motion.div
                   key={event.id}
+                  variants={{
+                    hidden: { opacity: 0, y: 20 },
+                    visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 20 } }
+                  }}
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all"
                 >
                   <div className="relative h-44 overflow-hidden">
@@ -457,10 +483,10 @@ export function NewHomePage() {
                       <span className="truncate">{event.location}</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
         ) : (
           <div className="bg-gray-50 rounded-xl p-10 text-center">
             <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -649,19 +675,21 @@ function QuickNavCard({
   to: string;
 }) {
   return (
-    <Link
-      to={to}
-      className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-3 transition-colors group"
-    >
-      <div className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center text-white/80 group-hover:text-white">
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-[600] text-white">{title}</div>
-        <div className="text-xs text-white/50 truncate">{desc}</div>
-      </div>
-      <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-white/60" />
-    </Link>
+    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="h-full">
+      <Link
+        to={to}
+        className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-3 transition-colors group h-full"
+      >
+        <div className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center text-white/80 group-hover:text-white">
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-[600] text-white">{title}</div>
+          <div className="text-xs text-white/50 truncate">{desc}</div>
+        </div>
+        <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-white/60" />
+      </Link>
+    </motion.div>
   );
 }
 
@@ -681,7 +709,10 @@ function PillarCard({
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
+    <motion.div 
+      whileHover={{ y: -8 }}
+      className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all"
+    >
       <div className="flex items-center justify-between mb-4">
         <div
           className={`w-12 h-12 ${color} rounded-lg flex items-center justify-center text-white`}
@@ -693,7 +724,7 @@ function PillarCard({
       <h3 className="font-[700] text-gray-900 mb-1">{title}</h3>
       <p className="text-sm text-[#0D9488] font-[500] mb-2">{subtitle}</p>
       <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -709,8 +740,8 @@ function StepCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="relative">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 h-full hover:shadow-md transition-shadow">
+    <motion.div whileHover={{ y: -8 }} className="relative h-full">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 h-full hover:shadow-lg transition-all">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-[#1E3A8A] text-white rounded-full flex items-center justify-center font-[700]">
             {number}
@@ -722,6 +753,6 @@ function StepCard({
         <h4 className="font-[600] text-gray-900 mb-2">{title}</h4>
         <p className="text-sm text-gray-600 leading-relaxed">{description}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }

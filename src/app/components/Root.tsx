@@ -1,4 +1,5 @@
-import { Outlet, Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate, useOutlet } from "react-router";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Building2,
   User,
@@ -15,6 +16,7 @@ import { useData } from "../context/DataContext";
 export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
+  const outlet = useOutlet();
   const { isAdmin, adminLogout, currentHospital, hospitalLogout } = useData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -45,7 +47,7 @@ export function Root() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen flex flex-col bg-white">
       {/* Header */}
       <header className="border-b border-gray-200 bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-3">
@@ -66,21 +68,28 @@ export function Root() {
             </Link>
 
             {/* Desktop Nav */}
-            <nav className="hidden lg:flex items-center gap-1">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  className={`px-4 py-2 rounded-lg text-sm font-[500] transition-colors ${
-                    isActive(link.to) &&
-                    (link.to === "/" ? location.pathname === "/" : true)
-                      ? "text-[#1E3A8A] bg-blue-50"
-                      : "text-gray-600 hover:text-[#1E3A8A] hover:bg-gray-50"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+            <nav className="hidden lg:flex items-center gap-2 relative">
+              {navLinks.map((link) => {
+                const active = isActive(link.to) && (link.to === "/" ? location.pathname === "/" : true);
+                return (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className={`relative px-4 py-2 rounded-lg text-sm font-[500] transition-colors z-10 ${
+                      active ? "text-[#1E3A8A]" : "text-gray-600 hover:text-[#1E3A8A]"
+                    }`}
+                  >
+                    {active && (
+                      <motion.div
+                        layoutId="active-nav-pill"
+                        className="absolute inset-0 bg-blue-50/80 rounded-lg -z-10"
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      />
+                    )}
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
 
             {/* Right Actions */}
@@ -177,38 +186,60 @@ export function Root() {
           </div>
 
           {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div className="lg:hidden pt-4 pb-2 border-t border-gray-100 mt-3">
-              <div className="space-y-1">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`block px-4 py-2.5 rounded-lg text-sm font-[500] ${
-                      isActive(link.to)
-                        ? "text-[#1E3A8A] bg-blue-50"
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-                <Link
-                  to="/hospital-login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-2.5 rounded-lg text-sm font-[600] text-[#0D9488]"
-                >
-                  Portal Rumah Sakit
-                </Link>
-              </div>
-            </div>
-          )}
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="lg:hidden overflow-hidden"
+              >
+                <div className="pt-4 pb-2 border-t border-gray-100 mt-3">
+                  <div className="space-y-1">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.to}
+                        to={link.to}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`block px-4 py-2.5 rounded-lg text-sm font-[500] ${
+                          isActive(link.to)
+                            ? "text-[#1E3A8A] bg-blue-50"
+                            : "text-gray-600 hover:bg-gray-50 bg-transparent transition-colors"
+                        }`}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                    <Link
+                      to="/hospital-login"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block px-4 py-2.5 rounded-lg text-sm font-[600] text-[#0D9488]"
+                    >
+                      Portal Rumah Sakit
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </header>
 
       {/* Main Content */}
-      <Outlet />
+      <AnimatePresence mode="wait">
+        <motion.main
+          // We use pathname as key so framer-motion triggers on route change
+          key={location.pathname}
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.98 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="flex-grow flex flex-col"
+        >
+          {outlet}
+        </motion.main>
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white mt-0">
