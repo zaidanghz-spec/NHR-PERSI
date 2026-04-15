@@ -89,12 +89,12 @@ export function AdminDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-8">
+        <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-8 overflow-x-auto no-scrollbar">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-[500] transition-colors ${
+              className={`flex-shrink-0 whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-[500] transition-colors ${
                 activeTab === tab.key
                   ? "bg-[#1E3A8A] text-white"
                   : "text-gray-600 hover:bg-gray-50"
@@ -245,7 +245,8 @@ function AccountsTab({
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-5 py-3 text-left text-xs font-[600] text-gray-500 uppercase">Rumah Sakit</th>
@@ -335,6 +336,7 @@ function AccountsTab({
             })}
           </tbody>
         </table>
+        </div>
         {accounts.length === 0 && (
           <div className="py-10 text-center text-gray-400">
             Belum ada akun rumah sakit terdaftar
@@ -522,7 +524,8 @@ function NewsTab({
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-5 py-3 text-left text-xs font-[600] text-gray-500 uppercase">
@@ -581,6 +584,7 @@ function NewsTab({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -743,7 +747,8 @@ function EventsTab({
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-5 py-3 text-left text-xs font-[600] text-gray-500 uppercase">
@@ -802,6 +807,7 @@ function EventsTab({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

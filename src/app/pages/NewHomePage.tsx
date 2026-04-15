@@ -643,17 +643,17 @@ export function NewHomePage() {
             PERSI Assessment dan tunjukkan keunggulan institusi Anda kepada
             masyarakat.
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link to="/hospital-login">
-              <Button className="bg-white text-[#1E3A8A] hover:bg-white/90 h-12 px-8 font-[600]">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link to="/hospital-login" className="w-full sm:w-auto">
+              <Button className="w-full bg-white text-[#1E3A8A] hover:bg-white/90 h-12 px-6 font-[600]">
                 Portal Rumah Sakit
                 <ChevronRight className="w-5 h-5 ml-1" />
               </Button>
             </Link>
-            <Link to="/methodology">
+            <Link to="/methodology" className="w-full sm:w-auto">
               <Button
                 variant="outline"
-                className="bg-transparent border-white/40 text-white hover:bg-white/10 h-12 px-8 font-[600]"
+                className="w-full bg-transparent border-white/40 text-white hover:bg-white/10 h-12 px-6 font-[600]"
               >
                 Pelajari Metodologi
               </Button>
