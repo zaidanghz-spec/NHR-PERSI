@@ -238,7 +238,7 @@ export function SiapAdminReviewPage() {
               activeTab === "rsbk" ? "bg-blue-50 text-blue-700 shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             }`}
           >
-            Hospital Structure (RSBK)
+            Hospital Structure (Hospital Structure)
           </button>
           <button
             onClick={() => setActiveTab("audit")}
@@ -316,11 +316,11 @@ export function SiapAdminReviewPage() {
           </div>
         )}
 
-        {/* --- TAB CONTENT: HOSPITAL STRUCTURE (RSBK) --- */}
+        {/* --- TAB CONTENT: HOSPITAL STRUCTURE (Hospital Structure) --- */}
         {activeTab === "rsbk" && (
           <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight">
-              Hospital Structure Detail (RSBK)
+              Hospital Structure Detail (Hospital Structure)
             </h3>
             
             <div className="space-y-8">

@@ -127,7 +127,7 @@ export function HospitalSubmissionPage() {
               </h2>
               <p className="text-gray-600 mb-4 leading-relaxed">
                 Mulai penilaian layanan spesialistik rumah sakit Anda. Pilih pelayanan
-                (Kardiologi, Neurologi, atau Onkologi) dan isi form RSBK, Clinical Audit,
+                (Kardiologi, Neurologi, atau Onkologi) dan isi form Hospital Structure, Clinical Audit,
                 serta Patient Report.
               </p>
               <div className="grid grid-cols-3 gap-3 mb-6">

@@ -151,14 +151,14 @@ export function RsbkFormPage() {
 
         {/* Info Banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-          <h3 className="font-bold text-gray-900 mb-2">Panduan Pengisian RSBK</h3>
+          <h3 className="font-bold text-gray-900 mb-2">Panduan Pengisian Hospital Structure</h3>
           <p className="text-sm text-[#0F4C81] font-semibold mb-3">
             {specialtyInfo.name} — SDM Target: {sdmTargetPoints} poin (maks 50) | Sarpras Target: {sarprasTargetPoints} poin (maks 50)
           </p>
           <div className="space-y-2 text-sm text-gray-700">
             <p>&bull; Klik tombol <strong>+</strong> untuk mulai mengisi (dimulai dari 0). Setiap dokter = 1 poin, setiap bed = 1 poin, setiap ruangan = <strong>5 poin</strong></p>
             <p>&bull; <strong>Hospital Structure Score</strong> = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = <strong>0–100</strong></p>
-            <p>&bull; Nilai RSBK dikalikan bobot <strong>15%</strong> untuk peringkat nasional</p>
+            <p>&bull; Nilai Hospital Structure dikalikan bobot <strong>15%</strong> untuk peringkat nasional</p>
           </div>
         </div>
 
@@ -333,7 +333,7 @@ export function RsbkFormPage() {
           <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 mt-4">
             <p><strong>Rumus:</strong> Hospital Structure Score = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = 0–100</p>
             <p className="mt-1">Sub-Skor SDM = (Poin SDM / Target SDM) × 50 | Sub-Skor Sarpras = (Total Bed + Ruangan×5 + Alat) / Target × 50</p>
-            <p className="mt-1">Nilai akhir RSBK dikalikan bobot <strong>15%</strong> untuk peringkat nasional.</p>
+            <p className="mt-1">Nilai akhir Hospital Structure dikalikan bobot <strong>15%</strong> untuk peringkat nasional.</p>
           </div>
         </div>
 

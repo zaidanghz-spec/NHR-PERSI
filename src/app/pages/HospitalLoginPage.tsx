@@ -195,7 +195,7 @@ export function HospitalLoginPage() {
             <InfoItem icon={<Building2 className="w-4 h-4" />} title="Registrasi Terbuka" description="Rumah sakit dapat mendaftar langsung dengan mengisi data dan mengunggah surat tugas" />
             <InfoItem icon={<FileText className="w-4 h-4" />} title="Upload Surat Tugas" description="Surat tugas PIC wajib diunggah saat registrasi (PDF, maks 2MB)" />
             <InfoItem icon={<Clock className="w-4 h-4" />} title="Aktivasi oleh Admin" description="Setelah mendaftar, akun harus diaktifkan oleh admin PERSI sebelum bisa login" />
-            <InfoItem icon={<CheckCircle2 className="w-4 h-4" />} title="Assessment Terstruktur" description="Isi data RSBK, Clinical Audit, dan Patient Report per pelayanan" />
+            <InfoItem icon={<CheckCircle2 className="w-4 h-4" />} title="Assessment Terstruktur" description="Isi data Hospital Structure, Clinical Audit, dan Patient Report per pelayanan" />
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10">
             <p className="text-sm text-white/70">

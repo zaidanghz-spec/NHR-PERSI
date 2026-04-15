@@ -27,7 +27,7 @@ export function SiapPersiResultPage() {
   const clinicalAuditScore = parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditScore`) || "0");
   const patientReportScore = parseFloat(sessionStorage.getItem(`${specialty}_patientReportScore`) || "0");
 
-  // Calculate weighted total: RSBK 15%, Clinical Audit 60%, Patient Report 25%
+  // Calculate weighted total: Hospital Structure 15%, Clinical Audit 60%, Patient Report 25%
   const rsbkWeighted = Number((rsbkScore * 0.15).toFixed(2));
   const auditWeighted = Number((clinicalAuditScore * 0.60).toFixed(2));
   const prmWeighted = Number((patientReportScore * 0.25).toFixed(2));
@@ -204,7 +204,7 @@ export function SiapPersiResultPage() {
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-            <p><strong>Rumus:</strong> Total = (RSBK x 15%) + (Clinical Audit x 60%) + (Patient Report x 25%)</p>
+            <p><strong>Rumus:</strong> Total = (Hospital Structure x 15%) + (Clinical Audit x 60%) + (Patient Report x 25%)</p>
           </div>
         </div>
 

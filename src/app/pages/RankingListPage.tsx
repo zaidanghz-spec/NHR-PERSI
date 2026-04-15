@@ -121,7 +121,7 @@ export function RankingListPage() {
                       Pelayanan
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-[600] text-gray-500 uppercase tracking-wider">
-                      RSBK
+                      Hospital Structure
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-[600] text-gray-500 uppercase tracking-wider">
                       Clinical Audit
@@ -253,7 +253,7 @@ export function RankingListPage() {
                     number={1}
                     icon={<FileCheck className="w-5 h-5" />}
                     title="Rumah Sakit Submit Assessment"
-                    description="Lengkapi NHR PERSI Assessment: RSBK, Clinical Audit, dan Patient Report"
+                    description="Lengkapi NHR PERSI Assessment: Hospital Structure, Clinical Audit, dan Patient Report"
                     status="current"
                   />
                   <TimelineStep

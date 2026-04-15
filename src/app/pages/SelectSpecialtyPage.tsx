@@ -72,7 +72,7 @@ export function SelectSpecialtyPage() {
     sessionStorage.setItem("selectedSpecialties", JSON.stringify(selectedSpecialties));
     draftManager.setCurrentDraftId(draft.draftId);
     
-    // Navigate to first specialty's RSBK
+    // Navigate to first specialty's Hospital Structure
     navigate(`/siap-persi/rsbk/${selectedSpecialties[0]}`);
   };
 
@@ -294,7 +294,7 @@ export function SelectSpecialtyPage() {
                   <div className="grid grid-cols-1 gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-blue-400" />
-                      <span className="text-sm font-bold opacity-90">Bobot RSBK: 15%</span>
+                      <span className="text-sm font-bold opacity-90">Bobot Hospital Structure: 15%</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-teal-400" />
