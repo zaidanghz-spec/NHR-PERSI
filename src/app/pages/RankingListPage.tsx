@@ -107,8 +107,9 @@ export function RankingListPage() {
 
             {/* Ranking Table */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px]">
+                  <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-[600] text-gray-500 uppercase tracking-wider">
                       Rank
@@ -213,6 +214,7 @@ export function RankingListPage() {
                   ))}
                 </motion.tbody>
               </table>
+            </div>
 
               {filtered.length === 0 && (
                 <div className="py-12 text-center">

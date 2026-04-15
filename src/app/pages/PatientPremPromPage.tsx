@@ -247,7 +247,7 @@ export function PatientPremPromPage() {
         {/* Rating Guide */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-5">
           <h3 className="font-bold text-gray-900 mb-3">Panduan Penilaian</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
             {ratingOptions.map((opt) => (
               <div
                 key={opt.value}
@@ -367,10 +367,10 @@ function SurveyQuestion({
               {subCategory}
             </div>
           )}
-          <p className="font-medium text-gray-900 mb-3 leading-relaxed text-sm">
+          <p className="font-medium text-gray-900 mb-4 leading-relaxed text-sm md:text-base">
             {question}
           </p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col sm:grid sm:grid-cols-2 md:grid-cols-5 gap-2">
             {ratingOptions.map((opt) => {
               const isSelected = value === opt.value;
               const colorMap: Record<string, { selected: string; hover: string }> = {
@@ -386,12 +386,12 @@ function SurveyQuestion({
                 <button
                   key={opt.value}
                   onClick={() => onChange(opt.value)}
-                  className={`py-3 px-2 rounded-xl border-2 text-center transition-all ${
+                  className={`p-3 md:py-3 md:px-2 rounded-xl border-2 flex items-center md:flex-col md:justify-center gap-3 md:gap-1 transition-all text-left md:text-center ${
                     isSelected ? colors.selected : `border-gray-200 ${colors.hover}`
                   }`}
                 >
-                  <div className="text-2xl mb-0.5">{opt.emoji}</div>
-                  <div className={`text-sm font-semibold ${isSelected ? "text-gray-900" : "text-gray-600"}`}>
+                  <div className="text-xl md:text-2xl">{opt.emoji}</div>
+                  <div className={`text-sm font-semibold flex-1 md:flex-none ${isSelected ? "text-gray-900" : "text-gray-600"}`}>
                     {opt.label}
                   </div>
                 </button>
