@@ -581,8 +581,7 @@ export function NewHomePage() {
                   <div>
                     <h4 className="font-[600] mb-1">NHR PERSI</h4>
                     <p className="text-sm text-white/70 leading-relaxed">
-                      Sistem penilaian kualitas RS berbasis tiga pilar: RSBK,
-                      Clinical Audit, dan Patient Report (PREM & PROM).
+                      Sistem penilaian kualitas RS berbasis tiga pilar: Hospital Structure, Clinical Audit, dan Patient Report (PREM & PROM).
                     </p>
                   </div>
                 </div>
@@ -614,7 +613,7 @@ export function NewHomePage() {
           <StepCard
             number={2}
             title="Isi Assessment"
-            description="Lengkapi data RSBK, Clinical Audit, dan Patient Report per pelayanan"
+            description="Lengkapi data Hospital Structure, Clinical Audit, dan Patient Report per pelayanan"
             icon={<FileText className="w-6 h-6" />}
           />
           <StepCard

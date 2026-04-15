@@ -109,7 +109,7 @@ export function MethodologyPage() {
               </div>
               <div>
                 <h3 className="text-xl font-[700] text-gray-900">
-                  Pilar 1: RSBK (Rumah Sakit Berstandar Kemampuan)
+                  Pilar 1: Hospital Structure
                 </h3>
                 <p className="text-sm text-[#D97706] font-[600]">
                   Bobot: 15%
@@ -132,10 +132,8 @@ export function MethodologyPage() {
                 {[
                   "Jumlah dan kualifikasi dokter spesialis sesuai SIP terbaru",
                   "Ketersediaan peralatan medis esensial sesuai inventaris",
-                  "Rasio tenaga kesehatan per tempat tidur",
                   "Ketersediaan fasilitas penunjang (laboratorium, radiologi, dll)",
                   "Infrastruktur dan sistem pendukung layanan",
-                  "Kesesuaian dengan standar kemampuan kelas RS",
                 ].map((item, i) => (
                   <li
                     key={i}
@@ -153,7 +151,7 @@ export function MethodologyPage() {
                 <Info className="w-4 h-4 text-[#1E3A8A] mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-gray-700">
                   <strong>Sumber Data:</strong> Data diinput langsung oleh admin
-                  RS melalui formulir RSBK. Sistem melakukan auto-scoring
+                  RS melalui formulir Hospital Structure. Sistem melakukan auto-scoring
                   berdasarkan kesesuaian data dengan standar PERSI.
                 </p>
               </div>
@@ -271,14 +269,21 @@ export function MethodologyPage() {
             </div>
 
             <div className="bg-orange-50 rounded-lg p-4">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-[#D97706] mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-700">
-                  <strong>Metode:</strong> Survei menggunakan skala Likert yang
-                  diberikan kepada pasien atau keluarga. RS mengunggah hasil
-                  survei melalui portal NHR PERSI. Minimum 30 responden per
-                  pelayanan.
-                </p>
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-[#D97706] mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-gray-700 space-y-2">
+                  <p>
+                    <strong>Metode Pengumpulan Data:</strong> Terdapat dua metode pelaksanaan survei yang dapat dipilih oleh rumah sakit (minimum 30 responden per pelayanan):
+                  </p>
+                  <ol className="list-decimal pl-4 space-y-2 ml-1">
+                    <li>
+                      <strong>Survei Digital Terintegrasi:</strong> Rumah sakit dapat mengunduh QR Code atau menyalin tautan survei yang dihasilkan langsung oleh portal NHR PERSI untuk dibagikan kepada pasien. Jawaban responden akan masuk otomatis ke dalam server dan langsung mendapatkan <i>auto-scoring</i>.
+                    </li>
+                    <li>
+                      <strong>Unggah Dokumen Survei Independen:</strong> Jika rumah sakit telah melaksanakan survei kepuasan pasien internal secara mandiri, rekapitulasi hasilnya dapat diunggah terpisah. Tim reviewer PERSI akan mengevaluasi dokumen tersebut dan memberikan penilaian yang sesuai.
+                    </li>
+                  </ol>
+                </div>
               </div>
             </div>
           </div>
@@ -304,7 +309,7 @@ export function MethodologyPage() {
             </div>
             <div className="text-gray-700">
               <div>
-                Skor Final = (RSBK &times; 0.15) + (Clinical Audit &times;
+                Skor Final = (Hospital Structure &times; 0.15) + (Clinical Audit &times;
                 0.60) + (Patient Report &times; 0.25)
               </div>
             </div>
