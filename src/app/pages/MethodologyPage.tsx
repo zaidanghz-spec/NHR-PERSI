@@ -317,26 +317,31 @@ export function MethodologyPage() {
 
           {/* Grading */}
           <h4 className="font-[600] text-gray-900 mb-3">Sistem Grading:</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-white rounded-lg p-4 text-center border border-green-200">
-              <div className="text-2xl font-[700] text-green-600 mb-1">A</div>
-              <div className="text-sm text-gray-600">85 - 100</div>
-              <div className="text-xs text-gray-400">Excellent</div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="bg-white rounded-lg p-4 text-center border border-purple-200">
+              <div className="text-xl md:text-2xl font-[700] text-purple-600 mb-1">Tier 1</div>
+              <div className="text-sm text-gray-600 font-medium">90 - 100</div>
+              <div className="text-xs text-gray-400 font-bold mt-1">Platinum</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 text-center border border-emerald-200">
+              <div className="text-xl md:text-2xl font-[700] text-emerald-600 mb-1">Tier 2</div>
+              <div className="text-sm text-gray-600 font-medium">80 - 89</div>
+              <div className="text-xs text-gray-400 font-bold mt-1">Outstanding</div>
             </div>
             <div className="bg-white rounded-lg p-4 text-center border border-blue-200">
-              <div className="text-2xl font-[700] text-blue-600 mb-1">B</div>
-              <div className="text-sm text-gray-600">70 - 84</div>
-              <div className="text-xs text-gray-400">Good</div>
+              <div className="text-xl md:text-2xl font-[700] text-blue-600 mb-1">Tier 3</div>
+              <div className="text-sm text-gray-600 font-medium">70 - 79</div>
+              <div className="text-xs text-gray-400 font-bold mt-1">Excellent</div>
             </div>
-            <div className="bg-white rounded-lg p-4 text-center border border-yellow-200">
-              <div className="text-2xl font-[700] text-yellow-600 mb-1">C</div>
-              <div className="text-sm text-gray-600">55 - 69</div>
-              <div className="text-xs text-gray-400">Average</div>
+            <div className="bg-white rounded-lg p-4 text-center border border-amber-200">
+              <div className="text-xl md:text-2xl font-[700] text-amber-600 mb-1">Tier 4</div>
+              <div className="text-sm text-gray-600 font-medium">60 - 69</div>
+              <div className="text-xs text-gray-400 font-bold mt-1">Commendable</div>
             </div>
-            <div className="bg-white rounded-lg p-4 text-center border border-red-200">
-              <div className="text-2xl font-[700] text-red-600 mb-1">D</div>
-              <div className="text-sm text-gray-600">0 - 54</div>
-              <div className="text-xs text-gray-400">Below Standard</div>
+            <div className="bg-white rounded-lg p-4 text-center border border-slate-300">
+              <div className="text-xl md:text-2xl font-[700] text-slate-600 mb-1">Tier 5</div>
+              <div className="text-sm text-gray-600 font-medium">0 - 59</div>
+              <div className="text-xs text-gray-400 font-bold mt-1">Developing</div>
             </div>
           </div>
         </div>
