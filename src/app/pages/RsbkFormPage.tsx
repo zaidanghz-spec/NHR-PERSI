@@ -78,8 +78,6 @@ export function RsbkFormPage() {
 
   const sdmPoints = calcPoints(sdmItems);
   const sdmTargetPoints = calcTargetPoints(sdmItems);
-  const sarprasPoints = calcPoints(sarprasItems);
-  const sarprasTargetPoints = calcTargetPoints(sarprasItems);
 
   // Bed points & room points (for display)
   const bedItems = saranaItems.filter(i => i.pointPerUnit === 1);
@@ -88,12 +86,17 @@ export function RsbkFormPage() {
   const bedTargetPoints = calcTargetPoints(bedItems);
   const roomPoints = calcPoints(roomItems);
   const roomTargetPoints = calcTargetPoints(roomItems);
+
+  const saranaPoints = calcPoints(saranaItems);
+  const saranaTargetPoints = calcTargetPoints(saranaItems);
+  
   const alatPoints = calcPoints(alatItems);
   const alatTargetPoints = calcTargetPoints(alatItems);
 
   const sdmSubScore = sdmTargetPoints > 0 ? Number(((sdmPoints / sdmTargetPoints) * 50).toFixed(1)) : 0;
-  const sarprasSubScore = sarprasTargetPoints > 0 ? Number(((sarprasPoints / sarprasTargetPoints) * 50).toFixed(1)) : 0;
-  const totalRsbkScore = Number((sdmSubScore + sarprasSubScore).toFixed(1));
+  const saranaSubScore = saranaTargetPoints > 0 ? Number(((saranaPoints / saranaTargetPoints) * 25).toFixed(1)) : 0;
+  const alatSubScore = alatTargetPoints > 0 ? Number(((alatPoints / alatTargetPoints) * 25).toFixed(1)) : 0;
+  const totalRsbkScore = Number((sdmSubScore + saranaSubScore + alatSubScore).toFixed(1));
 
   const handleSaveDraft = () => {
     const draftId = draftManager.getCurrentDraftId();
@@ -180,11 +183,11 @@ export function RsbkFormPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
           <h3 className="font-bold text-gray-900 mb-2">Panduan Pengisian Hospital Structure</h3>
           <p className="text-sm text-[#0F4C81] font-semibold mb-3">
-            {specialtyInfo.name} — SDM Target: {sdmTargetPoints} poin (maks 50) | Sarpras Target: {sarprasTargetPoints} poin (maks 50)
+            {specialtyInfo.name} — SDM Target: {sdmTargetPoints} poin (maks 50) | Sarana Target: {saranaTargetPoints} poin (maks 25) | Alat Target: {alatTargetPoints} poin (maks 25)
           </p>
           <div className="space-y-2 text-sm text-gray-700">
             <p>&bull; Klik tombol <strong>+</strong> untuk mulai mengisi (dimulai dari 0). Setiap dokter = 1 poin, setiap bed = 1 poin, setiap ruangan = <strong>5 poin</strong></p>
-            <p>&bull; <strong>Hospital Structure Score</strong> = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = <strong>0–100</strong></p>
+            <p>&bull; <strong>Hospital Structure Score</strong> = Sub-Skor SDM (maks 50) + Sub-Skor Sarana (maks 25) + Sub-Skor Alat (maks 25) = <strong>0–100</strong></p>
             <p>&bull; Nilai Hospital Structure dikalikan bobot <strong>15%</strong> untuk peringkat nasional</p>
           </div>
         </div>
@@ -221,7 +224,7 @@ export function RsbkFormPage() {
 
         {/* Section 2: Sarana & Prasarana (Bed + Ruangan + Alat) */}
         <FormSection title="Sarana & Prasarana" icon={<Building2 className="w-6 h-6" />} color="teal"
-          subtitle={`Poin: ${sarprasPoints} / ${sarprasTargetPoints} | Sub-Skor: ${sarprasSubScore}/50`}>
+          subtitle={`Sarana: ${saranaSubScore}/25 | Alat Medis: ${alatSubScore}/25`}>
           
           {/* Kapasitas Bed */}
           {saranaGroups["Kapasitas Bed"] && (
@@ -320,13 +323,13 @@ export function RsbkFormPage() {
                   </td>
                   <td className="py-2.5 px-4 text-center font-semibold text-teal-700">{bedPoints}</td>
                   <td className="py-2.5 px-4 text-center text-gray-500">{bedTargetPoints}</td>
-                  <td className="py-2.5 px-4 text-center text-gray-400 text-xs" rowSpan={3}>
+                  <td className="py-2.5 px-4 text-center text-gray-400 text-xs" rowSpan={2}>
                     <div className="flex flex-col items-center gap-1">
-                      <span>× 50</span>
-                      <span className="text-[10px] text-gray-400">(Sarpras)</span>
+                      <span>× 25</span>
+                      <span className="text-[10px] text-gray-400">(Sarana)</span>
                     </div>
                   </td>
-                  <td className="py-2.5 px-4 text-center font-bold text-teal-700 text-lg" rowSpan={3}>{sarprasSubScore}</td>
+                  <td className="py-2.5 px-4 text-center font-bold text-teal-700 text-lg" rowSpan={2}>{saranaSubScore}</td>
                 </tr>
                 {/* Sarpras: Ruangan */}
                 <tr className="border-b border-gray-100 bg-indigo-50/30">
@@ -355,6 +358,13 @@ export function RsbkFormPage() {
                   </td>
                   <td className="py-2.5 px-4 text-center font-semibold text-purple-700">{alatPoints}</td>
                   <td className="py-2.5 px-4 text-center text-gray-500">{alatTargetPoints}</td>
+                  <td className="py-2.5 px-4 text-center text-gray-400 text-xs">
+                    <div className="flex flex-col items-center gap-1">
+                      <span>× 25</span>
+                      <span className="text-[10px] text-gray-400">(Alat Medis)</span>
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-bold text-purple-700 text-lg">{alatSubScore}</td>
                 </tr>
               </tbody>
               <tfoot>
@@ -369,12 +379,12 @@ export function RsbkFormPage() {
           <div className="bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] rounded-xl p-5 text-white text-center">
             <p className="text-sm opacity-90 mb-1">Hospital Structure Score</p>
             <p className="text-4xl font-bold">{totalRsbkScore} <span className="text-lg font-normal opacity-80">/ 100</span></p>
-            <p className="text-sm opacity-80 mt-1">SDM ({sdmPoints}/{sdmTargetPoints}): {sdmSubScore}/50 + Sarpras ({sarprasPoints}/{sarprasTargetPoints}): {sarprasSubScore}/50</p>
+            <p className="text-sm opacity-80 mt-1">SDM: {sdmSubScore}/50 + Sarana: {saranaSubScore}/25 + Alat: {alatSubScore}/25</p>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 mt-4">
-            <p><strong>Rumus:</strong> Hospital Structure Score = Sub-Skor SDM (maks 50) + Sub-Skor Sarpras (maks 50) = 0–100</p>
-            <p className="mt-1">Sub-Skor SDM = (Poin SDM / Target SDM) × 50 | Sub-Skor Sarpras = (Total Bed + Ruangan×5 + Alat) / Target × 50</p>
+            <p><strong>Rumus:</strong> Hospital Structure Score = Sub-Skor SDM (maks 50) + Sub-Skor Sarana (maks 25) + Sub-Skor Alat (maks 25) = 0–100</p>
+            <p className="mt-1">Sub-Skor SDM = (Poin SDM / Target SDM) × 50 | Sub-Skor Sarana = (Total Bed + Ruangan×5) / Target × 25 | Sub-Skor Alat = (Total Alat) / Target × 25</p>
             <p className="mt-1">Nilai akhir Hospital Structure dikalikan bobot <strong>15%</strong> untuk peringkat nasional.</p>
           </div>
         </div>
