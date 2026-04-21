@@ -172,12 +172,10 @@ export function ClinicalAuditPage() {
     const score = calculateOverallScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     
-    // Save breakdowns
+    // Calculate and save scores
     const scores = calculateCategoryScores();
-    const medScore = scores.filter(s => s.category !== "Aspek Keperawatan").reduce((acc, s) => acc + s.weightedScore, 0);
-    const nurseScore = scores.find(s => s.category === "Aspek Keperawatan")?.weightedScore || 0;
-    sessionStorage.setItem(`${specialty}_clinicalAuditMedicalScore`, medScore.toFixed(1));
-    sessionStorage.setItem(`${specialty}_clinicalAuditNursingScore`, nurseScore.toFixed(1));
+    sessionStorage.setItem(`${specialty}_clinicalAuditMedicalScore`, "");
+    sessionStorage.setItem(`${specialty}_clinicalAuditNursingScore`, "");
     
     // Save to server
     api.saveDraft("clinical-audit", hospitalCode, specialty, draft).catch((err) => {
@@ -242,22 +240,7 @@ export function ClinicalAuditPage() {
   const validityWeight = getSampleValidityWeight(completedPatients);
   const totalWeightedAudit = Number((rawWeightedAudit * validityWeight).toFixed(1));
 
-  // Profession breakdown
-  const medicalQuestions = currentQuestions.filter(q => q.category !== "Aspek Keperawatan");
-  const nursingQuestions = currentQuestions.filter(q => q.category === "Aspek Keperawatan");
 
-  const getProfessionProgress = (questions: typeof currentQuestions) => {
-    if (questions.length === 0) return 0;
-    let completedCount = 0;
-    for (let p = 1; p <= 30; p++) {
-      const isComplete = questions.every(q => formData[`${p}-${q.id}`]);
-      if (isComplete) completedCount++;
-    }
-    return completedCount;
-  };
-
-  const medicalProgress = getProfessionProgress(medicalQuestions);
-  const nursingProgress = getProfessionProgress(nursingQuestions);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -359,48 +342,6 @@ export function ClinicalAuditPage() {
             </p>
           )}
 
-          {/* LIVE BREAKDOWN: MEDICAL VS NURSING */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#0F4C81]" />
-              Live Progress per Profesi (Target 30 RM)
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className={`p-4 rounded-xl border-2 transition-all ${medicalProgress === 30 ? "bg-green-50 border-green-200" : "bg-blue-50/50 border-blue-100"}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-gray-700">Audit Medis (Dokter)</span>
-                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${medicalProgress === 30 ? "bg-green-200 text-green-700" : "bg-blue-200 text-blue-700"}`}>
-                    {medicalProgress} / 30 RM
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className={`h-2 rounded-full transition-all ${medicalProgress === 30 ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${(medicalProgress/30)*100}%` }} />
-                </div>
-                {medicalProgress < nursingProgress && (
-                  <p className="text-[10px] text-amber-600 font-semibold mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Dokter belum menyelesaikan audit sebanyak Perawat
-                  </p>
-                )}
-              </div>
-
-              <div className={`p-4 rounded-xl border-2 transition-all ${nursingProgress === 30 ? "bg-green-50 border-green-200" : "bg-purple-50/50 border-purple-100"}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-gray-700">Audit Keperawatan (Perawat)</span>
-                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${nursingProgress === 30 ? "bg-green-200 text-green-700" : "bg-purple-200 text-purple-700"}`}>
-                    {nursingProgress} / 30 RM
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className={`h-2 rounded-full transition-all ${nursingProgress === 30 ? "bg-green-500" : "bg-purple-500"}`} style={{ width: `${(nursingProgress/30)*100}%` }} />
-                </div>
-                {nursingProgress < medicalProgress && (
-                  <p className="text-[10px] text-amber-600 font-semibold mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Perawat belum menyelesaikan audit sebanyak Dokter
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Patient Selector */}

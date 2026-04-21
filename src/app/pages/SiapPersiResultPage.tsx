@@ -207,65 +207,7 @@ export function SiapPersiResultPage() {
             <p><strong>Rumus:</strong> Total = (Hospital Structure x 15%) + (Clinical Audit x 60%) + (Patient Report x 25%)</p>
           </div>
 
-          {/* PROFESSION COMPLIANCE BREAKDOWN */}
-          <div className="mt-8 pt-8 border-t border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-              Professional Compliance Insight
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Doctor Side */}
-              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Stethoscope className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <span className="font-bold text-gray-700">Kepatuhan Medis (Dokter)</span>
-                  </div>
-                  <span className="text-2xl font-bold text-blue-700">
-                    {parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditMedicalScore`) || "0")}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.min(100, (parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditMedicalScore`) || "0") / 100) * 100)}%` }} />
-                </div>
-                <p className="text-xs text-gray-500 italic">Mencakup Diagnosa, Tatalaksana, dan Outcome Klinis</p>
-              </div>
 
-              {/* Nurse Side */}
-              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Users className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <span className="font-bold text-gray-700">Aspek Keperawatan (Perawat)</span>
-                  </div>
-                  <span className="text-2xl font-bold text-purple-700">
-                    {parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditNursingScore`) || "0")}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
-                  <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${Math.min(100, (parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditNursingScore`) || "0") / 100) * 100)}%` }} />
-                </div>
-                <p className="text-xs text-gray-500 italic">Mencakup Pengkajian & Implementasi Keperawatan Khusus</p>
-              </div>
-            </div>
-
-            {/* Gap Analysis */}
-            {Math.abs(parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditMedicalScore`) || "0") - parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditNursingScore`) || "0")) > 15 && (
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-amber-800">Gap Kepatuhan Terdeteksi</p>
-                  <p className="text-xs text-amber-700 leading-relaxed mt-1">
-                    Terdapat perbedaan signifikan antara kepatuhan medis dan keperawatan. Disarankan melakukan audit internal gabungan untuk sinkronisasi Clinical Pathway.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Ringkasan Submission */}
