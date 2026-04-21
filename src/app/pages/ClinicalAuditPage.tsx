@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
-import { ChevronRight, Save, AlertCircle, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { ChevronRight, Save, AlertCircle, ChevronLeft, CheckCircle2, TrendingUp } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
