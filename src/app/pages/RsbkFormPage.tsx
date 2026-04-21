@@ -53,7 +53,11 @@ export function RsbkFormPage() {
     return groups;
   };
 
-  const sdmGroups = groupBySubCategory(sdmItems);
+  const sdmMedicalItems = sdmItems.filter(i => i.subCategory !== "Keperawatan");
+  const sdmNursingItems = sdmItems.filter(i => i.subCategory === "Keperawatan");
+
+  const sdmMedicalGroups = groupBySubCategory(sdmMedicalItems);
+  const sdmNursingGroups = groupBySubCategory(sdmNursingItems);
   const saranaGroups = groupBySubCategory(saranaItems);
 
   const totalItems = rsbkItems.length;
@@ -149,6 +153,29 @@ export function RsbkFormPage() {
           </div>
         </div>
 
+        {/* Section 0: Required Medical Staff (Read-only Info) */}
+        <div className="bg-white rounded-xl border border-gray-200 p-8 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Stethoscope className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Persyaratan Tim Medis (Dokter)</h3>
+              <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+                Berdasarkan standar PNPK & SIAP PERSI, pelayanan <strong>{specialtyInfo.name}</strong> harus melibatkan kolaborasi multidisiplin berikut:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {specialtyInfo.medicalStaff.map((staff) => (
+                  <div key={staff.code} className="px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
+                    <p className="text-xs font-bold text-indigo-700 leading-none mb-1">{staff.code}</p>
+                    <p className="text-[10px] text-indigo-600 leading-none">{staff.name}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Info Banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
           <h3 className="font-bold text-gray-900 mb-2">Panduan Pengisian Hospital Structure</h3>
@@ -162,12 +189,27 @@ export function RsbkFormPage() {
           </div>
         </div>
 
-        {/* Section 1: SDM */}
-        <FormSection title="Tenaga Medis (SDM)" icon={<Users className="w-6 h-6" />} color="blue"
-          subtitle={`${sdmItems.length} item | Poin: ${sdmPoints} / ${sdmTargetPoints} | Sub-Skor: ${sdmSubScore}/50`}>
-          {Object.entries(sdmGroups).map(([group, items]) => (
+        {/* Section 1: SDM Medis */}
+        <FormSection title="Tenaga Medis Spesialis (SDM)" icon={<Stethoscope className="w-6 h-6" />} color="blue"
+          subtitle={`${sdmMedicalItems.length} item`}>
+          {Object.entries(sdmMedicalGroups).map(([group, items]) => (
             <div key={group} className="mb-6 last:mb-0">
               <h4 className="text-sm font-semibold text-blue-700 bg-blue-50 px-4 py-2 rounded-lg mb-3">{group}</h4>
+              <div className="space-y-3">
+                {items.map((item) => (
+                  <QuantityInput key={item.id} item={item} value={formData[item.id] ?? null} onChange={handleChange} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </FormSection>
+
+        {/* Section 1.5: Keperawatan */}
+        <FormSection title="Tenaga Keperawatan" icon={<Users className="w-6 h-6" />} color="purple"
+          subtitle={`${sdmNursingItems.length} item`}>
+          {Object.entries(sdmNursingGroups).map(([group, items]) => (
+            <div key={group} className="mb-6 last:mb-0">
+              <h4 className="text-sm font-semibold text-purple-700 bg-purple-50 px-4 py-2 rounded-lg mb-3">{group}</h4>
               <div className="space-y-3">
                 {items.map((item) => (
                   <QuantityInput key={item.id} item={item} value={formData[item.id] ?? null} onChange={handleChange} />

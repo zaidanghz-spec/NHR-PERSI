@@ -113,6 +113,12 @@ const cardiologyRsbkItems: RsbkItem[] = [
   { id: "alat-ecmo", name: "ECMO (Extracorporeal Membrane Oxygenation)", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-transplant_set", name: "Heart Transplant set", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-ablation_pfa", name: "Pulse-Field Ablation / Cryoablation System", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+
+  // ASPEK KEPERAWATAN (SIAP PERSI)
+  { id: "sdm-ners-spkmb-cv", name: "Ners Sp.KMB (Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cert-cv", name: "Ners dan Sertifikasi/Fellowship CV", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cv-total", name: "Jumlah Ners (Total)", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-cv", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const cardiologyDiseases: DiseaseAudit[] = [
@@ -124,6 +130,8 @@ const cardiologyDiseases: DiseaseAudit[] = [
       { id: "card-st-2", question: "Dilakukan penetapan stratifikasi berdasarkan kelas Killip", category: "Diagnosa (25%)" },
       { id: "card-st-3", question: "Dilakukan revaskularisasi menggunakan agen fibrinolitik atau intervensi koroner perkutan primer (kecuali onset > 12 jam)", category: "Tatalaksana (25%)" },
       { id: "card-st-4", question: "Diberikan Clopidogrel dan Aspirin oral", category: "Tatalaksana (25%)" },
+      { id: "card-st-nurse-1", question: "Dilakukan pengkajian hemodinamik", category: "Aspek Keperawatan" },
+      { id: "card-st-nurse-2", question: "Diberikan manajemen aktifitas dan bedrest oleh perawat", category: "Aspek Keperawatan" },
       { id: "card-st-5", question: "Pasien tidak meninggal dunia di RS", category: "Outcome (50%)" },
       { id: "card-st-6", question: "LOS < 5 hari (kecuali kelas Killip III dan IV, atau mengalami Syok Kardiogenik)", category: "Outcome (50%)" },
     ],
@@ -138,6 +146,7 @@ const cardiologyDiseases: DiseaseAudit[] = [
       { id: "card-st-prem-8", question: "Apakah Anda mendapat informasi yang jelas tentang jadwal kontrol dan tanda bahaya yang harus diwaspadai setelah pulang?", type: "prem", subCategory: "Discharge" },
       { id: "card-st-prem-9", question: "Apakah proses administrasi (pendaftaran, pembiayaan, klaim BPJS) berjalan lancar dan tidak membebani?", type: "prem", subCategory: "Administrasi" },
       { id: "card-st-prem-10", question: "Secara keseluruhan, seberapa puas Anda dengan pengalaman perawatan di unit jantung ini?", type: "prem", subCategory: "Kepuasan Global" },
+      { id: "card-st-prem-nurse", question: "Apakah perawat memeriksa kondisi saudara/ri, memastikan tidak sesak dan nyeri?", type: "prem", subCategory: "Aspek Keperawatan" },
     ],
     promQuestions: [
       { id: "card-st-prom-1", question: "Apakah nyeri dada Anda hilang atau berkurang secara signifikan setelah tindakan PCI/trombolisis?", type: "prom", subCategory: "Gejala (KCCQ)" },
@@ -150,6 +159,7 @@ const cardiologyDiseases: DiseaseAudit[] = [
       { id: "card-st-prom-8", question: "Apakah Anda sudah mulai menerapkan gaya hidup sehat (berhenti merokok, diet) sesuai anjuran dokter?", type: "prom", subCategory: "Gaya Hidup" },
       { id: "card-st-prom-9", question: "Apakah semangat dan motivasi hidup Anda meningkat setelah mendapat perawatan?", type: "prom", subCategory: "Kesejahteraan" },
       { id: "card-st-prom-10", question: "Secara keseluruhan, apakah kondisi kesehatan Anda terasa lebih baik dibandingkan saat pertama kali masuk RS?", type: "prom", subCategory: "Outcome Global" },
+      { id: "card-st-prom-nurse", question: "Saya dapat bed rest dan istirahat selama perawatan", type: "prom", subCategory: "Aspek Keperawatan" },
     ],
   },
   {
@@ -160,6 +170,8 @@ const cardiologyDiseases: DiseaseAudit[] = [
       { id: "card-gj-2", question: "Dilakukan uji fungsional jantung, jalan 6 menit (kecuali ada kontraindikasi)", category: "Diagnosa (25%)" },
       { id: "card-gj-3", question: "Diberikan edukasi perubahan gaya hidup", category: "Tatalaksana (25%)" },
       { id: "card-gj-4", question: "Dilakukan pemberian ACE Inhibitor (Angiotensin-Converting Enzyme Inhibitor) atau ARB (Angiotensin Receptor Blocker) atau ARNI (Angiotensin Receptor Neprilysin)", category: "Tatalaksana (25%)" },
+      { id: "card-gj-nurse-1", question: "Dilakukan pengkajian hemodinamik", category: "Aspek Keperawatan" },
+      { id: "card-gj-nurse-2", question: "Diberikan manajemen aktifitas dan bedrest oleh perawat", category: "Aspek Keperawatan" },
       { id: "card-gj-5", question: "Pasien pulang dengan skor NYHA 1-2", category: "Outcome (50%)" },
       { id: "card-gj-6", question: "Tidak ada readmisi dalam waktu 30 hari setelah pasien pulang rawat", category: "Outcome (50%)" },
     ],
@@ -261,6 +273,12 @@ const neurologyRsbkItems: RsbkItem[] = [
   { id: "alat-stereotaxic", name: "Stereotaxic instrument (Neuronavigasi) / Set Bedah Saraf Stereotaxy", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-neuro_endoscope", name: "Neurological Endoscope", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-icp", name: "Intracranial Pressure Monitoring Device", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
+
+  // ASPEK KEPERAWATAN (SIAP PERSI)
+  { id: "sdm-ners-spkmb-neuro", name: "Ners Sp.KMB (Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cert-neuro", name: "Ners dan Sertifikasi/Fellowship Neurologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-neuro-total", name: "Jumlah Ners (Total)", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-neuro", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const neurologyDiseases: DiseaseAudit[] = [
@@ -272,6 +290,7 @@ const neurologyDiseases: DiseaseAudit[] = [
       { id: "neuro-sp-2", question: "Dilakukan skrining disphagia (GUSS score) dalam waktu 24 jam pertama", category: "Diagnosa (25%)" },
       { id: "neuro-sp-3", question: "Dilakukan penurunan tekanan darah secara aktif dengan IV short-acting antihypertensive kecuali perdarahan kurang dari 30cc atau SBP awal >220 mmHg", category: "Tatalaksana (25%)" },
       { id: "neuro-sp-4", question: "Dilakukan tindakan pembedahan kranial pada pasien dengan perdarahan supratentorial dalam waktu <24 jam kecuali tidak memenuhi kriteria klinis dan radiologis", category: "Tatalaksana (25%)" },
+      { id: "neuro-sp-nurse-1", question: "Memposisikan pasien dengan elevasi 15-30 derajat dan posisi miring kanan-kiri lateral 30° setiap 2 jam sekali oleh perawat", category: "Aspek Keperawatan" },
       { id: "neuro-sp-5", question: "Tidak meninggal dunia", category: "Outcome (50%)" },
       { id: "neuro-sp-6", question: "SBP <140 mmHg dalam 1 jam pertama sejak kedatangan kecuali SBP awal >220 mmHg", category: "Outcome (50%)" },
     ],
@@ -286,6 +305,7 @@ const neurologyDiseases: DiseaseAudit[] = [
       { id: "neuro-pd-prem-8", question: "Apakah fasilitas Stroke Unit (alat monitor, kebersihan) mendukung keamanan Anda?", type: "prem", subCategory: "Lingkungan" },
       { id: "neuro-pd-prem-9", question: "Apakah proses administrasi perpanjangan rawat atau rujukan berjalan lancar?", type: "prem", subCategory: "Administrasi" },
       { id: "neuro-pd-prem-10", question: "Secara keseluruhan, seberapa puas Anda dengan layanan Stroke Unit ini?", type: "prem", subCategory: "Kepuasan Global" },
+      { id: "neuro-pd-prem-nurse", question: "Apakah perawat mengedukasi cara melakukan bantuan aktivitas sehari-hari pada pasien dan/keluarga?", type: "prem", subCategory: "Aspek Keperawatan" },
     ],
     promQuestions: [
       { id: "neuro-pd-prom-1", question: "Apakah Anda mampu melakukan aktivitas harian dasar (makan, higiene) secara mandiri atau dengan bantuan minimal?", type: "prom", subCategory: "Fisik (Barthel)" },
@@ -298,6 +318,7 @@ const neurologyDiseases: DiseaseAudit[] = [
       { id: "neuro-pd-prom-8", question: "Apakah Anda merasa suasana hati Anda lebih stabil dan tidak mudah cemas?", type: "prom", subCategory: "Psikologis" },
       { id: "neuro-pd-prom-9", question: "Apakah daya ingat atau konsentrasi Anda terasa membaik selama perawatan?", type: "prom", subCategory: "Kognitif" },
       { id: "neuro-pd-prom-10", question: "Secara keseluruhan, apakah pemulihan Anda berjalan sesuai harapan Anda?", type: "prom", subCategory: "Outcome Global" },
+      { id: "neuro-pd-prom-nurse", question: "Kemampuan perawatan diri dan mobilisasi dengan keterbatasan meningkat", type: "prom", subCategory: "Aspek Keperawatan" },
     ],
   },
   {
@@ -308,6 +329,8 @@ const neurologyDiseases: DiseaseAudit[] = [
       { id: "neuro-si-2", question: "Dilakukan pemeriksaan gula darah sewaktu saat masuk", category: "Diagnosa (25%)" },
       { id: "neuro-si-3", question: "Diberikan trombolisis dengan rtPA (Alteplase) dosis 0,9 mg/kg atau 0.6 mg/kg kecuali onset > 4 jam", category: "Tatalaksana (25%)" },
       { id: "neuro-si-4", question: "Diberikan antiplatelets dan/atau antikoagulan", category: "Tatalaksana (25%)" },
+      { id: "neuro-si-nurse-1", question: "Memposisikan pasien dengan elevasi 15-30 derajat dan posisi miring kanan-kiri lateral 30° setiap 2 jam sekali oleh perawat", category: "Aspek Keperawatan" },
+      { id: "neuro-si-nurse-2", question: "Dilakukan pemantauan neurologis berkala (GCS/pupil) oleh perawat", category: "Aspek Keperawatan" },
       { id: "neuro-si-5", question: "Tidak meninggal dunia", category: "Outcome (50%)" },
       { id: "neuro-si-6", question: "LOS < 7 hari kecuali ada komplikasi", category: "Outcome (50%)" },
     ],
@@ -322,6 +345,7 @@ const neurologyDiseases: DiseaseAudit[] = [
       { id: "neuro-si-prem-8", question: "Apakah fasilitas Stroke Unit (alat monitor, kebersihan) mendukung keamanan Anda?", type: "prem", subCategory: "Lingkungan" },
       { id: "neuro-si-prem-9", question: "Apakah proses administrasi perpanjangan rawat atau rujukan berjalan lancar?", type: "prem", subCategory: "Administrasi" },
       { id: "neuro-si-prem-10", question: "Secara keseluruhan, seberapa puas Anda dengan layanan Stroke Unit ini?", type: "prem", subCategory: "Kepuasan Global" },
+      { id: "neuro-si-prem-nurse", question: "Apakah perawat mengedukasi cara melakukan bantuan aktivitas sehari-hari pada pasien dan/keluarga?", type: "prem", subCategory: "Aspek Keperawatan" },
     ],
     promQuestions: [
       { id: "neuro-si-prom-1", question: "Apakah Anda mampu melakukan aktivitas harian dasar (makan, higiene) secara mandiri atau dengan bantuan minimal?", type: "prom", subCategory: "Fisik (Barthel)" },
@@ -334,6 +358,7 @@ const neurologyDiseases: DiseaseAudit[] = [
       { id: "neuro-si-prom-8", question: "Apakah Anda merasa suasana hati Anda lebih stabil dan tidak mudah cemas?", type: "prom", subCategory: "Psikologis" },
       { id: "neuro-si-prom-9", question: "Apakah daya ingat atau konsentrasi Anda terasa membaik selama perawatan?", type: "prom", subCategory: "Kognitif" },
       { id: "neuro-si-prom-10", question: "Secara keseluruhan, apakah pemulihan Anda berjalan sesuai harapan Anda?", type: "prom", subCategory: "Outcome Global" },
+      { id: "neuro-si-prom-nurse", question: "Kemampuan perawatan diri dan mobilisasi dengan keterbatasan meningkat", type: "prom", subCategory: "Aspek Keperawatan" },
     ],
   },
 ];
@@ -364,6 +389,12 @@ const oncologyRsbkItems: RsbkItem[] = [
   { id: "alat-usg-biopsi", name: "USG Biopsi", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-ct-sim", name: "CT Simulator", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
   { id: "alat-mri", name: "MRI", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
+
+  // ASPEK KEPERAWATAN (SIAP PERSI)
+  { id: "sdm-ners-sp-onk", name: "Ners Sp.Kep Onkologi", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cert-onk", name: "Ners dan Sertifikasi/Fellowship Onkologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-onk-total", name: "Jumlah Ners (Total)", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-onk", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const oncologyDiseases: DiseaseAudit[] = [
@@ -375,6 +406,8 @@ const oncologyDiseases: DiseaseAudit[] = [
       { id: "onc-py-2", question: "Dilakukan pemeriksaan imunohistokimia: ER, PR, HER2, dan Ki67", category: "Diagnosa (25%)" },
       { id: "onc-py-3", question: "Dilakukan mastektomi (bila diindikasi) < 5 minggu sejak diagnosis", category: "Tatalaksana (25%)" },
       { id: "onc-py-4", question: "Diberikan kemoterapi regimen standar (CMF/CAF/CEF/Taxane) sesuai subtipe", category: "Tatalaksana (25%)" },
+      { id: "onc-py-nurse-1", question: "Dilakukan asesmen nyeri dan manajemen nyeri non farmakologi serta terapi psikososial oleh perawat", category: "Aspek Keperawatan" },
+      { id: "onc-py-nurse-2", question: "Tidak terjadi ekstravasasi (kondisi kebocoran obat kemoterapi dari pembuluh darah vena ke jaringan sekitar yang sehat selama infus intravena)", category: "Aspek Keperawatan" },
       { id: "onc-py-5", question: "Pasien tidak mengalami limfedema berat pada sisi operasi", category: "Outcome (50%)" },
       { id: "onc-py-6", question: "Pasien menjalani follow-up rutin pasca operasi", category: "Outcome (50%)" },
     ],
@@ -389,6 +422,7 @@ const oncologyDiseases: DiseaseAudit[] = [
       { id: "onc-py-prem-8", question: "Apakah ketersediaan ruang tunggu dan fasilitas rumah sakit membuat Anda merasa nyaman?", type: "prem", subCategory: "Fasilitas" },
       { id: "onc-py-prem-9", question: "Apakah staf administrasi membantu mempermudah proses klaim untuk terapi jangka panjang?", type: "prem", subCategory: "Administrasi" },
       { id: "onc-py-prem-10", question: "Secara keseluruhan, seberapa puas Anda dengan kualitas layanan onkologi ini?", type: "prem", subCategory: "Kepuasan Global" },
+      { id: "onc-py-prem-nurse", question: "Apakah perawat memberikan kenyamanan saat merawat dengan pendekatan psikologis dan budaya?", type: "prem", subCategory: "Aspek Keperawatan" },
     ],
     promQuestions: [
       { id: "onc-py-prom-1", question: "Apakah Anda mampu melakukan aktivitas sehari-hari secara mandiri pasca operasi mastektomi?", type: "prom", subCategory: "Fisik (EORTC)" },
@@ -401,6 +435,7 @@ const oncologyDiseases: DiseaseAudit[] = [
       { id: "onc-py-prom-8", question: "Apakah nafsu makan Anda tetap baik selama masa pemulihan?", type: "prom", subCategory: "Nafsu Makan" },
       { id: "onc-py-prom-9", question: "Apakah Anda merasa optimis terhadap hasil akhir dari seluruh rangkaian pengobatan ini?", type: "prom", subCategory: "Optimisme" },
       { id: "onc-py-prom-10", question: "Secara keseluruhan, apakah Anda merasa kualitas hidup Anda membaik?", type: "prom", subCategory: "Status Global" },
+      { id: "onc-py-prom-nurse", question: "Nyeri saya berkurang dan nyaman setelah Latihan nafas dalam", type: "prom", subCategory: "Aspek Keperawatan" },
     ],
   },
   {
@@ -411,6 +446,8 @@ const oncologyDiseases: DiseaseAudit[] = [
       { id: "onc-sv-2", question: "Dilakukan pemeriksaan imaging (MRI/CT) untuk penentuan penyebaran parametrium", category: "Diagnosa (25%)" },
       { id: "onc-sv-3", question: "Dilakukan operasi (IA1-IIA2) atau Radioterapi/Kemoradiasi (stadium lanjut/risiko tinggi)", category: "Tatalaksana (25%)" },
       { id: "onc-sv-4", question: "Diberikan Kemoradiasi dengan cisplatin mingguan (untuk stadium lanjut lokal)", category: "Tatalaksana (25%)" },
+      { id: "onc-sv-nurse-1", question: "Dilakukan asesmen nyeri dan manajemen nyeri non farmakologi serta terapi psikososial oleh perawat", category: "Aspek Keperawatan" },
+      { id: "onc-sv-nurse-2", question: "Tidak terjadi ekstravasasi (kondisi kebocoran obat kemoterapi dari pembuluh darah vena ke jaringan sekitar yang sehat selama infus intravena)", category: "Aspek Keperawatan" },
       { id: "onc-sv-5", question: "Status ECOG Performance Status saat pulang adalah 0-2", category: "Outcome (50%)" },
       { id: "onc-sv-6", question: "Nyeri terkendali dengan analgetik oral (skala nyeri < 3)", category: "Outcome (50%)" },
     ],
@@ -425,6 +462,7 @@ const oncologyDiseases: DiseaseAudit[] = [
       { id: "onc-sv-prem-8", question: "Apakah kebersihan toilet dan ruang perawatan di bangsal onkologi terjaga sangat baik?", type: "prem", subCategory: "Fasilitas" },
       { id: "onc-sv-prem-9", question: "Apakah dokter menanyakan keluhan-keluhan lain di luar penyakit utama Anda?", type: "prem", subCategory: "Perhatian Holistik" },
       { id: "onc-sv-prem-10", question: "Secara keseluruhan, seberapa puas Anda dengan kualitas layanan onkologi serviks di RS ini?", type: "prem", subCategory: "Kepuasan Global" },
+      { id: "onc-sv-prem-nurse", question: "Apakah perawat memberikan kenyamanan saat merawat dengan pendekatan psikologis dan budaya?", type: "prem", subCategory: "Aspek Keperawatan" },
     ],
     promQuestions: [
       { id: "onc-sv-prom-1", question: "Apakah Anda tidak mengalami gangguan berkemih bermakna (beser/ompol) pasca tindakan?", type: "prom", subCategory: "Fungsi Kemih" },
@@ -437,6 +475,7 @@ const oncologyDiseases: DiseaseAudit[] = [
       { id: "onc-sv-prom-8", question: "Apakah berat badan Anda cenderung stabil atau mulai menunjukkan peningkatan?", type: "prom", subCategory: "Nutrisi" },
       { id: "onc-sv-prom-9", question: "Apakah Anda merasa pengobatan ini memberikan harapan kesembuhan yang nyata bagi Anda?", type: "prom", subCategory: "Harapan" },
       { id: "onc-sv-prom-10", question: "Secara keseluruhan, apakah Anda merasa kondisi kesehatan Anda sudah membaik?", type: "prom", subCategory: "Status Global" },
+      { id: "onc-sv-prom-nurse", question: "Nyeri saya berkurang dan nyaman setelah Latihan nafas dalam (dipandu perawat)", type: "prom", subCategory: "Aspek Keperawatan" },
     ],
   },
 ];
