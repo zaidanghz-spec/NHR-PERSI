@@ -407,7 +407,7 @@ function NewsTab({
       ...form,
       imageUrl:
         form.imageUrl ||
-        "https://images.unsplash.com/photo-1687677347190-58c4ebf93bf6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
+        "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Crect x='340' y='240' width='120' height='120' rx='24' fill='%231E3A8A'/%3E%3Csvg x='364' y='264' width='72' height='72' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z'/%3E%3Cpath d='M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2'/%3E%3Cpath d='M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 10h4'/%3E%3Cpath d='M10 14h4'/%3E%3Cpath d='M10 18h4'/%3E%3C/svg%3E%3C/svg%3E",
     });
     setForm({
       title: "",
@@ -420,6 +420,17 @@ function NewsTab({
       featured: false,
     });
     setShowForm(false);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setForm({ ...form, imageUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -498,12 +509,26 @@ function NewsTab({
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-sm font-[600]">URL Gambar (opsional)</Label>
-            <Input
-              value={form.imageUrl}
-              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-              placeholder="https://..."
-            />
+            <Label className="text-sm font-[600]">Gambar Berita (opsional)</Label>
+            <div className="flex flex-col gap-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-semibold whitespace-nowrap">ATAU URL:</span>
+                <Input
+                  value={form.imageUrl}
+                  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+            {form.imageUrl && form.imageUrl.startsWith("data:image") && (
+              <p className="text-xs text-green-600 font-medium">Gambar dari device siap diunggah.</p>
+            )}
           </div>
           <div className="flex gap-3">
             <Button
@@ -624,7 +649,7 @@ function EventsTab({
       ...form,
       imageUrl:
         form.imageUrl ||
-        "https://images.unsplash.com/photo-1627560985113-ab67e8031f40?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
+        "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Crect x='340' y='240' width='120' height='120' rx='24' fill='%231E3A8A'/%3E%3Csvg x='364' y='264' width='72' height='72' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z'/%3E%3Cpath d='M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2'/%3E%3Cpath d='M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 10h4'/%3E%3Cpath d='M10 14h4'/%3E%3Cpath d='M10 18h4'/%3E%3C/svg%3E%3C/svg%3E",
     });
     setForm({
       title: "",
@@ -638,6 +663,17 @@ function EventsTab({
       featured: false,
     });
     setShowForm(false);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setForm({ ...form, imageUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -726,6 +762,27 @@ function EventsTab({
                 placeholder="Jakarta / Online"
                 required
               />
+            <div className="space-y-1.5 md:col-span-3">
+              <Label className="text-sm font-[600]">Gambar Event (opsional)</Label>
+              <div className="flex flex-col gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 font-semibold whitespace-nowrap">ATAU URL:</span>
+                  <Input
+                    value={form.imageUrl}
+                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+              {form.imageUrl && form.imageUrl.startsWith("data:image") && (
+                <p className="text-xs text-green-600 font-medium">Gambar dari device siap diunggah.</p>
+              )}
             </div>
           </div>
           <div className="flex gap-3">
