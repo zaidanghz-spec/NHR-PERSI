@@ -92,6 +92,9 @@ export function SiapPersiResultPage() {
       sessionStorage.removeItem(`${spec}_prmSummary`);
     });
     
+    // Save submitted specialties before cleanup so SubmissionSuccessPage can display them
+    sessionStorage.setItem("lastSubmittedSpecialties", JSON.stringify(selectedSpecialties));
+
     // Cleanup draft
     if (draftId) {
       draftManager.deleteDraft(draftId);

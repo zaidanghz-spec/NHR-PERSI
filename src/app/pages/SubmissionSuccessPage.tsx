@@ -6,13 +6,14 @@ import { specialtyAuditData } from "../data/specialtyAuditData";
 export function SubmissionSuccessPage() {
   const navigate = useNavigate();
 
-  // Get submitted data from session before it was cleared
-  // In real app, this would come from API/database
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
   const hospitalName = authData.hospitalName || "Rumah Sakit";
 
-  // Try to get specialty data (this would be stored before clearing in real app)
-  const submittedSpecialties = ["cardiology", "neurology", "oncology"]; // Mock data for demo
+  // Read actual submitted specialties stored just before clearing session in SiapPersiResultPage
+  const submitted = sessionStorage.getItem("lastSubmittedSpecialties");
+  const submittedSpecialties: string[] = submitted
+    ? JSON.parse(submitted)
+    : [];
 
   const specialtyIcons: Record<string, React.ReactNode> = {
     cardiology: <Heart className="w-5 h-5" />,
@@ -46,33 +47,40 @@ export function SubmissionSuccessPage() {
           </p>
 
           {/* Submitted Specialties Summary */}
-          <div className="bg-gradient-to-r from-blue-500 to-teal-500 rounded-xl p-6 mb-8 text-white">
-            <h3 className="text-lg font-bold mb-4">
-              Data yang Disubmit
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {submittedSpecialties.map((spec) => {
-                const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
-                return (
-                  <div
-                    key={spec}
-                    className="bg-white/20 backdrop-blur-sm rounded-lg p-4 text-center"
-                  >
-                    <div className={`w-12 h-12 mx-auto mb-2 bg-gradient-to-br ${specialtyColors[spec]} rounded-lg flex items-center justify-center`}>
-                      {specialtyIcons[spec]}
+          {submittedSpecialties.length > 0 ? (
+            <div className="bg-gradient-to-r from-blue-500 to-teal-500 rounded-xl p-6 mb-8 text-white">
+              <h3 className="text-lg font-bold mb-4">
+                Data yang Disubmit
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {submittedSpecialties.map((spec) => {
+                  const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+                  if (!info) return null;
+                  return (
+                    <div
+                      key={spec}
+                      className="bg-white/20 backdrop-blur-sm rounded-lg p-4 text-center"
+                    >
+                      <div className={`w-12 h-12 mx-auto mb-2 bg-gradient-to-br ${specialtyColors[spec] || "from-gray-400 to-gray-600"} rounded-lg flex items-center justify-center`}>
+                        {specialtyIcons[spec] || <Activity className="w-5 h-5" />}
+                      </div>
+                      <p className="font-semibold text-sm">{info.name}</p>
+                      <p className="text-xs text-white/80">{info.disease}</p>
                     </div>
-                    <p className="font-semibold text-sm">{info.name}</p>
-                    <p className="text-xs text-white/80">{info.disease}</p>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              <div className="mt-4 bg-white/10 rounded-lg p-3">
+                <p className="text-sm">
+                  <strong>{submittedSpecialties.length} Pelayanan</strong> telah disubmit untuk review
+                </p>
+              </div>
             </div>
-            <div className="mt-4 bg-white/10 rounded-lg p-3">
-              <p className="text-sm">
-                <strong>{submittedSpecialties.length} Pelayanan</strong> telah disubmit untuk review
-              </p>
+          ) : (
+            <div className="bg-gradient-to-r from-blue-500 to-teal-500 rounded-xl p-6 mb-8 text-white">
+              <p className="text-sm opacity-80">Data submission berhasil dikirim ke tim reviewer PERSI.</p>
             </div>
-          </div>
+          )}
 
           {/* Status Badge */}
           <div className="inline-flex items-center gap-3 bg-yellow-50 border-2 border-yellow-200 rounded-xl px-6 py-4 mb-8">
@@ -114,55 +122,36 @@ export function SubmissionSuccessPage() {
           <div className="bg-gray-50 rounded-xl p-6 mb-8 text-left">
             <h3 className="font-bold text-gray-900 mb-4">Langkah Selanjutnya:</h3>
             <div className="space-y-3">
-              <div className="flex gap-3">
-                <div className="w-6 h-6 bg-[#0F4C81] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold">
-                  1
+              {[
+                "Tim reviewer PERSI akan memverifikasi kelengkapan dan keakuratan data Anda",
+                "Perhitungan skor dilakukan sesuai metodologi NHR PERSI",
+                "Jika disetujui, Anda akan menerima sertifikasi dan skor dapat dilihat",
+                "Jika ada data yang perlu dilengkapi, kami akan menghubungi Anda",
+              ].map((step, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="w-6 h-6 bg-[#0F4C81] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold">
+                    {i + 1}
+                  </div>
+                  <p className="text-gray-700">{step}</p>
                 </div>
-                <p className="text-gray-700">
-                  Tim reviewer PERSI akan memverifikasi kelengkapan dan keakuratan data Anda
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-6 h-6 bg-[#0F4C81] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold">
-                  2
-                </div>
-                <p className="text-gray-700">
-                  Perhitungan skor dilakukan sesuai metodologi NHR PERSI
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-6 h-6 bg-[#0F4C81] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold">
-                  3
-                </div>
-                <p className="text-gray-700">
-                  Jika disetujui, Anda akan menerima sertifikasi dan skor dapat dilihat
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-6 h-6 bg-[#0F4C81] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold">
-                  4
-                </div>
-                <p className="text-gray-700">
-                  Jika ada data yang perlu dilengkapi, kami akan menghubungi Anda
-                </p>
-              </div>
+              ))}
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/siap-persi/overview")}
               variant="outline"
               className="flex-1 h-12 border-2 border-gray-300 font-semibold"
             >
-              Kembali ke Homepage
+              Kembali ke Overview
             </Button>
             <Button
-              onClick={() => navigate("/submit")}
+              onClick={() => navigate("/siap-persi/select-specialty")}
               className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold"
             >
-              Submit Data Lainnya
+              Submit Pelayanan Lain
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </div>

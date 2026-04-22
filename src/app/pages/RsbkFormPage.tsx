@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
-import { Users, Building2, Stethoscope, ChevronRight, Save, Target, BedDouble, DoorOpen } from "lucide-react";
+import { Users, Building2, Stethoscope, ChevronRight, Save, Target, BedDouble, DoorOpen, CheckCircle2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData, RsbkItem } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
@@ -98,6 +98,16 @@ export function RsbkFormPage() {
   const alatSubScore = alatTargetPoints > 0 ? Number(((alatPoints / alatTargetPoints) * 25).toFixed(1)) : 0;
   const totalRsbkScore = Number((sdmSubScore + saranaSubScore + alatSubScore).toFixed(1));
 
+  const [draftSavedMsg, setDraftSavedMsg] = useState(false);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (draftSavedMsg) {
+      timer = setTimeout(() => setDraftSavedMsg(false), 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [draftSavedMsg]);
+
   const handleSaveDraft = () => {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId || !specialty) return;
@@ -106,7 +116,7 @@ export function RsbkFormPage() {
       score: totalRsbkScore,
       completed: filledItems === totalItems,
     });
-    alert("Draft berhasil disimpan!");
+    setDraftSavedMsg(true);
   };
 
   const handleSubmit = () => {
@@ -126,6 +136,14 @@ export function RsbkFormPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto">
         <SpecialtyProgressTracker currentSpecialty={specialty || ""} currentStage="rsbk" />
+
+        {/* Draft Saved Toast */}
+        {draftSavedMsg && (
+          <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-in slide-in-from-right">
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="font-semibold">Draft berhasil disimpan!</span>
+          </div>
+        )}
 
         {/* Header */}
         <div className="mb-6">

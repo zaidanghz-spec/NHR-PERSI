@@ -17,7 +17,7 @@ import { useData } from "../context/DataContext";
 export function HospitalSubmissionPage() {
   const navigate = useNavigate();
   const { currentHospital, hospitalLogout } = useData();
-  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string } | null>(null);
+  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string; hospitalCode?: string } | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -40,7 +40,9 @@ export function HospitalSubmissionPage() {
     return null;
   }
 
-  const hospitalCode = authData.hospitalName.substring(0, 3).toUpperCase() + "001";
+  const hospitalCode = (authData as any).hospitalCode
+    || authData.hospitalName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8)
+    || "RS001";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 py-12">

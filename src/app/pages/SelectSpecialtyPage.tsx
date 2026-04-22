@@ -99,6 +99,13 @@ export function SelectSpecialtyPage() {
           clinicalAudit: { completed: false, data: {} },
           patientReport: { completed: false, data: {} },
         };
+        // BUGFIX: Persist the updated draft back to localStorage
+        const allDrafts = draftManager.getAllDrafts();
+        const idx = allDrafts.findIndex(d => d.draftId === existingDraft.draftId);
+        if (idx !== -1) {
+          allDrafts[idx] = existingDraft;
+          localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
+        }
       }
       sessionStorage.setItem("selectedSpecialties", JSON.stringify(existingDraft.selectedSpecialties));
     } else {

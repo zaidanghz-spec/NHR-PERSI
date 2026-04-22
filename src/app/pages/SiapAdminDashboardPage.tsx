@@ -25,29 +25,6 @@ import { Input } from "../components/ui/input";
 import { SimpleSelect } from "../components/SimpleSelect";
 import { useData } from "../context/DataContext";
 
-// Submissions will be loaded from server in production
-const mockSubmissions: {
-  id: string;
-  hospitalName: string;
-  specialty: string;
-  submittedDate: string;
-  status: string;
-  finalScore: number;
-}[] = [];
-
-const scoreDistribution = [
-  { range: "90-100 — Tier 1: Platinum", count: 0, color: "bg-purple-500" },
-  { range: "80-89 — Tier 2: Outstanding", count: 0, color: "bg-blue-500" },
-  { range: "70-79 — Tier 3: Excellent", count: 0, color: "bg-emerald-500" },
-  { range: "60-69 — Tier 4: Commendable", count: 0, color: "bg-amber-500" },
-  { range: "0-59 — Tier 5: Developing", count: 0, color: "bg-slate-500" },
-];
-
-const statusDistribution = [
-  { name: "Pending", value: 0, color: "#F59E0B" },
-  { name: "Approved", value: 0, color: "#10B981" },
-  { name: "Revision Required", value: 0, color: "#EF4444" },
-];
 
 export function SiapAdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");

@@ -44,7 +44,7 @@ export function PatientReportPage() {
   // Get hospital code from session
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
   const hospitalName = authData.hospitalName || "Unknown Hospital";
-  const hospitalCode = hospitalName.substring(0, 3).toUpperCase() + "001";
+  const hospitalCode = authData.hospitalCode || hospitalName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8) || "RS001";
 
   const [activeDiseaseIndex, setActiveDiseaseIndex] = useState(0);
   const activeDisease = diseases[activeDiseaseIndex];
@@ -330,7 +330,7 @@ export function PatientReportPage() {
     
     try {
       for (let i = 0; i < diseases.length; i++) {
-        const dKey = `${specialty}_${i}`;
+        const dKey = `${specialty}-d${i}`;  // Must match diseaseSpecialtyKey format used in PatientPremPromPage
         const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
         
         let diseaseAvg = 0;
