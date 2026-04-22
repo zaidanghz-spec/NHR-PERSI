@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { Heart, MessageSquare, CheckCircle2, Building2, Shield } from "lucide-react";
+import { Heart, MessageSquare, CheckCircle2, Building2, Shield, Star } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { submitSurvey } from "../utils/api";
@@ -9,12 +9,20 @@ import { submitSurvey } from "../utils/api";
 // Based on NHS PREM framework & validated patient experience instruments
 // 5=Sangat Setuju (100pts), 4=Setuju (75pts), 3=Netral (50pts), 2=Tidak Setuju (25pts), 1=Sangat Tidak Setuju (0pts)
 const ratingOptions = [
-  { value: "5", label: "Sangat Setuju", emoji: "⭐⭐⭐⭐⭐", score: 100, color: "green" },
-  { value: "4", label: "Setuju", emoji: "⭐⭐⭐⭐", score: 75, color: "teal" },
-  { value: "3", label: "Netral", emoji: "⭐⭐⭐", score: 50, color: "yellow" },
-  { value: "2", label: "Tidak Setuju", emoji: "⭐⭐", score: 25, color: "orange" },
-  { value: "1", label: "Sangat Tidak Setuju", emoji: "⭐", score: 0, color: "red" },
+  { value: "5", label: "Sangat Setuju", stars: 5, score: 100, color: "green" },
+  { value: "4", label: "Setuju", stars: 4, score: 75, color: "teal" },
+  { value: "3", label: "Netral", stars: 3, score: 50, color: "yellow" },
+  { value: "2", label: "Tidak Setuju", stars: 2, score: 25, color: "orange" },
+  { value: "1", label: "Sangat Tidak Setuju", stars: 1, score: 0, color: "red" },
 ];
+
+const renderStars = (count: number) => (
+  <div className="flex justify-center items-center gap-0.5 flex-wrap w-full mb-1.5 min-h-[24px]">
+    {Array.from({ length: count }).map((_, i) => (
+      <Star key={i} className="w-4 h-4 md:w-5 md:h-5 fill-amber-400 text-amber-500" />
+    ))}
+  </div>
+);
 
 // Default generic questions (fallback if no specialty selected)
 const defaultPremQuestions = [
@@ -251,7 +259,7 @@ export function PatientPremPromPage() {
             {ratingOptions.map((opt) => (
               <div
                 key={opt.value}
-                className={`rounded-xl p-3 md:p-4 text-center border-2 ${
+                className={`rounded-xl p-3 md:p-4 text-center border-2 flex flex-col items-center justify-center ${
                   opt.color === "green" ? "bg-green-50 border-green-200" :
                   opt.color === "teal" ? "bg-teal-50 border-teal-200" :
                   opt.color === "yellow" ? "bg-yellow-50 border-yellow-200" :
@@ -259,7 +267,7 @@ export function PatientPremPromPage() {
                   "bg-red-50 border-red-200"
                 }`}
               >
-                <div className="text-2xl md:text-3xl mb-0.5">{opt.emoji}</div>
+                {renderStars(opt.stars)}
                 <div className="font-bold text-gray-800 text-sm md:text-base">{opt.label}</div>
                 <div className="text-xs text-gray-500 mt-1">{opt.score} poin</div>
               </div>
@@ -386,12 +394,12 @@ function SurveyQuestion({
                 <button
                   key={opt.value}
                   onClick={() => onChange(opt.value)}
-                  className={`p-3 md:py-3 md:px-2 rounded-xl border-2 flex items-center md:flex-col md:justify-center gap-3 md:gap-1 transition-all text-left md:text-center ${
+                  className={`p-3 lg:px-1 rounded-xl border-2 flex items-center md:flex-col md:justify-center gap-3 md:gap-1 transition-all text-left md:text-center w-full ${
                     isSelected ? colors.selected : `border-gray-200 ${colors.hover}`
                   }`}
                 >
-                  <div className="text-xl md:text-2xl">{opt.emoji}</div>
-                  <div className={`text-sm font-semibold flex-1 md:flex-none ${isSelected ? "text-gray-900" : "text-gray-600"}`}>
+                  <div className="flex-shrink-0 md:w-full">{renderStars(opt.stars)}</div>
+                  <div className={`text-sm font-bold flex-1 md:flex-none ${isSelected ? "text-gray-900" : "text-gray-600"} break-words`}>
                     {opt.label}
                   </div>
                 </button>
