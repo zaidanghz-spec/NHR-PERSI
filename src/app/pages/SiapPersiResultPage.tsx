@@ -56,6 +56,12 @@ export function SiapPersiResultPage() {
 
       // Get real raw data from draft
       const specProgress = draft?.progress[spec];
+      
+      // Load summaries prepared by ClinicalAuditPage and PatientReportPage
+      const auditSummaryStr = sessionStorage.getItem(`${spec}_auditSummary`);
+      const prmSummaryStr = sessionStorage.getItem(`${spec}_prmSummary`);
+      const auditSummary = auditSummaryStr ? JSON.parse(auditSummaryStr) : {};
+      const prmSummary = prmSummaryStr ? JSON.parse(prmSummaryStr) : {};
 
       addSubmission({
         hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
@@ -73,15 +79,17 @@ export function SiapPersiResultPage() {
         details: { 
           specialties: [{ specialty: info.name, disease: info.disease }],
           rsbkData: specProgress?.rsbk.data || {},
-          auditData: specProgress?.clinicalAudit.data || {},
-          prmData: specProgress?.patientReport.data || {},
+          auditData: auditSummary,   // Replaced with summarized data for Admin compatibility
+          prmData: prmSummary,       // Replaced with summarized data for Admin compatibility
         },
       });
 
       // Cleanup specialty-specific scores
       sessionStorage.removeItem(`${spec}_rsbkScore`);
       sessionStorage.removeItem(`${spec}_clinicalAuditScore`);
+      sessionStorage.removeItem(`${spec}_auditSummary`);
       sessionStorage.removeItem(`${spec}_patientReportScore`);
+      sessionStorage.removeItem(`${spec}_prmSummary`);
     });
     
     // Cleanup draft

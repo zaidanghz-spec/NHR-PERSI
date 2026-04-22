@@ -229,9 +229,7 @@ export function ClinicalAuditPage() {
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     
     // Calculate and save scores
-    const scores = calculateCategoryScores();
-    sessionStorage.setItem(`${specialty}_clinicalAuditMedicalScore`, "");
-    sessionStorage.setItem(`${specialty}_clinicalAuditNursingScore`, "");
+    const categoryScores = calculateCategoryScores();
     
     // Save to server
     api.saveDraft("clinical-audit", hospitalCode, specialty, draft).catch((err) => {
@@ -245,6 +243,23 @@ export function ClinicalAuditPage() {
     handleSaveDraft();
     const score = calculateSpecialtyAuditScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
+    
+    // Save summary for admin dashboard compatibility
+    let summary: Record<string, string> = {};
+    diseases.forEach(d => {
+      d.questions.forEach(q => {
+        let yes = 0, count = 0;
+        for(let i=1; i<=30; i++) {
+          if (formData[`${i}-${q.id}`]) { 
+            count++; 
+            if(formData[`${i}-${q.id}`] === "1") yes++; 
+          }
+        }
+        summary[q.id] = (count > 0 && (yes / count) >= 0.5) ? "1" : "2";
+      });
+    });
+    sessionStorage.setItem(`${specialty}_auditSummary`, JSON.stringify(summary));
+
     navigate(`/siap-persi/patient-report/${specialty}`);
   };
 

@@ -326,6 +326,7 @@ export function PatientReportPage() {
     
     // Calculate final score across ALL diseases for this specialty
     let finalScore = 0;
+    let prmSummary: Record<string, string> = {};
     
     try {
       for (let i = 0; i < diseases.length; i++) {
@@ -333,13 +334,29 @@ export function PatientReportPage() {
         const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
         
         let diseaseAvg = 0;
-        const customSurveyStorageKey = `siap_persi_custom_survey_${hospitalCode}_${dKey}`;
+        const customSurveyStorageKey = `custom-survey-${hospitalCode}-${dKey}`;
         const customDoc = localStorage.getItem(customSurveyStorageKey);
         
         if (customDoc) {
           diseaseAvg = 0; // Menunggu Review
         } else if (diseaseSurveys.length > 0) {
           diseaseAvg = Math.round(diseaseSurveys.reduce((s, r) => s + (r.overallScore || 0), 0) / diseaseSurveys.length);
+          
+          // Build summary for admin dashboard compatibility
+          const allQuestions = [...diseases[i].premQuestions, ...diseases[i].promQuestions];
+          allQuestions.forEach(q => {
+            let sum = 0, count = 0;
+            diseaseSurveys.forEach(survey => {
+               if (survey.answers && survey.answers[q.id]) {
+                 count++;
+                 // In PatientSurvey, answer is "1" to "5" representing score 1 to 5.
+                 sum += parseInt(survey.answers[q.id]);
+               }
+            });
+            // Dashboard expects value like "4", we store integer average scaled back to 1-5 range string if needed.
+            // Actually, PRM expects 0-5. So we parse Int and round!
+            prmSummary[q.id] = count > 0 ? Math.round(sum / count).toString() : "0";
+          });
         }
         
         const weightMatch = diseases[i].weight.match(/(\d+)%/);
@@ -349,10 +366,10 @@ export function PatientReportPage() {
       }
     } catch (e) {
       console.error("Failed to fetch all disease surveys for accurate final score:", e);
-      // Fallback
       finalScore = overallScore;
     }
 
+    sessionStorage.setItem(`${specialty}_prmSummary`, JSON.stringify(prmSummary));
     sessionStorage.setItem(`${specialty}_patientReportScore`, Math.round(finalScore).toString());
     navigate(`/siap-persi/result/${specialty}`);
   };
