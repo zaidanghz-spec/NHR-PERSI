@@ -323,7 +323,37 @@ export function PatientReportPage() {
 
   const handleContinue = async () => {
     await handleSaveDraft();
-    sessionStorage.setItem(`${specialty}_patientReportScore`, overallScore.toString());
+    
+    // Calculate final score across ALL diseases for this specialty
+    let finalScore = 0;
+    
+    try {
+      for (let i = 0; i < diseases.length; i++) {
+        const dKey = `${specialty}_${i}`;
+        const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
+        
+        let diseaseAvg = 0;
+        const customSurveyStorageKey = `siap_persi_custom_survey_${hospitalCode}_${dKey}`;
+        const customDoc = localStorage.getItem(customSurveyStorageKey);
+        
+        if (customDoc) {
+          diseaseAvg = 0; // Menunggu Review
+        } else if (diseaseSurveys.length > 0) {
+          diseaseAvg = Math.round(diseaseSurveys.reduce((s, r) => s + (r.overallScore || 0), 0) / diseaseSurveys.length);
+        }
+        
+        const weightMatch = diseases[i].weight.match(/(\d+)%/);
+        const weight = weightMatch ? parseInt(weightMatch[1]) / 100 : 1;
+        
+        finalScore += diseaseAvg * weight;
+      }
+    } catch (e) {
+      console.error("Failed to fetch all disease surveys for accurate final score:", e);
+      // Fallback
+      finalScore = overallScore;
+    }
+
+    sessionStorage.setItem(`${specialty}_patientReportScore`, Math.round(finalScore).toString());
     navigate(`/siap-persi/result/${specialty}`);
   };
 

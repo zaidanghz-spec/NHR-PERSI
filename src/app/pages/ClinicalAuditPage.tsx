@@ -141,6 +141,53 @@ export function ClinicalAuditPage() {
     return Math.round(rawScore * validityWeight);
   };
 
+  const calculateSpecialtyAuditScore = () => {
+    let finalScore = 0;
+    
+    diseases.forEach((disease) => {
+      let patientsCompleted = 0;
+      let categories: Record<string, { total: number; count: number; weight: number }> = {};
+      
+      for (let p = 1; p <= 30; p++) {
+        let isPatientComplete = true;
+        disease.questions.forEach(q => {
+          if (!formData[`${p}-${q.id}`]) isPatientComplete = false;
+        });
+        
+        if (isPatientComplete) {
+          patientsCompleted++;
+          disease.questions.forEach(q => {
+            const key = `${p}-${q.id}`;
+            const catName = q.category.replace(/\s*\(\d+%\)/, "");
+            const weightMatch = q.category.match(/(\d+)%/);
+            const w = weightMatch ? parseInt(weightMatch[1]) / 100 : 0.25;
+            
+            if (!categories[catName]) categories[catName] = { total: 0, count: 0, weight: w };
+            categories[catName].total += getOptionScore(formData[key]);
+            categories[catName].count++;
+          });
+        }
+      }
+      
+      let rawWeightedAudit = 0;
+      Object.values(categories).forEach(cat => {
+         if (cat.count > 0) {
+           rawWeightedAudit += (cat.total / cat.count) * 100 * cat.weight;
+         }
+      });
+      
+      const validityWeight = getSampleValidityWeight(patientsCompleted);
+      const diseaseFinalScore = rawWeightedAudit * validityWeight;
+      
+      const diseaseWeightMatch = disease.weight.match(/(\d+)%/);
+      const diseaseWeight = diseaseWeightMatch ? parseInt(diseaseWeightMatch[1]) / 100 : 1;
+      
+      finalScore += diseaseFinalScore * diseaseWeight;
+    });
+    
+    return Number(finalScore.toFixed(1));
+  };
+
   const getCompletedPatientsCount = () => {
     let count = 0;
     for (let i = 1; i <= 30; i++) {
@@ -178,7 +225,7 @@ export function ClinicalAuditPage() {
     localStorage.setItem(getDraftKey(specialty), JSON.stringify(draft));
     
     // Update session storage immediately for live score sync
-    const score = calculateOverallScore();
+    const score = calculateSpecialtyAuditScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     
     // Calculate and save scores
@@ -196,7 +243,7 @@ export function ClinicalAuditPage() {
   const handleSubmit = () => {
     // Also save draft before navigating
     handleSaveDraft();
-    const score = calculateOverallScore();
+    const score = calculateSpecialtyAuditScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     navigate(`/siap-persi/patient-report/${specialty}`);
   };
