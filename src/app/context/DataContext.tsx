@@ -231,7 +231,7 @@ const DataContext = createContext<DataContextType | null>(null);
 function loadFromStorage<T>(key: string, defaultValue: T): T {
   try {
     const stored = localStorage.getItem(key);
-    if (stored) return JSON.parse(decodeURIComponent(atob(stored)));
+    if (stored) return JSON.parse(stored);
     return defaultValue;
   } catch {
     return defaultValue;
@@ -245,7 +245,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("persi_admin") === "true");
   const [currentHospital, setCurrentHospital] = useState<HospitalAccount | null>(() => {
     const stored = sessionStorage.getItem("persi_hospital_session");
-    return stored ? JSON.parse(decodeURIComponent(atob(stored))) : null;
+    if (!stored) return null;
+    try { return JSON.parse(stored); } catch { return null; }
   });
   const [approvedRankings, setApprovedRankings] = useState<ApprovedRanking[]>(() => loadFromStorage("persi_rankings", []));
   const [submissions, setSubmissions] = useState<SubmissionType[]>(() => loadFromStorage("persi_submissions", []));
@@ -382,7 +383,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let currentAccounts: HospitalAccount[] = hospitalAccounts;
     try {
       const storedAcc = localStorage.getItem("persi_hospital_accounts");
-      if (storedAcc) currentAccounts = JSON.parse(decodeURIComponent(atob(storedAcc)));
+      if (storedAcc) currentAccounts = JSON.parse(storedAcc);
     } catch {}
 
     // Check if email already registered
@@ -405,7 +406,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await addAccountToDb(account);
       const updatedAccounts = [...currentAccounts, account];
       setHospitalAccounts(updatedAccounts);
-      localStorage.setItem("persi_hospital_accounts", btoa(encodeURIComponent(JSON.stringify(updatedAccounts))));
+      localStorage.setItem("persi_hospital_accounts", JSON.stringify(updatedAccounts));
       return true;
     } catch (err) {
       console.error("Cloud account push failed:", err);
@@ -418,7 +419,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let accounts = hospitalAccounts;
     try {
       const stored = localStorage.getItem("persi_hospital_accounts");
-      if (stored) accounts = JSON.parse(decodeURIComponent(atob(stored)));
+      if (stored) accounts = JSON.parse(stored);
     } catch {}
 
     const account = accounts.find(
