@@ -417,12 +417,12 @@ function SpecialtyCard({
       </div>
 
       {/* Header with Visual Richness */}
-      <div className={`relative bg-gradient-to-br ${specialty.color} p-8 text-white overflow-hidden`}>
+      <div className={`relative w-full bg-gradient-to-br ${specialty.color} p-8 text-white overflow-hidden`}>
         {/* Abstract Background Shapes */}
         <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
         <div className="absolute -left-4 -bottom-4 w-24 h-24 bg-black/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
         
-        <div className="relative z-10">
+        <div className="relative z-10 w-full text-left">
           <div className={`${specialty.bgLight} w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-inner backdrop-blur-sm`}>
             <div className={`${specialty.textColor} transform group-hover:scale-110 transition-transform w-8 h-8 [&>svg]:w-full [&>svg]:h-full`}>
               {specialty.icon}
