@@ -7,7 +7,6 @@ import { HospitalSubmissionPage } from "./pages/HospitalSubmissionPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
 import { ReviewSubmissionPage } from "./pages/ReviewSubmissionPage";
-import { SiapPersiOverviewPage } from "./pages/SiapPersiOverviewPage";
 import { SelectSpecialtyPage } from "./pages/SelectSpecialtyPage";
 import { RsbkFormPage } from "./pages/RsbkFormPage";
 import { ClinicalAuditPage } from "./pages/ClinicalAuditPage";
@@ -71,7 +70,6 @@ export const router = createBrowserRouter([
           { path: "admin/review/:id", Component: ReviewSubmissionPage },
 
           // NHR PERSI Routes
-          { path: "siap-persi/overview", Component: SiapPersiOverviewPage },
           { path: "siap-persi/select-specialty", Component: SelectSpecialtyPage },
           { path: "siap-persi/rsbk/:specialty", Component: RsbkFormPage },
           { path: "siap-persi/clinical-audit/:specialty", Component: ClinicalAuditPage },

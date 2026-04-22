@@ -132,7 +132,7 @@ export function HospitalLoginPage() {
             hospitalCode,
             authenticated: true,
           }));
-          navigate("/siap-persi/overview");
+          navigate("/submit");
         });
         setLoading(false);
         return;

@@ -218,10 +218,10 @@ export function SelectSpecialtyPage() {
         {/* Header */}
         <div className="mb-8">
           <Link
-            to="/siap-persi/overview"
+            to="/submit"
             className="inline-flex items-center text-[#0F4C81] hover:underline mb-4"
           >
-            ← Kembali ke Overview
+            ← Kembali ke Portal RS
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Pilih Pelayanan

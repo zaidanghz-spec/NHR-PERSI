@@ -311,14 +311,6 @@ export function Root() {
                     Portal Rumah Sakit
                   </Link>
                 </li>
-                <li>
-                  <Link
-                    to="/siap-persi/overview"
-                    className="hover:text-white transition-colors"
-                  >
-                    NHR PERSI Overview
-                  </Link>
-                </li>
               </ul>
             </div>
             <div>
