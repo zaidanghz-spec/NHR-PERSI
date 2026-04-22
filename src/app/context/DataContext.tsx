@@ -3,6 +3,7 @@ import {
   getAllSubmissions, 
   addSubmission as addSubmissionToDb, 
   updateSubmissionStatus as updateStatusInDb,
+  updateSubmissionReview as updateReviewInDb,
   getAllHospitalAccounts,
   addHospitalAccount as addAccountToDb,
   updateAccountStatus as updateAccountStatusInDb,
@@ -222,7 +223,7 @@ interface DataContextType {
 
   submissions: SubmissionType[];
   addSubmission: (submission: Omit<SubmissionType, "id">) => void;
-  updateSubmissionStatus: (id: string, status: SubmissionType["status"], notes?: string) => void;
+  updateSubmissionStatus: (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any) => void;
   unpublishRanking: (submissionId: string) => void;
 }
 
@@ -529,17 +530,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const updateSubmissionStatus = useCallback(async (id: string, status: SubmissionType["status"], notes?: string) => {
+  const updateSubmissionStatus = useCallback(async (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any) => {
+    let updatedDetailsJson: any = null;
+    
     setSubmissions(prev => prev.map(s => {
       if (s.id === id) {
-        return { ...s, status, ...(notes !== undefined ? { reviewerNotes: notes } : {}) };
+        // Embed reviewer notes directly into details for database mapping
+        const newDetails = { 
+          ...(s.details || {}), 
+          reviewerNotes: notes !== undefined ? notes : s.details?.reviewerNotes,
+          revisionTargets: revisionTargets || s.details?.revisionTargets
+        };
+        updatedDetailsJson = newDetails;
+        
+        return { 
+          ...s, 
+          status, 
+          details: newDetails,
+          reviewerNotes: notes !== undefined ? notes : s.reviewerNotes // keep flat for UI compat
+        };
       }
       return s;
     }));
 
     // Sync to cloud
     try {
-      await updateStatusInDb(id, status);
+      if (updatedDetailsJson) {
+        await updateReviewInDb(id, status, updatedDetailsJson);
+      } else {
+        await updateStatusInDb(id, status);
+      }
     } catch (err) {
       console.error("Cloud status update failed:", err);
     }

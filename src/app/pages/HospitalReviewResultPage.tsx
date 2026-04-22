@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { useData } from "../context/DataContext";
+import { draftManager } from "../utils/draftManager";
+import { specialtyAuditData } from "../data/specialtyAuditData";
 
 export function HospitalReviewResultPage() {
   const navigate = useNavigate();
@@ -62,6 +64,52 @@ export function HospitalReviewResultPage() {
     if (score >= 70) return { grade: "Tier 3", name: "Excellent", color: "text-emerald-700", bg: "bg-emerald-50" };
     if (score >= 60) return { grade: "Tier 4", name: "Commendable", color: "text-amber-700", bg: "bg-amber-50" };
     return { grade: "Tier 5", name: "Developing", color: "text-slate-600", bg: "bg-slate-50" };
+  };
+
+  const handleReviseSubmission = (submission: any) => {
+    // Determine technical specialty key
+    const specKey = Object.keys(specialtyAuditData).find(
+      key => specialtyAuditData[key as keyof typeof specialtyAuditData].name === submission.specialty
+    ) || "cardiology";
+
+    // 1. Create a fresh draft
+    const draft = draftManager.createDraft(
+      authData.hospitalName,
+      authData.picName || "PIC",
+      [specKey]
+    );
+
+    // 2. Hydrate with rawProgress from submission if available, otherwise fallback to empty initialized progress
+    if (submission.details && submission.details.rawProgress) {
+      draft.progress[specKey] = submission.details.rawProgress;
+      // Ensure it is marked incomplete so the user has to re-submit
+      draft.progress[specKey].rsbk.completed = false;
+      draft.progress[specKey].clinicalAudit.completed = false;
+      draft.progress[specKey].patientReport.completed = false;
+      
+      // Force update the draft in draftManager
+      const allDrafts = draftManager.getAllDrafts();
+      const idx = allDrafts.findIndex(d => d.draftId === draft.draftId);
+      if (idx !== -1) {
+        allDrafts[idx] = draft;
+        localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
+      }
+    }
+
+    // 3. Set as active draft and jump into it!
+    draftManager.setCurrentDraftId(draft.draftId);
+    sessionStorage.setItem("selectedSpecialties", JSON.stringify([specKey]));
+    
+    // Auto-navigate to whichever stage was marked for revision by admin 
+    // If admin requested specific revision target, we can route directly. 
+    // Defaulting to the first stage: rsbk
+    let targetStage = "rsbk";
+    if (submission.details?.revisionTargets) {
+      if (submission.details.revisionTargets.patientReport) targetStage = "patient-report";
+      else if (submission.details.revisionTargets.clinicalAudit) targetStage = "clinical-audit";
+    }
+
+    navigate(`/siap-persi/${targetStage}/${specKey}`);
   };
 
   return (
@@ -190,14 +238,24 @@ export function HospitalReviewResultPage() {
                         </div>
 
                         {isRevision && (
-                          <Button 
-                            className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white"
-                            onClick={() => {
-                              navigate(`/siap-persi/select-specialty`);
-                            }}
-                          >
-                            Perbaiki & Upload Ulang
-                          </Button>
+                          <div className="mt-4">
+                            {submission.details?.revisionTargets && (
+                              <div className="mb-3 text-sm flex gap-2">
+                                <span className="font-semibold text-gray-700">Fokus Perbaikan:</span>
+                                <div className="flex gap-2">
+                                  {submission.details.revisionTargets.rsbk && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">Hospital Structure</span>}
+                                  {submission.details.revisionTargets.clinicalAudit && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">Clinical Audit</span>}
+                                  {submission.details.revisionTargets.patientReport && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">Patient Report</span>}
+                                </div>
+                              </div>
+                            )}
+                            <Button 
+                              className="w-full bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all"
+                              onClick={() => handleReviseSubmission(submission)}
+                            >
+                              Perbaiki & Upload Ulang
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>

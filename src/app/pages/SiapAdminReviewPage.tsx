@@ -34,6 +34,7 @@ export function SiapAdminReviewPage() {
   const [comment, setComment] = useState("");
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "">("");
+  const [revisionTargets, setRevisionTargets] = useState({ rsbk: false, clinicalAudit: false, patientReport: false });
   const [customSurveyDocs, setCustomSurveyDocs] = useState<CustomSurveyDoc[]>([]);
   const [activeTab, setActiveTab] = useState<"summary" | "rsbk" | "audit" | "prm">("summary");
 
@@ -133,7 +134,7 @@ export function SiapAdminReviewPage() {
           submissionId: submissionData.id,
         });
     } else if (action === "reject") {
-      updateSubmissionStatus(submissionData.id, "Revision Required", comment);
+      updateSubmissionStatus(submissionData.id, "Revision Required", comment, revisionTargets);
     }
     console.log(`${action} submission with comment:`, comment);
     setShowApprovalDialog(false);
@@ -630,6 +631,42 @@ export function SiapAdminReviewPage() {
                   ? "Assessment ini akan dipublikasikan dan rumah sakit akan menerima notifikasi approval."
                   : "Rumah sakit akan diminta untuk melakukan revisi berdasarkan catatan yang Anda berikan."}
               </p>
+              
+              {action === "reject" && (
+                <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-3 text-sm">Pilih Bagian yang Perlu Direvisi:</h4>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={revisionTargets.rsbk}
+                        onChange={(e) => setRevisionTargets(prev => ({...prev, rsbk: e.target.checked}))}
+                        className="w-4 h-4 rounded border-gray-300 text-[#0F4C81] focus:ring-[#0F4C81]"
+                      />
+                      <span className="text-sm font-medium text-gray-700">Hospital Structure</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={revisionTargets.clinicalAudit}
+                        onChange={(e) => setRevisionTargets(prev => ({...prev, clinicalAudit: e.target.checked}))}
+                        className="w-4 h-4 rounded border-gray-300 text-[#0F4C81] focus:ring-[#0F4C81]"
+                      />
+                      <span className="text-sm font-medium text-gray-700">Clinical Audit</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={revisionTargets.patientReport}
+                        onChange={(e) => setRevisionTargets(prev => ({...prev, patientReport: e.target.checked}))}
+                        className="w-4 h-4 rounded border-gray-300 text-[#0F4C81] focus:ring-[#0F4C81]"
+                      />
+                      <span className="text-sm font-medium text-gray-700">Patient Report</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <Button
                   variant="outline"

@@ -289,6 +289,21 @@ export async function updateSubmissionStatus(id: string, status: string): Promis
   }
 }
 
+export async function updateSubmissionReview(id: string, status: string, details: any): Promise<void> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return;
+
+  try {
+    await db.execute({
+      sql: "UPDATE submissions SET status = ?, details = ? WHERE id = ?",
+      args: [status, JSON.stringify(details), id]
+    });
+  } catch (err) {
+    console.error("Update Submission Review Error:", err);
+  }
+}
+
 // ============ RANKINGS ============
 
 export async function publishRankingToDb(ranking: any): Promise<void> {

@@ -81,6 +81,7 @@ export function SiapPersiResultPage() {
           rsbkData: specProgress?.rsbk.data || {},
           auditData: auditSummary,   // Replaced with summarized data for Admin compatibility
           prmData: prmSummary,       // Replaced with summarized data for Admin compatibility
+          rawProgress: specProgress, // Raw draft data to enable granular revisions without starting from scratch
         },
       });
 
