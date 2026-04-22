@@ -502,8 +502,8 @@ export async function submitSurvey(
   }
 
   try {
-    // Basic Unique ID since Edge/Browser might not have node crypto
-    const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    // Better Unique ID using Web Crypto API
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
     
     // Check Dup
     const existing = await db.execute({
@@ -587,7 +587,7 @@ export async function registerPatient(
   if (!db) return { success: false, error: "Koneksi ke Turso Gagal. Pastikan VITE_TURSO_DATABASE_URL valid (harus terdepan libsql://) di Dashboard Vercel lalu REDEPLOY." };
 
   try {
-    const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
     
     // Check if duplicate RM
     const existing = await db.execute({

@@ -300,6 +300,14 @@ export function PatientReportPage() {
     alert(`Link survei untuk ${patient.name} telah disalin!`);
   };
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (draftSavedMsg) {
+      timer = setTimeout(() => setDraftSavedMsg(false), 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [draftSavedMsg]);
+
   // Save draft
   const handleSaveDraft = async () => {
     if (!specialty) return;
@@ -308,7 +316,6 @@ export function PatientReportPage() {
         registeredPatients,
       });
       setDraftSavedMsg(true);
-      setTimeout(() => setDraftSavedMsg(false), 3000);
     } catch (err) {
       console.error("Failed to save draft:", err);
     }

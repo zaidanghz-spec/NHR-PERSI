@@ -231,7 +231,7 @@ const DataContext = createContext<DataContextType | null>(null);
 function loadFromStorage<T>(key: string, defaultValue: T): T {
   try {
     const stored = localStorage.getItem(key);
-    if (stored) return JSON.parse(stored);
+    if (stored) return JSON.parse(decodeURIComponent(atob(stored)));
     return defaultValue;
   } catch {
     return defaultValue;
@@ -245,7 +245,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("persi_admin") === "true");
   const [currentHospital, setCurrentHospital] = useState<HospitalAccount | null>(() => {
     const stored = sessionStorage.getItem("persi_hospital_session");
-    return stored ? JSON.parse(stored) : null;
+    return stored ? JSON.parse(decodeURIComponent(atob(stored))) : null;
   });
   const [approvedRankings, setApprovedRankings] = useState<ApprovedRanking[]>(() => loadFromStorage("persi_rankings", []));
   const [submissions, setSubmissions] = useState<SubmissionType[]>(() => loadFromStorage("persi_submissions", []));
@@ -314,7 +314,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       syncRankings();
       syncNewsAndEvents();
       draftManager.syncWithCloud();
-    }, 10000);
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -382,7 +382,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let currentAccounts: HospitalAccount[] = hospitalAccounts;
     try {
       const storedAcc = localStorage.getItem("persi_hospital_accounts");
-      if (storedAcc) currentAccounts = JSON.parse(storedAcc);
+      if (storedAcc) currentAccounts = JSON.parse(decodeURIComponent(atob(storedAcc)));
     } catch {}
 
     // Check if email already registered
@@ -405,7 +405,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await addAccountToDb(account);
       const updatedAccounts = [...currentAccounts, account];
       setHospitalAccounts(updatedAccounts);
-      localStorage.setItem("persi_hospital_accounts", JSON.stringify(updatedAccounts));
+      localStorage.setItem("persi_hospital_accounts", btoa(encodeURIComponent(JSON.stringify(updatedAccounts))));
       return true;
     } catch (err) {
       console.error("Cloud account push failed:", err);
@@ -418,7 +418,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let accounts = hospitalAccounts;
     try {
       const stored = localStorage.getItem("persi_hospital_accounts");
-      if (stored) accounts = JSON.parse(stored);
+      if (stored) accounts = JSON.parse(decodeURIComponent(atob(stored)));
     } catch {}
 
     const account = accounts.find(
@@ -468,7 +468,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Admin Auth
   const adminLogin = useCallback((email: string, password: string): boolean => {
-    if (email === "admin@persi.or.id" && password === "admin123") {
+    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || "admin@persi.or.id";
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || "admin123";
+    
+    if (email === adminEmail && password === adminPassword) {
       setIsAdmin(true);
       sessionStorage.setItem("persi_admin", "true");
       return true;

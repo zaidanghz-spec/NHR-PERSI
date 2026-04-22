@@ -157,6 +157,15 @@ export function ClinicalAuditPage() {
     if (currentPatient > 1) setCurrentPatient(currentPatient - 1);
   };
 
+  
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (draftSavedMsg) {
+      timer = setTimeout(() => setDraftSavedMsg(false), 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [draftSavedMsg]);
+
   const handleSaveDraft = () => {
     if (!specialty) return;
     const draft = {
@@ -182,7 +191,6 @@ export function ClinicalAuditPage() {
       console.error("Failed to save draft to server:", err);
     });
     setDraftSavedMsg(true);
-    setTimeout(() => setDraftSavedMsg(false), 3000);
   };
 
   const handleSubmit = () => {
