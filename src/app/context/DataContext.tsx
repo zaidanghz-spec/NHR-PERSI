@@ -428,6 +428,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (account) {
       if (account.status === "activated") {
         setCurrentHospital(account);
+        // Also store email in session so hospitalCode can be derived consistently
         sessionStorage.setItem("persi_hospital_session", JSON.stringify(account));
       }
       return account;

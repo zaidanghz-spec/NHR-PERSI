@@ -13,11 +13,12 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { useData } from "../context/DataContext";
+import { getHospitalCode } from "../utils/api";
 
 export function HospitalSubmissionPage() {
   const navigate = useNavigate();
   const { currentHospital, hospitalLogout } = useData();
-  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string; hospitalCode?: string } | null>(null);
+  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string; hospitalCode?: string; email?: string } | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -41,8 +42,7 @@ export function HospitalSubmissionPage() {
   }
 
   const hospitalCode = (authData as any).hospitalCode
-    || authData.hospitalName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8)
-    || "RS001";
+    || getHospitalCode((authData as any).email || "");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-teal-50 py-12">

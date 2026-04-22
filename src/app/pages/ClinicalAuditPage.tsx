@@ -5,6 +5,7 @@ import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import * as api from "../utils/api";
+import { getHospitalCode } from "../utils/api";
 
 // Audit compliance options
 const AUDIT_OPTIONS = [
@@ -58,10 +59,10 @@ export function ClinicalAuditPage() {
   const [currentPatient, setCurrentPatient] = useState(1);
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
 
-  // Get hospital code from session
+  // Get hospital code from session — must match Turso's hospital_code column (derived from email)
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
   const hospitalName = authData.hospitalName || "Unknown Hospital";
-  const hospitalCode = authData.hospitalCode || hospitalName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8) || "RS001";
+  const hospitalCode = authData.hospitalCode || getHospitalCode(authData.email || "");
 
   // Load draft on mount - try server first, then localStorage fallback
   useEffect(() => {

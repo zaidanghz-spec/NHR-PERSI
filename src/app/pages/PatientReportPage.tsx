@@ -26,6 +26,7 @@ import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import type { PatientSurveyResponse } from "./PatientPremPromPage";
 import * as api from "../utils/api";
+import { getHospitalCode } from "../utils/api";
 
 interface RegisteredPatient {
   id: string;
@@ -41,10 +42,10 @@ export function PatientReportPage() {
   const specData = specialty ? specialtyAuditData[specialty as keyof typeof specialtyAuditData] : null;
   const diseases = specData?.diseases || [];
 
-  // Get hospital code from session
+  // Get hospital code — must match Turso's hospital_code column (derived from email, the Turso PK)
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
   const hospitalName = authData.hospitalName || "Unknown Hospital";
-  const hospitalCode = authData.hospitalCode || hospitalName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8) || "RS001";
+  const hospitalCode = authData.hospitalCode || getHospitalCode(authData.email || "");
 
   const [activeDiseaseIndex, setActiveDiseaseIndex] = useState(0);
   const activeDisease = diseases[activeDiseaseIndex];

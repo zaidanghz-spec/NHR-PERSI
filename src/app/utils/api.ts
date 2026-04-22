@@ -149,6 +149,16 @@ export async function initTursoTables() {
   }
 }
 
+// ============ HOSPITAL CODE UTILITY ============
+// Derives a stable, unique hospital code from email (the true unique identifier in Turso).
+// All surveys, patients, and drafts in Turso use hospital_code as a partition key.
+// This must be called consistently across all pages — never derive ad-hoc from hospital name.
+export function getHospitalCode(email: string): string {
+  if (!email) return "UNKNOWN";
+  const local = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return local.substring(0, 12) || "RS001";
+}
+
 // ============ HOSPITAL ACCOUNTS ============
 
 export async function addHospitalAccount(acc: any): Promise<void> {

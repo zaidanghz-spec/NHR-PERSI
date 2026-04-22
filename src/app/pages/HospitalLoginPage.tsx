@@ -122,16 +122,20 @@ export function HospitalLoginPage() {
           setLoading(false);
           return;
         }
-        // Derive a consistent unique hospitalCode from email (stable across sessions)
-        const rawCode = loginEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-        const hospitalCode = rawCode.substring(0, 8) || "RS001";
-        sessionStorage.setItem("hospitalAuth", JSON.stringify({
-          hospitalName: account.hospitalName,
-          picName: account.picName,
-          hospitalCode,
-          authenticated: true,
-        }));
-        navigate("/siap-persi/overview");
+        // hospitalCode must match what Turso uses — derived from email (the Turso PK)
+        import("../utils/api").then(({ getHospitalCode }) => {
+          const hospitalCode = getHospitalCode(account.email);
+          sessionStorage.setItem("hospitalAuth", JSON.stringify({
+            hospitalName: account.hospitalName,
+            picName: account.picName,
+            email: account.email,
+            hospitalCode,
+            authenticated: true,
+          }));
+          navigate("/siap-persi/overview");
+        });
+        setLoading(false);
+        return;
       } else {
         setError("Email atau password salah. Pastikan Anda sudah mendaftar terlebih dahulu.");
       }
