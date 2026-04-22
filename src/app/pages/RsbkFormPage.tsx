@@ -436,10 +436,12 @@ function QuantityInput({ item, value, onChange }: {
 }) {
   const isFilled = value !== null;
   const actualValue = value ?? 0;
-  const achievement = isFilled ? Math.min(actualValue, item.target) / item.target : 0;
-  const isMetTarget = isFilled && actualValue >= item.target;
+  const isInfoOnly = item.target === 0;
+  
+  const achievement = isFilled && !isInfoOnly ? Math.min(actualValue, item.target) / item.target : 0;
+  const isMetTarget = isInfoOnly ? isFilled && actualValue > 0 : (isFilled && actualValue >= item.target);
   const unit = item.inputUnit || "unit";
-  const pointsEarned = isFilled ? Math.min(actualValue, item.target) * item.pointPerUnit : 0;
+  const pointsEarned = isFilled && !isInfoOnly ? Math.min(actualValue, item.target) * item.pointPerUnit : 0;
   const targetPoints = item.target * item.pointPerUnit;
 
   const handleDecrement = () => {
@@ -463,20 +465,28 @@ function QuantityInput({ item, value, onChange }: {
       <div className="flex-1">
         <label className="font-medium text-gray-900">{item.name}</label>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
-            isMetTarget ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
-          }`}>
-            <Target className="w-3 h-3" />
-            Target: {item.target} {unit}
-          </span>
-          {item.pointPerUnit > 1 && (
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
-              ×{item.pointPerUnit} poin
-            </span>
-          )}
-          {isFilled && (
-            <span className={`text-xs font-medium ${isMetTarget ? "text-green-600" : "text-orange-600"}`}>
-              {pointsEarned}/{targetPoints} poin ({(achievement * 100).toFixed(0)}%)
+          {!isInfoOnly ? (
+            <>
+              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                isMetTarget ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
+              }`}>
+                <Target className="w-3 h-3" />
+                Target: {item.target} {unit}
+              </span>
+              {item.pointPerUnit > 1 && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
+                  ×{item.pointPerUnit} poin
+                </span>
+              )}
+              {isFilled && (
+                <span className={`text-xs font-medium ${isMetTarget ? "text-green-600" : "text-orange-600"}`}>
+                  {pointsEarned}/{targetPoints} poin ({(achievement * 100).toFixed(0)}%)
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">
+              Hanya Informasi (Tidak Dinilai)
             </span>
           )}
         </div>
@@ -492,7 +502,7 @@ function QuantityInput({ item, value, onChange }: {
           className="w-9 h-9 rounded-lg bg-[#0F4C81] hover:bg-[#0d3d66] flex items-center justify-center font-bold text-white transition-colors">+</button>
         <span className="text-sm text-gray-500 w-16">{unit}</span>
       </div>
-      {isMetTarget && (
+      {(!isInfoOnly && isMetTarget) && (
         <div className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">&check; Target</div>
       )}
     </div>

@@ -115,10 +115,10 @@ const cardiologyRsbkItems: RsbkItem[] = [
   { id: "alat-ablation_pfa", name: "Pulse-Field Ablation / Cryoablation System", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
 
   // ASPEK KEPERAWATAN (SIAP PERSI)
-  { id: "sdm-ners-spkmb-cv", name: "Ners Sp.KMB (Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-cert-cv", name: "Ners dan Sertifikasi/Fellowship Cardiovascular", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-cv-total", name: "Jumlah Ners", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
-  { id: "sdm-perawat-d3-cv", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-ners-spkmb-cv", name: "Jumlah Ners Sp.KMB (Spesialis Keperawatan Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cert-cv", name: "Jumlah Ners dan Sertifikasi/ Fellowship Keperawatan Kardiovaskuler", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cv-total", name: "Jumlah Ners (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-cv", name: "Jumlah Perawat D3 (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const cardiologyDiseases: DiseaseAudit[] = [
@@ -275,10 +275,10 @@ const neurologyRsbkItems: RsbkItem[] = [
   { id: "alat-icp", name: "Intracranial Pressure Monitoring Device", category: "alat", target: 2, pointPerUnit: 1, inputUnit: "unit" },
 
   // ASPEK KEPERAWATAN (SIAP PERSI)
-  { id: "sdm-ners-spkmb-neuro", name: "Ners Sp.KMB (Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-cert-neuro", name: "Ners dan Sertifikasi/Fellowship Neurologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-neuro-total", name: "Jumlah Ners", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
-  { id: "sdm-perawat-d3-neuro", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-ners-spkmb-neuro", name: "Jumlah Ners Sp.KMB (Spesialis Keperawatan Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cert-neuro", name: "Jumlah Ners dan Sertifikasi/Fellowship Keperawatan Neurologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-neuro-total", name: "Jumlah Ners (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-neuro", name: "Jumlah D3 (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const neurologyDiseases: DiseaseAudit[] = [
@@ -391,10 +391,10 @@ const oncologyRsbkItems: RsbkItem[] = [
   { id: "alat-mri", name: "MRI", category: "alat", target: 1, pointPerUnit: 1, inputUnit: "unit" },
 
   // ASPEK KEPERAWATAN (SIAP PERSI)
-  { id: "sdm-ners-sp-onk", name: "Ners Sp.Kep Onkologi", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-cert-onk", name: "Ners dan Sertifikasi/Fellowship Onkologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-onk-total", name: "Jumlah Ners", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
-  { id: "sdm-perawat-d3-onk", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 10, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-ners-sp-onk", name: "Jumlah Ners Sp.Kep Onkologi", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-cert-onk", name: "Jumlah Ners dan Sertifikasi/Fellowship Keperawatan Onkologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
+  { id: "sdm-ners-onk-total", name: "Jumlah Ners (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-onk", name: "Jumlah Perawat D3 (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const oncologyDiseases: DiseaseAudit[] = [
