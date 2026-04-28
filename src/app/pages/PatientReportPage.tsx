@@ -28,6 +28,7 @@ import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker
 import type { PatientSurveyResponse } from "./PatientPremPromPage";
 import * as api from "../utils/api";
 import { getHospitalCode } from "../utils/api";
+import { safeLocalStorageSet } from "../utils/storage";
 
 interface RegisteredPatient {
   id: string;
@@ -131,7 +132,7 @@ export function PatientReportPage() {
       };
       
       try {
-        localStorage.setItem(customSurveyKey, JSON.stringify(doc));
+        safeLocalStorageSet(customSurveyKey, JSON.stringify(doc));
         setCustomSurveyFileName(file.name);
         setCustomSurveyPatientCount(doc.patientCount);
         setCustomSurveyUploaded(true);

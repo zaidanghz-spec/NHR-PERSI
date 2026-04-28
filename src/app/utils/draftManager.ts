@@ -1,4 +1,5 @@
 import { saveHospitalDraft, getAllHospitalDrafts, deleteHospitalDraft as deleteCloudDraft } from "./api";
+import { safeLocalStorageSet } from "./storage";
 
 export interface DraftData {
   draftId: string;
@@ -67,7 +68,7 @@ export const draftManager = {
 
     const drafts = this.getAllDrafts();
     drafts.push(draft);
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+    safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(drafts));
 
     // Async push to cloud
     saveHospitalDraft(draft).catch(err => console.error("Cloud draft sync failed:", err));
@@ -113,7 +114,7 @@ export const draftManager = {
     draft.updatedAt = new Date().toISOString();
 
     drafts[draftIndex] = draft;
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+    safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(drafts));
 
     // Async push to cloud
     saveHospitalDraft(draft).catch(err => console.error("Cloud draft update failed:", err));
@@ -123,7 +124,7 @@ export const draftManager = {
   deleteDraft(draftId: string): void {
     const drafts = this.getAllDrafts();
     const filtered = drafts.filter((d) => d.draftId !== draftId);
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(filtered));
+    safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(filtered));
 
     // Async delete from cloud
     deleteCloudDraft(draftId).catch(err => console.error("Cloud draft deletion failed:", err));
@@ -218,7 +219,7 @@ export const draftManager = {
           }
         });
 
-        localStorage.setItem(DRAFTS_KEY, JSON.stringify(mergedDrafts));
+        safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(mergedDrafts));
       }
     } catch (err) {
       console.error("Manual cloud sync failed:", err);

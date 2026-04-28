@@ -227,29 +227,9 @@ interface DataContextType {
   unpublishRanking: (submissionId: string) => void;
 }
 
+import { safeLocalStorageSet, loadFromStorage } from "../utils/storage";
+
 const DataContext = createContext<DataContextType | null>(null);
-
-function safeLocalStorageSet(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch (e) {
-    if (e instanceof DOMException && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
-      console.warn("LocalStorage Quota Exceeded for key:", key);
-    } else {
-      console.error("LocalStorage Error:", e);
-    }
-  }
-}
-
-function loadFromStorage<T>(key: string, defaultValue: T): T {
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored) return JSON.parse(stored);
-    return defaultValue;
-  } catch {
-    return defaultValue;
-  }
-}
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [news, setNews] = useState<NewsItem[]>(() => loadFromStorage("persi_news", defaultNews));
