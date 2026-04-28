@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { CheckCircle2, Clock, FileText, ChevronRight, ArrowRight, Stethoscope, Users, AlertCircle } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -5,6 +6,7 @@ import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import { useData } from "../context/DataContext";
 import { draftManager } from "../utils/draftManager";
+import * as api from "../utils/api";
 
 export function SiapPersiResultPage() {
   const { specialty } = useParams<{ specialty: string }>();
@@ -33,9 +35,53 @@ export function SiapPersiResultPage() {
   const prmWeighted = Number((patientReportScore * 0.25).toFixed(2));
   const totalSiapScore = Number((rsbkWeighted + auditWeighted + prmWeighted).toFixed(2));
 
-  // Get patient counts for display
-  const auditPatientCount = sessionStorage.getItem(`${specialty}_auditPatientCount`) || "0";
-  const prmPatientCount = sessionStorage.getItem(`${specialty}_prmPatientCount`) || "0";
+  const [auditPatientCount, setAuditPatientCount] = useState(sessionStorage.getItem(`${specialty}_auditPatientCount`) || "0");
+  const [prmPatientCount, setPrmPatientCount] = useState(sessionStorage.getItem(`${specialty}_prmPatientCount`) || "0");
+
+  useEffect(() => {
+    async function recoverCounts() {
+      if (!specialty) return;
+      const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
+      const hCode = hospitalAuth.hospitalCode || hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "RS001";
+
+      // 1. Recover PRM Count
+      let totalPRM = 0;
+      if (specialtyInfo) {
+        for (let i = 0; i < specialtyInfo.diseases.length; i++) {
+          const dKey = `${specialty}-d${i}`;
+          try {
+            const surveys = await api.getSurveys(hCode, dKey);
+            const customData = await api.getCustomSurveyMetadata(hCode, dKey);
+            totalPRM += surveys.length + (customData ? (customData.patientCount || 0) : 0);
+          } catch {}
+        }
+      }
+      setPrmPatientCount(totalPRM.toString());
+      sessionStorage.setItem(`${specialty}_prmPatientCount`, totalPRM.toString());
+
+      // 2. Recover Audit Count (from Draft)
+      const draftKey = `nhr_persi_audit_draft_${specialty}`;
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          const formData = parsed.formData || {};
+          let totalAudit = 0;
+          if (specialtyInfo) {
+            specialtyInfo.diseases.forEach((d, dIdx) => {
+              for (let p = 1; p <= 30; p++) {
+                const isComplete = d.questions.every(q => formData[`${dIdx}_p${p}_q${q.id}`]);
+                if (isComplete) totalAudit++;
+              }
+            });
+          }
+          setAuditPatientCount(totalAudit.toString());
+          sessionStorage.setItem(`${specialty}_auditPatientCount`, totalAudit.toString());
+        } catch {}
+      }
+    }
+    recoverCounts();
+  }, [specialty, specialtyInfo]);
 
   const handleContinueToNext = () => {
     if (nextSpecialty) {
