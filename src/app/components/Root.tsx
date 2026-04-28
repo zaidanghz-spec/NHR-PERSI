@@ -162,14 +162,7 @@ export function Root() {
                     </>
                   )}
                 </div>
-              ) : (
-                <Link
-                  to="/admin/login"
-                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                >
-                  <User className="w-4 h-4 text-gray-500" />
-                </Link>
-              )}
+              ) : null}
 
               {/* Mobile Menu Toggle */}
               <button
@@ -309,6 +302,14 @@ export function Root() {
                     className="hover:text-white transition-colors"
                   >
                     Portal Rumah Sakit
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/admin/login"
+                    className="hover:text-white transition-colors"
+                  >
+                    Login Admin
                   </Link>
                 </li>
               </ul>
