@@ -172,6 +172,12 @@ export async function initTursoTables() {
           if (!existingColumns.includes("rm") && !existingColumns.includes("patient_rm")) {
              await db.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''");
           }
+          if (!existingColumns.includes("created_at")) {
+             await db.execute("ALTER TABLE patients ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+          }
+          if (!existingColumns.includes("id")) {
+             await db.execute("ALTER TABLE patients ADD COLUMN id TEXT");
+          }
           
           // If hospitalCode (camelCase) exists as NOT NULL, it will cause issues during snake_case inserts.
           // We can't easily change it to NULLABLE, but we can try to add hospital_code if it was missing.
@@ -728,6 +734,12 @@ export async function registerPatient(
     nCols.forEach(() => args.push(patient.name));
     rCols.forEach(() => args.push(patient.rm || ""));
     sCols.forEach(() => args.push(specialty));
+    
+    // Always add created_at if it exists in schema
+    if (existingCols.includes("created_at")) {
+      columns.push("created_at");
+      args.push(new Date().toISOString());
+    }
 
     // Check duplicate using the best available unique identifiers
     const hColForSelect = hCols[0] || "hospital_code";
@@ -769,13 +781,20 @@ export async function getPatients(hospitalCode: string, specialty: string): Prom
     const sCol = cols.find(c => ["specialty", "specialtyName"].includes(c.toLowerCase())) || "specialty";
     const nameCol = cols.find(c => ["name", "patient_name"].includes(c.toLowerCase())) || "name";
     const rmCol = cols.find(c => ["rm", "patient_rm"].includes(c.toLowerCase())) || "rm";
+    const idCol = cols.find(c => c.toLowerCase() === "id") || "id";
+    const orderCol = cols.includes("created_at") ? "created_at" : "id";
 
     const rs = await db.execute({
-      sql: `SELECT ${nameCol} as name, ${rmCol} as rm, ${sCol} as specialty FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY created_at DESC`,
+      sql: `SELECT ${idCol} as id, ${nameCol} as name, ${rmCol} as rm, ${sCol} as specialty FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY ${orderCol} DESC`,
       args: [hospitalCode, specialty]
     });
     
-    return rs.rows;
+    return rs.rows.map((r: any) => ({
+       id: r.id || `temp-${Math.random()}`,
+       name: r.name,
+       rm: r.rm,
+       specialty: r.specialty
+    }));
   } catch (err) {
     console.error("Get Patients Error:", err);
     return [];
