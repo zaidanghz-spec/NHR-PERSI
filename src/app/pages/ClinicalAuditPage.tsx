@@ -39,8 +39,8 @@ function getSampleLabel(count: number): string {
   return "Sampel Lengkap (100% bobot validitas)";
 }
 
-function getDraftKey(specialty: string) {
-  return `clinical-audit-draft-${specialty}`;
+function getDraftKey(specialty: string, hospitalCode: string) {
+  return `clinical-audit-draft-${hospitalCode}-${specialty}`;
 }
 
 export function ClinicalAuditPage() {
@@ -75,7 +75,7 @@ export function ClinicalAuditPage() {
         }
       } catch { /* fallback */ }
       try {
-        const saved = localStorage.getItem(getDraftKey(specialty!));
+        const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
         if (saved) {
           const draft = JSON.parse(saved);
           if (draft.formData) setFormData(draft.formData);
@@ -225,7 +225,7 @@ export function ClinicalAuditPage() {
       activeDiseaseIndex,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(getDraftKey(specialty), JSON.stringify(draft));
+    localStorage.setItem(getDraftKey(specialty, hospitalCode), JSON.stringify(draft));
     const score = calculateSpecialtyAuditScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     
