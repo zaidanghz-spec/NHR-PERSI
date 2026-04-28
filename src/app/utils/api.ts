@@ -150,9 +150,15 @@ export async function initTursoTables() {
     try { await db.execute("ALTER TABLE surveys ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
     try { await db.execute("ALTER TABLE surveys ADD COLUMN patient_name TEXT DEFAULT ''"); } catch(e) {}
     try { await db.execute("ALTER TABLE surveys ADD COLUMN patient_rm TEXT DEFAULT ''"); } catch(e) {}
+    try { await db.execute("ALTER TABLE surveys ADD COLUMN prem_score REAL DEFAULT 0"); } catch(e) {}
+    try { await db.execute("ALTER TABLE surveys ADD COLUMN prom_score REAL DEFAULT 0"); } catch(e) {}
+    try { await db.execute("ALTER TABLE surveys ADD COLUMN overall_score REAL DEFAULT 0"); } catch(e) {}
+    try { await db.execute("ALTER TABLE surveys ADD COLUMN answers TEXT DEFAULT '{}'"); } catch(e) {}
     
     try { await db.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
     try { await db.execute("ALTER TABLE patients ADD COLUMN specialty TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+    try { await db.execute("ALTER TABLE patients ADD COLUMN name TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+    try { await db.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''"); } catch(e) {}
     
     try { await db.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
     try { await db.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''"); } catch(e) {}
