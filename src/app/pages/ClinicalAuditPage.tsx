@@ -99,23 +99,7 @@ export function ClinicalAuditPage() {
     `d${diseaseIdx}-${patientNum}-${questionId}`;
 
   // Get answer for current disease/patient
-  // Advanced Auto-save: Persists state to local and cloud on every change via draftManager
-  useEffect(() => {
-    if (!specialty || Object.keys(formData).length === 0) return;
-    
-    const draftId = draftManager.getCurrentDraftId();
-    if (!draftId) return;
 
-    const timer = setTimeout(() => {
-      draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
-        data: formData,
-        score: specialtyScore,
-        currentPatient,
-      });
-    }, 1000); // 1s debounce to prevent flooding
-
-    return () => clearTimeout(timer);
-  }, [formData, currentPatient, activeDiseaseIndex, specialty, specialtyScore]);
 
   const handleChange = (patientNum: number, questionId: string, value: string) => {
     const key = makeKey(activeDiseaseIndex, patientNum, questionId);
@@ -273,6 +257,24 @@ export function ClinicalAuditPage() {
   const activeProgress = (activeCompletedPatients / 30) * 100;
   const activeDiseaseScore = calculateDiseaseScore(activeDiseaseIndex);
   const specialtyScore = calculateSpecialtyAuditScore();
+
+  // Advanced Auto-save: Persists state to local and cloud on every change via draftManager
+  useEffect(() => {
+    if (!specialty || Object.keys(formData).length === 0) return;
+    
+    const draftId = draftManager.getCurrentDraftId();
+    if (!draftId) return;
+
+    const timer = setTimeout(() => {
+      draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
+        data: formData,
+        score: specialtyScore,
+        currentPatient,
+      });
+    }, 1000); // 1s debounce to prevent flooding
+
+    return () => clearTimeout(timer);
+  }, [formData, currentPatient, activeDiseaseIndex, specialty, specialtyScore]);
   const activeCategoryScores = calculateActiveDiseaseCategories();
   const activeValidity = getSampleValidityWeight(activeCompletedPatients);
   const currentPatientScoreVal = calculatePatientScore(activeDiseaseIndex, currentPatient);
