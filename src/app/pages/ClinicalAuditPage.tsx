@@ -116,12 +116,29 @@ export function ClinicalAuditPage() {
     return qs.every(q => !!formData[makeKey(diseaseIdx, patientNum, q.id)]);
   };
 
-  // Score for a single patient in a given disease
+  // Score for a single patient in a given disease (weighted by category)
   const calculatePatientScore = (diseaseIdx: number, patientNum: number): number | null => {
-    const qs = diseases[diseaseIdx].questions;
+    const disease = diseases[diseaseIdx];
     if (!isPatientComplete(diseaseIdx, patientNum)) return null;
-    const total = qs.reduce((s, q) => s + getOptionScore(formData[makeKey(diseaseIdx, patientNum, q.id)] || ""), 0);
-    return Math.round((total / qs.length) * 100);
+
+    let categories: Record<string, { total: number; count: number; weight: number }> = {};
+    disease.questions.forEach(q => {
+      const val = formData[makeKey(diseaseIdx, patientNum, q.id)] || "";
+      const catName = q.category.replace(/\s*\(\d+%\)/, "");
+      const weightMatch = q.category.match(/(\d+)%/);
+      const w = weightMatch ? parseInt(weightMatch[1]) / 100 : 0.25;
+      
+      if (!categories[catName]) categories[catName] = { total: 0, count: 0, weight: w };
+      categories[catName].total += getOptionScore(val);
+      categories[catName].count++;
+    });
+
+    let rawWeighted = 0;
+    Object.values(categories).forEach(cat => {
+      if (cat.count > 0) rawWeighted += (cat.total / cat.count) * 100 * cat.weight;
+    });
+
+    return Number(rawWeighted.toFixed(1));
   };
 
   const getCompletedPatientsCount = (diseaseIdx: number): number => {
