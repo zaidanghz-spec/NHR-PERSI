@@ -211,7 +211,7 @@ export function PatientPremPromPage() {
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-                Survei Kepuasan Pasien
+                Patient Reported Measurement (PRM)
               </h1>
               <p className="text-gray-500 text-sm">PREM & PROM Assessment</p>
             </div>
