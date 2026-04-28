@@ -228,6 +228,15 @@ export function ClinicalAuditPage() {
     localStorage.setItem(getDraftKey(specialty), JSON.stringify(draft));
     const score = calculateSpecialtyAuditScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
+    
+    // Count total unique medical record numbers filled
+    let totalPatientsCompleted = 0;
+    diseases.forEach((_, dIdx) => {
+      for (let p = 1; p <= 30; p++) {
+        if (isPatientComplete(dIdx, p)) totalPatientsCompleted++;
+      }
+    });
+    sessionStorage.setItem(`${specialty}_auditPatientCount`, totalPatientsCompleted.toString());
 
     // Build audit summary for admin compatibility (per question, avg across all patients)
     const summary: Record<string, string> = {};

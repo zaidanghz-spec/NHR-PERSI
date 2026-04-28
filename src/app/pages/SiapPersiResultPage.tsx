@@ -33,6 +33,10 @@ export function SiapPersiResultPage() {
   const prmWeighted = Number((patientReportScore * 0.25).toFixed(2));
   const totalSiapScore = Number((rsbkWeighted + auditWeighted + prmWeighted).toFixed(2));
 
+  // Get patient counts for display
+  const auditPatientCount = sessionStorage.getItem(`${specialty}_auditPatientCount`) || "0";
+  const prmPatientCount = sessionStorage.getItem(`${specialty}_prmPatientCount`) || "0";
+
   const handleContinueToNext = () => {
     if (nextSpecialty) {
       navigate(`/siap-persi/rsbk/${nextSpecialty}`);
@@ -176,7 +180,7 @@ export function SiapPersiResultPage() {
                 <tr className="border-b border-gray-200 bg-purple-50/50">
                   <td className="py-4 px-4">
                     <div className="font-medium text-gray-900">Clinical Audit</div>
-                    <div className="text-xs text-gray-500">30 rekam medis pasien</div>
+                    <div className="text-xs text-gray-500">{auditPatientCount}/30 rekam medis pasien</div>
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-purple-700">{clinicalAuditScore}</td>
                   <td className="py-4 px-4 text-center text-gray-600">60%</td>
@@ -190,7 +194,7 @@ export function SiapPersiResultPage() {
                 <tr className="border-b border-gray-200 bg-teal-50/50">
                   <td className="py-4 px-4">
                     <div className="font-medium text-gray-900">Patient Report (PREM & PROM)</div>
-                    <div className="text-xs text-gray-500">Target optimal 30 pasien</div>
+                    <div className="text-xs text-gray-500">{prmPatientCount}/30 pasien</div>
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-teal-700">{patientReportScore}</td>
                   <td className="py-4 px-4 text-center text-gray-600">25%</td>
@@ -247,7 +251,7 @@ export function SiapPersiResultPage() {
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
                 <div>
                   <p className="font-semibold text-gray-900">Clinical Audit</p>
-                  <p className="text-sm text-gray-600">30 rekam medis pasien</p>
+                  <p className="text-sm text-gray-600">{auditPatientCount}/30 rekam medis pasien</p>
                 </div>
               </div>
               <div className="text-right">
@@ -261,7 +265,7 @@ export function SiapPersiResultPage() {
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
                 <div>
                   <p className="font-semibold text-gray-900">Patient Report (PREM & PROM)</p>
-                  <p className="text-sm text-gray-600">Target optimal 30 pasien</p>
+                  <p className="text-sm text-gray-600">{prmPatientCount}/30 pasien</p>
                 </div>
               </div>
               <div className="text-right">

@@ -427,6 +427,17 @@ export function PatientReportPage() {
       finalScore = overallScore;
     }
 
+    let totalPRMPatients = 0;
+    try {
+      for (let i = 0; i < diseases.length; i++) {
+        const dKey = `${specialty}-d${i}`;
+        const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
+        const customData = await api.getCustomSurveyMetadata(hospitalCode, dKey);
+        totalPRMPatients += diseaseSurveys.length + (customData ? (customData.patientCount || 0) : 0);
+      }
+    } catch {}
+    sessionStorage.setItem(`${specialty}_prmPatientCount`, totalPRMPatients.toString());
+
     sessionStorage.setItem(`${specialty}_prmSummary`, JSON.stringify(prmSummary));
     sessionStorage.setItem(`${specialty}_patientReportScore`, Math.round(finalScore).toString());
     navigate(`/siap-persi/result/${specialty}`);
