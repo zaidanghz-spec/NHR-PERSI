@@ -416,8 +416,15 @@ export function RsbkFormPage() {
             className="h-12 px-8 border-2 border-yellow-400 text-yellow-700 hover:bg-yellow-50 font-semibold">
             Isi Nanti (Lanjut ke Clinical Audit)
           </Button>
-          <Button onClick={handleSubmit} className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold">
-            Lanjut ke Clinical Audit <ChevronRight className="w-5 h-5 ml-2" />
+          <Button 
+            onClick={handleSubmit} 
+            disabled={filledItems < totalItems}
+            className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {filledItems < totalItems 
+              ? `Lengkapi semua data (${filledItems}/${totalItems}) untuk lanjut` 
+              : "Lanjut ke Clinical Audit"}
+            <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
         </div>
 
