@@ -1,7 +1,8 @@
-import { Hono } from "npm:hono";
-import { cors } from "npm:hono/cors";
-import { logger } from "npm:hono/logger";
-import * as kv from "./kv_store.ts";
+import { handle } from "hono/vercel";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import * as kv from "./kv_store";
 const app = new Hono();
 
 // Enable logger
@@ -210,4 +211,7 @@ app.post("/api/drafts/:type/:hospitalCode/:specialty", async (c) => {
   }
 });
 
-export default handle(app);;
+export const GET = handle(app);
+export const POST = handle(app);
+export const PUT = handle(app);
+export const DELETE = handle(app);

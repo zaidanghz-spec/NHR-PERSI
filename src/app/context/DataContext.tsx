@@ -471,8 +471,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Admin Auth
   const adminLogin = useCallback((email: string, password: string): boolean => {
-    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || "admin@persi.or.id";
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || "admin123";
+    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || "admin@persi";
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || "admin123!";
     
     if (email === adminEmail && password === adminPassword) {
       setIsAdmin(true);
