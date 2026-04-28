@@ -45,6 +45,13 @@ export function SelectSpecialtyPage() {
     }
   }, [navigate]);
 
+  const submittedSpecialties = submissions
+    .filter(s => 
+      s.hospitalName === (authData?.hospitalName || currentHospital?.hospitalName) && 
+      (s.status === "Pending" || s.status === "Approved")
+    )
+    .map(s => s.specialty);
+
   const toggleSpecialty = (id: string) => {
     // Prevent toggling locked/submitted specialties
     const spec = specialties.find(s => s.id === id);
@@ -60,13 +67,6 @@ export function SelectSpecialtyPage() {
       }
     });
   };
-
-  const submittedSpecialties = submissions
-    .filter(s => 
-      s.hospitalName === (authData?.hospitalName || currentHospital?.hospitalName) && 
-      (s.status === "Pending" || s.status === "Approved")
-    )
-    .map(s => s.specialty);
 
   const handleStartAssessment = () => {
     if (selectedSpecialties.length === 0) {
