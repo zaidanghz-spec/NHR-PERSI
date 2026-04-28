@@ -69,6 +69,7 @@ export function PatientReportPage() {
   const [customSurveyUploaded, setCustomSurveyUploaded] = useState(false);
   const [customSurveyFileName, setCustomSurveyFileName] = useState<string>("");
   const [customSurveyPatientCount, setCustomSurveyPatientCount] = useState<number>(0);
+  const [diseaseCompletion, setDiseaseCompletion] = useState<Record<number, number>>({});
   // NOTE: PREM/PROM scores for PDF uploads are set ONLY by admin, not by the hospital
 
   const customSurveyKey = `custom-survey-${hospitalCode}-${diseaseSpecialtyKey}`;
@@ -184,29 +185,55 @@ export function PatientReportPage() {
     try {
       const surveys = await api.getSurveys(hospitalCode, diseaseSpecialtyKey);
       setSurveyResponses(surveys);
+      
+      // Update completion map for ACTIVE disease
+      const count = surveys.length + (customSurveyUploaded ? customSurveyPatientCount : 0);
+      setDiseaseCompletion(prev => ({ ...prev, [activeDiseaseIndex]: count }));
     } catch (err) {
       console.error("Failed to load surveys:", err);
     }
-  }, [hospitalCode, diseaseSpecialtyKey, specialty]);
+  }, [hospitalCode, diseaseSpecialtyKey, specialty, activeDiseaseIndex, customSurveyUploaded, customSurveyPatientCount]);
+
+  // Check progress for ALL diseases (background)
+  const checkAllDiseasesProgress = useCallback(async () => {
+    if (!specialty || !diseases.length) return;
+    const progress: Record<number, number> = {};
+    for (let i = 0; i < diseases.length; i++) {
+      const dKey = `${specialty}-d${i}`;
+      const surveys = await api.getSurveys(hospitalCode, dKey);
+      
+      // Also check for PDF upload
+      const customKey = `custom-survey-${hospitalCode}-${dKey}`;
+      const customExists = localStorage.getItem(customKey);
+      let customCount = 0;
+      if (customExists) {
+        try { customCount = JSON.parse(customExists).patientCount || 30; } catch {}
+      }
+      
+      progress[i] = surveys.length + customCount;
+    }
+    setDiseaseCompletion(progress);
+  }, [hospitalCode, specialty, diseases.length]);
 
   // Initial load and on disease tab change
   useEffect(() => {
     async function init() {
       setLoading(true);
-      await Promise.all([loadRegisteredPatients(), loadResponses()]);
+      await Promise.all([loadRegisteredPatients(), loadResponses(), checkAllDiseasesProgress()]);
       setLoading(false);
     }
     init();
-  }, [loadRegisteredPatients, loadResponses]);
+  }, [loadRegisteredPatients, loadResponses, checkAllDiseasesProgress]);
 
-  // Auto-refresh every 3 seconds
+  // Auto-refresh every 5 seconds (slightly slower for all-check)
   useEffect(() => {
     const interval = setInterval(() => {
       loadResponses();
       loadRegisteredPatients();
-    }, 3000);
+      checkAllDiseasesProgress();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [loadRegisteredPatients, loadResponses]);
+  }, [loadRegisteredPatients, loadResponses, checkAllDiseasesProgress]);
 
   // Mark registered patients that already have surveys
   const patientsWithStatus = registeredPatients.map(p => {
@@ -286,6 +313,10 @@ export function PatientReportPage() {
       setNewPatientName("");
       setNewPatientRM("");
       setShowRegisterForm(false);
+      
+      // Fast UI update for the button validation
+      setDiseaseCompletion(prev => ({ ...prev, [activeDiseaseIndex]: (prev[activeDiseaseIndex] || 0) + 1 }));
+      
       await loadRegisteredPatients();
     } catch (err: any) {
       setRegisterError(err.message || "Gagal mendaftarkan pasien.");
@@ -671,26 +702,26 @@ export function PatientReportPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Nama Lengkap Pasien <span className="text-red-500">*</span>
+                    Inisial Pasien <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={newPatientName}
                     onChange={(e) => setNewPatientName(e.target.value)}
-                    placeholder="Contoh: Budi Santoso"
+                    placeholder="Contoh: B.S"
                     className="w-full h-11 px-4 bg-white border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C81] focus:border-[#0F4C81]"
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Nomor Rekam Medis (RM) <span className="text-red-500">*</span>
+                    Kode Pasien <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={newPatientRM}
                     onChange={(e) => setNewPatientRM(e.target.value)}
-                    placeholder="Contoh: RM-000123"
+                    placeholder="Contoh: P-001"
                     className="w-full h-11 px-4 bg-white border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C81] focus:border-[#0F4C81] font-mono"
                     required
                   />
@@ -738,8 +769,8 @@ export function PatientReportPage() {
                 <thead>
                   <tr className="border-b-2 border-gray-200">
                     <th className="text-left py-3 px-2 text-gray-600 font-semibold">#</th>
-                    <th className="text-left py-3 px-2 text-gray-600 font-semibold">Nama Pasien</th>
-                    <th className="text-left py-3 px-2 text-gray-600 font-semibold">No. RM</th>
+                    <th className="text-left py-3 px-2 text-gray-600 font-semibold">Inisial</th>
+                    <th className="text-left py-3 px-2 text-gray-600 font-semibold">Kode Pasien</th>
                     <th className="text-center py-3 px-2 text-gray-600 font-semibold">Status</th>
                     <th className="text-center py-3 px-2 text-gray-600 font-semibold">Aksi</th>
                   </tr>
@@ -1055,11 +1086,11 @@ export function PatientReportPage() {
 
           <Button
             onClick={handleContinue}
-            disabled={patientCount < 1}
+            disabled={Object.values(diseaseCompletion).length < diseases.length || Object.values(diseaseCompletion).some(count => count < 1)}
             className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {patientCount < 1
-              ? `Daftarkan minimal 1 pasien untuk melanjutkan`
+            {Object.values(diseaseCompletion).length < diseases.length || Object.values(diseaseCompletion).some(count => count < 1)
+              ? `Mohon isi minimal 1 pasien untuk SETIAP penyakit`
               : `Lanjut ke Hasil Akhir (Skor: ${overallScore})`}
             <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
@@ -1300,7 +1331,7 @@ function PatientQRModal({
 
       ctx.fillStyle = "#666666";
       ctx.font = "16px Arial";
-      ctx.fillText("No. RM: " + patient.rm, 300, 590);
+      ctx.fillText("Kode Pasien: " + patient.rm, 300, 590);
 
       ctx.fillStyle = "#333333";
       ctx.font = "18px Arial";
