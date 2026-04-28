@@ -108,6 +108,24 @@ export function RsbkFormPage() {
     return () => clearTimeout(timer);
   }, [draftSavedMsg]);
 
+  // Auto-save: Persists state whenever formData or scores change
+  useEffect(() => {
+    if (!specialty || Object.keys(formData).length === 0) return;
+    
+    const draftId = draftManager.getCurrentDraftId();
+    if (!draftId) return;
+
+    const timer = setTimeout(() => {
+      draftManager.updateDraft(draftId, specialty, "rsbk", {
+        data: formData,
+        score: totalRsbkScore,
+        completed: filledItems === totalItems,
+      });
+    }, 1500); // 1.5s debounce
+
+    return () => clearTimeout(timer);
+  }, [formData, specialty, totalRsbkScore, filledItems, totalItems]);
+
   const handleSaveDraft = () => {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId || !specialty) return;
