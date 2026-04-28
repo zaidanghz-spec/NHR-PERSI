@@ -225,6 +225,13 @@ export function SiapAdminReviewPage() {
     setTimeout(() => navigate("/siap-persi/admin/dashboard"), 500);
   };
 
+  const handleUnpublish = () => {
+    if (!submissionData) return;
+    unpublishRanking(submissionData.id);
+    updateSubmissionStatus(submissionData.id, "Pending", "Ranking ditarik untuk peninjauan ulang oleh Admin Pusat.");
+    setTimeout(() => navigate("/siap-persi/admin/dashboard"), 500);
+  };
+
   const hasAdminOverride = adminScores && actualSubmission &&
     (adminScores.rsbk !== actualSubmission.scores.rsbk ||
      adminScores.clinicalAudit !== actualSubmission.scores.clinicalAudit ||
@@ -864,21 +871,34 @@ export function SiapAdminReviewPage() {
 
         {/* Action Buttons */}
         <div className="flex gap-4">
-          <Button
-            onClick={() => handleAction("reject")}
-            variant="outline"
-            className="h-12 px-8 border-2 border-red-300 text-red-600 hover:bg-red-50 font-semibold"
-          >
-            <XCircle className="w-5 h-5 mr-2" />
-            Request Revision
-          </Button>
-          <Button
-            onClick={() => handleAction("approve")}
-            className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold shadow-lg"
-          >
-            <CheckCircle2 className="w-5 h-5 mr-2" />
-            Approve & Publish ({effectiveFinal} pts — {gradeInfo.grade})
-          </Button>
+          {submissionData.status === "Approved" ? (
+             <Button
+               onClick={handleUnpublish}
+               variant="outline"
+               className="h-12 px-8 border-2 border-amber-500 text-amber-600 hover:bg-amber-50 font-bold flex items-center gap-2"
+             >
+               <RotateCcw className="w-5 h-5" />
+               Tarik Kembali dari Ranking (Unpublish)
+             </Button>
+          ) : (
+            <>
+              <Button
+                onClick={() => handleAction("reject")}
+                variant="outline"
+                className="h-12 px-8 border-2 border-red-300 text-red-600 hover:bg-red-50 font-semibold"
+              >
+                <XCircle className="w-5 h-5 mr-2" />
+                Request Revision
+              </Button>
+              <Button
+                onClick={() => handleAction("approve")}
+                className="flex-1 h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold shadow-lg"
+              >
+                <CheckCircle2 className="w-5 h-5 mr-2" />
+                Approve & Publish ({effectiveFinal} pts — {gradeInfo.grade})
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Approval Dialog */}
