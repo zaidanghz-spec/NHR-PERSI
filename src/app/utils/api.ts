@@ -164,10 +164,20 @@ export async function initTursoTables() {
         }
         
         if (table === "patients") {
-          if (!existingColumns.includes("hospital_code")) await db.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+          if (!existingColumns.includes("hospital_code") && !existingColumns.includes("hospitalCode")) {
+            await db.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+          }
           if (!existingColumns.includes("specialty")) await db.execute("ALTER TABLE patients ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
           if (!existingColumns.includes("name")) await db.execute("ALTER TABLE patients ADD COLUMN name TEXT NOT NULL DEFAULT ''");
-          if (!existingColumns.includes("rm")) await db.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''");
+          if (!existingColumns.includes("rm") && !existingColumns.includes("patient_rm")) {
+             await db.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''");
+          }
+          
+          // If hospitalCode (camelCase) exists as NOT NULL, it will cause issues during snake_case inserts.
+          // We can't easily change it to NULLABLE, but we can try to add hospital_code if it was missing.
+          if (existingColumns.includes("hospitalCode") && !existingColumns.includes("hospital_code")) {
+             await db.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+          }
         }
         
         if (table === "drafts") {
@@ -650,9 +660,16 @@ export async function registerPatient(
   try {
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
     
+    // Dynamically determine column names to avoid 'NOT NULL' errors on different schema versions
+    const info = await db.execute("PRAGMA table_info(patients)");
+    const existingCols = info.rows.map((r: any) => r.name);
+    
+    let hCol = existingCols.includes("hospital_code") ? "hospital_code" : (existingCols.includes("hospitalCode") ? "hospitalCode" : "hospital_code");
+    let rmCol = existingCols.includes("rm") ? "rm" : (existingCols.includes("patient_rm") ? "patient_rm" : "rm");
+    
     // Check if duplicate RM
     const existing = await db.execute({
-      sql: "SELECT id FROM patients WHERE hospital_code = ? AND specialty = ? AND rm = ?",
+      sql: `SELECT id FROM patients WHERE ${hCol} = ? AND specialty = ? AND ${rmCol} = ?`,
       args: [hospitalCode, specialty, patient.rm || ""]
     });
     
@@ -661,7 +678,7 @@ export async function registerPatient(
     }
 
     await db.execute({
-      sql: "INSERT INTO patients (id, hospital_code, specialty, name, rm) VALUES (?, ?, ?, ?, ?)",
+      sql: `INSERT INTO patients (id, ${hCol}, specialty, name, ${rmCol}) VALUES (?, ?, ?, ?, ?)`,
       args: [id, hospitalCode, specialty, patient.name, patient.rm]
     });
     
@@ -678,8 +695,12 @@ export async function getPatients(hospitalCode: string, specialty: string): Prom
   if (!db) return [];
 
   try {
+    const info = await db.execute("PRAGMA table_info(patients)");
+    const existingCols = info.rows.map((r: any) => r.name);
+    let hCol = existingCols.includes("hospital_code") ? "hospital_code" : (existingCols.includes("hospitalCode") ? "hospitalCode" : "hospital_code");
+
     const rs = await db.execute({
-      sql: "SELECT * FROM patients WHERE hospital_code = ? AND specialty = ? ORDER BY created_at ASC",
+      sql: `SELECT * FROM patients WHERE ${hCol} = ? AND specialty = ? ORDER BY created_at ASC`,
       args: [hospitalCode, specialty]
     });
     return rs.rows.map((r: any) => ({
@@ -701,8 +722,12 @@ export async function removePatient(hospitalCode: string, specialty: string, pat
   const db = getTurso();
   if (!db) return;
 
+  const info = await db.execute("PRAGMA table_info(patients)");
+  const existingCols = info.rows.map((r: any) => r.name);
+  let hCol = existingCols.includes("hospital_code") ? "hospital_code" : (existingCols.includes("hospitalCode") ? "hospitalCode" : "hospital_code");
+
   await db.execute({
-    sql: "DELETE FROM patients WHERE id = ? AND hospital_code = ?",
+    sql: `DELETE FROM patients WHERE id = ? AND ${hCol} = ?`,
     args: [patientId, hospitalCode]
   });
 }
