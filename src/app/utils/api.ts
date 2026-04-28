@@ -777,16 +777,27 @@ export async function getPatients(hospitalCode: string, specialty: string): Prom
     const info = await db.execute("PRAGMA table_info(patients)");
     const existingCols = info.rows.map((r: any) => r.name);
     
-    // Find matching columns for the WHERE clause
-    const hCol = existingCols.find(c => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
-    const sCol = existingCols.find(c => ["specialty", "specialty_name", "specialtyname"].includes(c.toLowerCase())) || "specialty";
+    // Find matching columns for the WHERE clause (be broad)
+    const sCols = existingCols.filter(c => ["specialty", "specialty_name", "specialtyname"].includes(c.toLowerCase()));
+    const hCols = existingCols.filter(c => ["hospital_code", "hospitalcode"].includes(c.toLowerCase()));
 
+    // Query by specialty first (usually more specific than hospital code across all hospitals)
+    // Or if sCols is empty, fall back to a generic query
+    const sCol = sCols[0] || "specialty";
+    
     const rs = await db.execute({
-      sql: `SELECT * FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY created_at ASC`,
-      args: [hospitalCode, specialty]
+      sql: `SELECT * FROM patients WHERE ${sCol} = ?`,
+      args: [specialty]
     });
     
-    return rs.rows.map((r: any) => {
+    // Filter by hospitalCode in JS for maximum reliability
+    return rs.rows.filter((r: any) => {
+      // Check ALL possible hospital code columns in the row
+      return hCols.some(hCol => {
+        const val = r[hCol];
+        return val && val.toString().toUpperCase() === hospitalCode.toUpperCase();
+      });
+    }).map((r: any) => {
       // Find name and rm dynamically from the row
       const name = r.name || r.patient_name || r.patientName || r.patient_Name || "";
       const rm = r.rm || r.patient_rm || r.patientRM || r.medical_record_number || r.medicalRecordNumber || r.patient_RM || "";
