@@ -10,6 +10,7 @@ import {
   Filter,
   ArrowUpDown,
   MapPin,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -17,7 +18,7 @@ import { useData } from "../context/DataContext";
 import { motion } from "framer-motion";
 
 export function RankingListPage() {
-  const { approvedRankings } = useData();
+  const { approvedRankings, isAdmin, unpublishRanking } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
   const [provinceFilter, setProvinceFilter] = useState("all");
@@ -135,6 +136,11 @@ export function RankingListPage() {
                     <th className="px-6 py-4 text-left text-xs font-[600] text-gray-500 uppercase tracking-wider">
                       Grade
                     </th>
+                    {isAdmin && (
+                      <th className="px-6 py-4 text-left text-xs font-[600] text-gray-500 uppercase tracking-wider">
+                        Aksi
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <motion.tbody 
@@ -210,6 +216,23 @@ export function RankingListPage() {
                           {r.grade}
                         </span>
                       </td>
+                      {isAdmin && (
+                        <td className="px-6 py-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 flex items-center gap-1.5"
+                            onClick={() => {
+                              if (window.confirm(`Tarik ranking untuk ${r.hospitalName}?`)) {
+                                unpublishRanking(r.submissionId || r.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Tarik
+                          </Button>
+                        </td>
+                      )}
                     </motion.tr>
                   ))}
                 </motion.tbody>

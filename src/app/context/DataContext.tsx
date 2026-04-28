@@ -225,6 +225,7 @@ interface DataContextType {
   addSubmission: (submission: Omit<SubmissionType, "id">) => void;
   updateSubmissionStatus: (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any) => void;
   unpublishRanking: (submissionId: string) => void;
+  syncWithCloud: () => Promise<void>;
 }
 
 import { safeLocalStorageSet, loadFromStorage } from "../utils/storage";
@@ -309,17 +310,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     }
     syncNewsAndEvents();
-    
-    // Polling for updates (every 10 seconds for real-time feel)
-    const interval = setInterval(() => {
-      syncSubmissions();
-      syncAccounts();
-      syncRankings();
-      syncNewsAndEvents();
-      draftManager.syncWithCloud();
-    }, 60000);
-    return () => clearInterval(interval);
   }, []);
+
+  const syncWithCloud = useCallback(async () => {
+    try {
+      const [dbSubs, dbAccs, dbRankings, dbNews, dbEvents] = await Promise.all([
+        getAllSubmissions(),
+        getAllHospitalAccounts(),
+        getAllRankingsFromDb(),
+        getAllNews(),
+        getAllEvents()
+      ]);
+
+      if (dbSubs !== null) { setSubmissions(dbSubs); safeLocalStorageSet("persi_submissions", JSON.stringify(dbSubs)); }
+      if (dbAccs !== null) { setHospitalAccounts(dbAccs); safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(dbAccs)); }
+      if (dbRankings !== null) { setApprovedRankings(dbRankings); safeLocalStorageSet("persi_rankings", JSON.stringify(dbRankings)); }
+      if (dbNews !== null) { setNews(dbNews); safeLocalStorageSet("persi_news", JSON.stringify(dbNews)); }
+      if (dbEvents !== null) { setEvents(dbEvents); safeLocalStorageSet("persi_events", JSON.stringify(dbEvents)); }
+      
+      draftManager.syncWithCloud();
+    } catch (err) {
+      console.error("Manual sync failed:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Polling for updates (every 30 seconds)
+    const interval = setInterval(() => {
+      syncWithCloud();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [syncWithCloud]);
 
   // Persist to localStorage
   useEffect(() => { safeLocalStorageSet("persi_news", JSON.stringify(news)); }, [news]);
@@ -580,6 +601,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       currentHospital, hospitalLogout,
       approvedRankings, publishRanking, unpublishRanking,
       submissions, addSubmission, updateSubmissionStatus,
+      syncWithCloud,
     }}>
       {children}
     </DataContext.Provider>

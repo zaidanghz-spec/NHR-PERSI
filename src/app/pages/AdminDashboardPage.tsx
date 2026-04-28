@@ -16,6 +16,8 @@ import {
   FileText,
   UserCheck,
   XCircle,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -37,8 +39,16 @@ export function AdminDashboardPage() {
     deleteEvent,
     approvedRankings,
     hospitalAccounts,
+    syncWithCloud,
   } = useData();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [syncing, setSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    await syncWithCloud();
+    setTimeout(() => setSyncing(false), 800);
+  };
 
   if (!isAdmin) {
     return (
@@ -80,12 +90,24 @@ export function AdminDashboardPage() {
               Pusat Kendali NHR PERSI
             </p>
           </div>
-          <Link to="/siap-persi/admin/dashboard">
-            <Button className="bg-[#0D9488] hover:bg-[#0b7f75] font-[600]">
-              <Eye className="w-4 h-4 mr-2" />
-              Review Submissions
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualSync}
+              disabled={syncing}
+              className="h-10 px-4 border-gray-200 text-gray-600 bg-white"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing..." : "Refresh Data"}
             </Button>
-          </Link>
+            <Link to="/siap-persi/admin/dashboard">
+              <Button className="bg-[#0D9488] hover:bg-[#0b7f75] font-[600]">
+                <Eye className="w-4 h-4 mr-2" />
+                Review Submissions
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Tabs */}
