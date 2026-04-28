@@ -660,27 +660,32 @@ export async function registerPatient(
   try {
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
     
-    // BE AGGRESSIVE: Find all columns that might be hospital code or RM and fill them ALL 
+    // BE ULTRA AGGRESSIVE: Find all columns that might match ANY patient data and fill them ALL
     const info = await db.execute("PRAGMA table_info(patients)");
     const existingCols = info.rows.map((r: any) => r.name);
     
-    // Logic to find all matching columns (case-insensitive and common variants)
-    const hCols = existingCols.filter(c => c.toLowerCase() === "hospitalcode" || c.toLowerCase() === "hospital_code");
-    const rCols = existingCols.filter(c => c.toLowerCase() === "rm" || c.toLowerCase() === "patientrm" || c.toLowerCase() === "patient_rm");
+    // Define patterns to match variants
+    const hCols = existingCols.filter(c => ["hospital_code", "hospitalcode"].includes(c.toLowerCase()));
+    const nCols = existingCols.filter(c => ["name", "patient_name", "patientname"].includes(c.toLowerCase()));
+    const rCols = existingCols.filter(c => ["rm", "patient_rm", "patientrm", "medical_record_number", "medicalrecordnumber"].includes(c.toLowerCase()));
+    const sCols = existingCols.filter(c => ["specialty", "specialty_name", "specialtyname"].includes(c.toLowerCase()));
     
     // Build SQL dynamically based on what exists
-    const columns = ["id", "specialty", "name", ...hCols, ...rCols];
+    const columns = ["id", ...hCols, ...nCols, ...rCols, ...sCols];
     const placeholders = columns.map(() => "?").join(", ");
-    const args = [id, specialty, patient.name];
+    const args = [id];
     hCols.forEach(() => args.push(hospitalCode));
+    nCols.forEach(() => args.push(patient.name));
     rCols.forEach(() => args.push(patient.rm || ""));
+    sCols.forEach(() => args.push(specialty));
 
-    // Check duplicate using the first available hospital code and RM columns
+    // Check duplicate using the best available unique identifiers
     const hColForSelect = hCols[0] || "hospital_code";
     const rmColForSelect = rCols[0] || "rm";
+    const sColForSelect = sCols[0] || "specialty";
 
     const existing = await db.execute({
-      sql: `SELECT id FROM patients WHERE ${hColForSelect} = ? AND specialty = ? AND ${rmColForSelect} = ?`,
+      sql: `SELECT id FROM patients WHERE ${hColForSelect} = ? AND ${sColForSelect} = ? AND ${rmColForSelect} = ?`,
       args: [hospitalCode, specialty, patient.rm || ""]
     });
     
