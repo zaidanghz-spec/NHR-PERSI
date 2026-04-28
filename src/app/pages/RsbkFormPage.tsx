@@ -546,7 +546,9 @@ function QuantityInput({ item, value, onChange }: {
         <span className="text-sm text-gray-500 w-16">{unit}</span>
       </div>
       {(!isInfoOnly && isMetTarget) && (
-        <div className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">&check; Target Tercapai</div>
+        <div className="bg-green-100 text-green-700 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+          Target Tercapai <CheckCircle2 className="w-3.5 h-3.5" />
+        </div>
       )}
     </div>
   );
