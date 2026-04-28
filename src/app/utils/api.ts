@@ -146,22 +146,38 @@ export async function initTursoTables() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
     );
-    // Ensure columns exist for older tables
-    try { await db.execute("ALTER TABLE surveys ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
-    try { await db.execute("ALTER TABLE surveys ADD COLUMN patient_name TEXT DEFAULT ''"); } catch(e) {}
-    try { await db.execute("ALTER TABLE surveys ADD COLUMN patient_rm TEXT DEFAULT ''"); } catch(e) {}
-    try { await db.execute("ALTER TABLE surveys ADD COLUMN prem_score REAL DEFAULT 0"); } catch(e) {}
-    try { await db.execute("ALTER TABLE surveys ADD COLUMN prom_score REAL DEFAULT 0"); } catch(e) {}
-    try { await db.execute("ALTER TABLE surveys ADD COLUMN overall_score REAL DEFAULT 0"); } catch(e) {}
-    try { await db.execute("ALTER TABLE surveys ADD COLUMN answers TEXT DEFAULT '{}'"); } catch(e) {}
-    
-    try { await db.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
-    try { await db.execute("ALTER TABLE patients ADD COLUMN specialty TEXT NOT NULL DEFAULT ''"); } catch(e) {}
-    try { await db.execute("ALTER TABLE patients ADD COLUMN name TEXT NOT NULL DEFAULT ''"); } catch(e) {}
-    try { await db.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''"); } catch(e) {}
-    
-    try { await db.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
-    try { await db.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+    // Improved Migration: Ensure critical columns exist for all tables
+    const tablesToMigrate = ["surveys", "patients", "drafts"];
+    for (const table of tablesToMigrate) {
+      try {
+        const info = await db.execute(`PRAGMA table_info(${table})`);
+        const existingColumns = info.rows.map((r: any) => r.name);
+        
+        if (table === "surveys") {
+          if (!existingColumns.includes("hospital_code")) await db.execute("ALTER TABLE surveys ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+          if (!existingColumns.includes("patient_name")) await db.execute("ALTER TABLE surveys ADD COLUMN patient_name TEXT DEFAULT ''");
+          if (!existingColumns.includes("patient_rm")) await db.execute("ALTER TABLE surveys ADD COLUMN patient_rm TEXT DEFAULT ''");
+          if (!existingColumns.includes("prem_score")) await db.execute("ALTER TABLE surveys ADD COLUMN prem_score REAL DEFAULT 0");
+          if (!existingColumns.includes("prom_score")) await db.execute("ALTER TABLE surveys ADD COLUMN prom_score REAL DEFAULT 0");
+          if (!existingColumns.includes("overall_score")) await db.execute("ALTER TABLE surveys ADD COLUMN overall_score REAL DEFAULT 0");
+          if (!existingColumns.includes("answers")) await db.execute("ALTER TABLE surveys ADD COLUMN answers TEXT DEFAULT '{}'");
+        }
+        
+        if (table === "patients") {
+          if (!existingColumns.includes("hospital_code")) await db.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+          if (!existingColumns.includes("specialty")) await db.execute("ALTER TABLE patients ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+          if (!existingColumns.includes("name")) await db.execute("ALTER TABLE patients ADD COLUMN name TEXT NOT NULL DEFAULT ''");
+          if (!existingColumns.includes("rm")) await db.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''");
+        }
+        
+        if (table === "drafts") {
+          if (!existingColumns.includes("hospital_code")) await db.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+          if (!existingColumns.includes("specialty")) await db.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+        }
+      } catch (e) {
+        console.warn(`Migration failed for table ${table}:`, e);
+      }
+    }
 
     tablesInitialized = true;
   } catch (err) {

@@ -229,6 +229,18 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | null>(null);
 
+function safeLocalStorageSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    if (e instanceof DOMException && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
+      console.warn("LocalStorage Quota Exceeded for key:", key);
+    } else {
+      console.error("LocalStorage Error:", e);
+    }
+  }
+}
+
 function loadFromStorage<T>(key: string, defaultValue: T): T {
   try {
     const stored = localStorage.getItem(key);
@@ -261,7 +273,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const dbSubs = await getAllSubmissions();
         if (dbSubs !== null) {
           setSubmissions(dbSubs);
-          localStorage.setItem("persi_submissions", JSON.stringify(dbSubs));
+          safeLocalStorageSet("persi_submissions", JSON.stringify(dbSubs));
         }
       } catch (err) {
         console.error("Failed to sync from cloud:", err);
@@ -277,7 +289,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const dbAccs = await getAllHospitalAccounts();
         if (dbAccs !== null) {
           setHospitalAccounts(dbAccs);
-          localStorage.setItem("persi_hospital_accounts", JSON.stringify(dbAccs));
+          safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(dbAccs));
         }
       } catch (err) {
         console.error("Failed to sync accounts:", err);
@@ -291,7 +303,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const dbRankings = await getAllRankingsFromDb();
         if (dbRankings !== null) {
           setApprovedRankings(dbRankings);
-          localStorage.setItem("persi_rankings", JSON.stringify(dbRankings));
+          safeLocalStorageSet("persi_rankings", JSON.stringify(dbRankings));
         }
       } catch (err) {
         console.error("Failed to sync rankings:", err);
@@ -304,13 +316,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const dbNews = await getAllNews();
         if (dbNews !== null) {
           setNews(dbNews);
-          localStorage.setItem("persi_news", JSON.stringify(dbNews));
+          safeLocalStorageSet("persi_news", JSON.stringify(dbNews));
         }
         
         const dbEvents = await getAllEvents();
         if (dbEvents !== null) {
           setEvents(dbEvents);
-          localStorage.setItem("persi_events", JSON.stringify(dbEvents));
+          safeLocalStorageSet("persi_events", JSON.stringify(dbEvents));
         }
       } catch (err) {
         console.error("Failed to sync news/events:", err);
@@ -330,18 +342,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Persist to localStorage
-  useEffect(() => { localStorage.setItem("persi_news", JSON.stringify(news)); }, [news]);
-  useEffect(() => { localStorage.setItem("persi_events", JSON.stringify(events)); }, [events]);
-  useEffect(() => { localStorage.setItem("persi_hospital_accounts", JSON.stringify(hospitalAccounts)); }, [hospitalAccounts]);
-  useEffect(() => { localStorage.setItem("persi_rankings", JSON.stringify(approvedRankings)); }, [approvedRankings]);
-  useEffect(() => { localStorage.setItem("persi_submissions", JSON.stringify(submissions)); }, [submissions]);
+  useEffect(() => { safeLocalStorageSet("persi_news", JSON.stringify(news)); }, [news]);
+  useEffect(() => { safeLocalStorageSet("persi_events", JSON.stringify(events)); }, [events]);
+  useEffect(() => { safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(hospitalAccounts)); }, [hospitalAccounts]);
+  useEffect(() => { safeLocalStorageSet("persi_rankings", JSON.stringify(approvedRankings)); }, [approvedRankings]);
+  useEffect(() => { safeLocalStorageSet("persi_submissions", JSON.stringify(submissions)); }, [submissions]);
 
   // News
   const addNews = useCallback((item: Omit<NewsItem, "id">) => {
     const newItem = { ...item, id: `news-${Date.now()}` };
     setNews((prev) => {
       const updated = [newItem, ...prev];
-      localStorage.setItem("persi_news", JSON.stringify(updated));
+      safeLocalStorageSet("persi_news", JSON.stringify(updated));
       return updated;
     });
     addNewsToDb(newItem).catch(console.error);
@@ -354,7 +366,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const deleteNews = useCallback((id: string) => {
     setNews((prev) => {
       const updated = prev.filter((n) => n.id !== id);
-      localStorage.setItem("persi_news", JSON.stringify(updated));
+      safeLocalStorageSet("persi_news", JSON.stringify(updated));
       return updated;
     });
     deleteNewsFromDb(id).catch(console.error);
@@ -365,7 +377,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const newItem = { ...item, id: `event-${Date.now()}` };
     setEvents((prev) => {
       const updated = [newItem, ...prev];
-      localStorage.setItem("persi_events", JSON.stringify(updated));
+      safeLocalStorageSet("persi_events", JSON.stringify(updated));
       return updated;
     });
     addEventToDb(newItem).catch(console.error);
@@ -378,7 +390,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const deleteEvent = useCallback((id: string) => {
     setEvents((prev) => {
       const updated = prev.filter((e) => e.id !== id);
-      localStorage.setItem("persi_events", JSON.stringify(updated));
+      safeLocalStorageSet("persi_events", JSON.stringify(updated));
       return updated;
     });
     deleteEventFromDb(id).catch(console.error);
@@ -416,7 +428,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await addAccountToDb(account);
       const updatedAccounts = [...currentAccounts, account];
       setHospitalAccounts(updatedAccounts);
-      localStorage.setItem("persi_hospital_accounts", JSON.stringify(updatedAccounts));
+      safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updatedAccounts));
       return true;
     } catch (err) {
       console.error("Cloud account push failed:", err);
@@ -453,7 +465,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? { ...a, status: "activated" as const }
           : a
       );
-      localStorage.setItem("persi_hospital_accounts", JSON.stringify(updated));
+      safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updated));
       return updated;
     });
     updateAccountStatusInDb(email, "activated").catch(err => console.error("Cloud activation failed:", err));
@@ -466,7 +478,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? { ...a, status: "rejected" as const }
           : a
       );
-      localStorage.setItem("persi_hospital_accounts", JSON.stringify(updated));
+      safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updated));
       return updated;
     });
     updateAccountStatusInDb(email, "rejected").catch(err => console.error("Cloud rejection failed:", err));
