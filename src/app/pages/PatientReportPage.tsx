@@ -1387,20 +1387,18 @@ function PatientQRModal({
           <X className="w-6 h-6 text-gray-500" />
         </button>
 
-        <h2 className="text-xl font-bold text-[#0F4C81] mb-1">
-          QR Code Survei Personal
-        </h2>
-        <p className="text-gray-500 mb-1 text-sm">{hospitalName} - {specialtyName}</p>
-        <p className="text-xs text-teal-600 font-medium mb-3">{diseaseName}</p>
-
-        <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-2 mb-5">
-          <span className="font-semibold text-gray-900 text-sm">{patient.name}</span>
-          <span className="text-gray-400">|</span>
-          <span className="text-gray-600 text-sm font-mono">{patient.rm}</span>
+        <div className="flex flex-col items-center gap-1 mb-6">
+          <div className="inline-flex items-center gap-2 bg-blue-50 border-2 border-blue-200 rounded-full px-5 py-2 mb-2 shadow-sm">
+            <span className="font-bold text-gray-900 text-sm">{patient.name}</span>
+            <span className="text-gray-300">|</span>
+            <span className="text-[#0F4C81] text-sm font-mono font-semibold">{patient.rm}</span>
+          </div>
+          <p className="text-gray-500 font-medium text-sm">{hospitalName}</p>
+          <p className="text-xs text-teal-600 font-bold uppercase tracking-wider">{specialtyName} - {diseaseName}</p>
         </div>
 
-        <div className="inline-block bg-white rounded-2xl border-4 border-[#0F4C81] p-5 mb-5">
-          <QRCodeDisplay value={surveyUrl} size={240} fgColor="#0F4C81" />
+        <div className="inline-block bg-white rounded-3xl border-4 border-[#0F4C81] p-6 mb-6 shadow-md">
+          <QRCodeDisplay value={surveyUrl} size={260} fgColor="#0F4C81" />
         </div>
 
         <p className="text-gray-500 text-xs mb-4 max-w-sm mx-auto break-all leading-relaxed">
