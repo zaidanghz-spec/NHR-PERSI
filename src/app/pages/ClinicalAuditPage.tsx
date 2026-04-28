@@ -6,6 +6,7 @@ import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import * as api from "../utils/api";
 import { getHospitalCode } from "../utils/api";
+import { draftManager } from "../utils/draftManager";
 
 // Audit compliance options
 const AUDIT_OPTIONS = [
