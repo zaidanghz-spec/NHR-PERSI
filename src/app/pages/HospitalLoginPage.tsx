@@ -21,7 +21,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useData } from "../context/DataContext";
 
-const MAX_FILE_SIZE_MB = 2;
+const MAX_FILE_SIZE_MB = 1;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export function HospitalLoginPage() {
