@@ -1,7 +1,7 @@
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
-import * as kv from "./kv_store.tsx";
+import * as kv from "./kv_store.ts";
 const app = new Hono();
 
 // Enable logger
@@ -20,7 +20,7 @@ app.use(
 );
 
 // ============ HEALTH CHECK ============
-app.get("/make-server-5e1d66c4/health", (c) => {
+app.get("/api/health", (c) => {
   return c.json({ status: "ok" });
 });
 
@@ -38,7 +38,7 @@ function draftKey(type: string, hospitalCode: string, specialty: string) {
 // ============ SURVEYS ============
 
 // GET surveys
-app.get("/make-server-5e1d66c4/surveys/:hospitalCode/:specialty", async (c) => {
+app.get("/api/surveys/:hospitalCode/:specialty", async (c) => {
   try {
     const { hospitalCode, specialty } = c.req.param();
     const key = surveysKey(hospitalCode, specialty);
@@ -51,7 +51,7 @@ app.get("/make-server-5e1d66c4/surveys/:hospitalCode/:specialty", async (c) => {
 });
 
 // POST submit a survey
-app.post("/make-server-5e1d66c4/surveys/:hospitalCode/:specialty", async (c) => {
+app.post("/api/surveys/:hospitalCode/:specialty", async (c) => {
   try {
     const { hospitalCode, specialty } = c.req.param();
     const survey = await c.req.json();
@@ -91,7 +91,7 @@ app.post("/make-server-5e1d66c4/surveys/:hospitalCode/:specialty", async (c) => 
 });
 
 // DELETE reset all surveys
-app.delete("/make-server-5e1d66c4/surveys/:hospitalCode/:specialty", async (c) => {
+app.delete("/api/surveys/:hospitalCode/:specialty", async (c) => {
   try {
     const { hospitalCode, specialty } = c.req.param();
     const key = surveysKey(hospitalCode, specialty);
@@ -104,7 +104,7 @@ app.delete("/make-server-5e1d66c4/surveys/:hospitalCode/:specialty", async (c) =
 });
 
 // POST bulk add surveys (for simulation)
-app.post("/make-server-5e1d66c4/surveys-bulk/:hospitalCode/:specialty", async (c) => {
+app.post("/api/surveys-bulk/:hospitalCode/:specialty", async (c) => {
   try {
     const { hospitalCode, specialty } = c.req.param();
     const { surveys } = await c.req.json();
@@ -124,7 +124,7 @@ app.post("/make-server-5e1d66c4/surveys-bulk/:hospitalCode/:specialty", async (c
 // ============ REGISTERED PATIENTS ============
 
 // GET patients
-app.get("/make-server-5e1d66c4/patients/:hospitalCode/:specialty", async (c) => {
+app.get("/api/patients/:hospitalCode/:specialty", async (c) => {
   try {
     const { hospitalCode, specialty } = c.req.param();
     const key = patientsKey(hospitalCode, specialty);
@@ -137,7 +137,7 @@ app.get("/make-server-5e1d66c4/patients/:hospitalCode/:specialty", async (c) => 
 });
 
 // POST register patient
-app.post("/make-server-5e1d66c4/patients/:hospitalCode/:specialty", async (c) => {
+app.post("/api/patients/:hospitalCode/:specialty", async (c) => {
   try {
     const { hospitalCode, specialty } = c.req.param();
     const patient = await c.req.json();
@@ -162,7 +162,7 @@ app.post("/make-server-5e1d66c4/patients/:hospitalCode/:specialty", async (c) =>
 });
 
 // DELETE remove patient
-app.delete("/make-server-5e1d66c4/patients/:hospitalCode/:specialty/:patientId", async (c) => {
+app.delete("/api/patients/:hospitalCode/:specialty/:patientId", async (c) => {
   try {
     const { hospitalCode, specialty, patientId } = c.req.param();
     const key = patientsKey(hospitalCode, specialty);
@@ -181,7 +181,7 @@ app.delete("/make-server-5e1d66c4/patients/:hospitalCode/:specialty/:patientId",
 // ============ DRAFTS ============
 
 // GET draft
-app.get("/make-server-5e1d66c4/drafts/:type/:hospitalCode/:specialty", async (c) => {
+app.get("/api/drafts/:type/:hospitalCode/:specialty", async (c) => {
   try {
     const { type, hospitalCode, specialty } = c.req.param();
     const key = draftKey(type, hospitalCode, specialty);
@@ -194,7 +194,7 @@ app.get("/make-server-5e1d66c4/drafts/:type/:hospitalCode/:specialty", async (c)
 });
 
 // POST save draft
-app.post("/make-server-5e1d66c4/drafts/:type/:hospitalCode/:specialty", async (c) => {
+app.post("/api/drafts/:type/:hospitalCode/:specialty", async (c) => {
   try {
     const { type, hospitalCode, specialty } = c.req.param();
     const draft = await c.req.json();
@@ -210,4 +210,4 @@ app.post("/make-server-5e1d66c4/drafts/:type/:hospitalCode/:specialty", async (c
   }
 });
 
-Deno.serve(app.fetch);
+export default handle(app);;

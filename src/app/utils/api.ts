@@ -3,6 +3,9 @@ import { createClient } from "@libsql/client/web";
 // Hubungkan ke Turso langsung dari browser! (Aman untuk solusi sementara)
 let tursoClient: any = null;
 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+export const PREFIX = "/api";
+
 function getTurso() {
   if (tursoClient) return tursoClient;
   
