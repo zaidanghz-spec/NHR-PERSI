@@ -719,14 +719,22 @@ export async function getPatients(hospitalCode: string, specialty: string): Prom
       sql: `SELECT * FROM patients WHERE ${hCol} = ? AND specialty = ? ORDER BY created_at ASC`,
       args: [hospitalCode, specialty]
     });
-    return rs.rows.map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      rm: r.rm,
-      specialty,
-      hospitalCode,
-      createdAt: r.created_at
-    }));
+    
+    return rs.rows.map((r: any) => {
+      // Find name and rm dynamically from the row
+      const name = r.name || r.patient_name || r.patientName || r.patient_Name || "";
+      const rm = r.rm || r.patient_rm || r.patientRM || r.medical_record_number || r.medicalRecordNumber || r.patient_RM || "";
+      const createdAt = r.created_at || r.createdAt || r.registered_at || "";
+
+      return {
+        id: r.id,
+        name,
+        rm,
+        specialty,
+        hospitalCode,
+        createdAt
+      };
+    });
   } catch (err) {
     console.error("Get Patients Error:", err);
     return [];
