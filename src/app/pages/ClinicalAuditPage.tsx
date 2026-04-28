@@ -257,7 +257,7 @@ export function ClinicalAuditPage() {
   const activeCategoryScores = calculateActiveDiseaseCategories();
   const activeValidity = getSampleValidityWeight(activeCompletedPatients);
   const currentPatientScoreVal = calculatePatientScore(activeDiseaseIndex, currentPatient);
-  const totalCompletedAllDiseases = diseases.reduce((s, _, idx) => s + getCompletedPatientsCount(idx), 0);
+  const allDiseasesHaveData = diseases.every((_, idx) => getCompletedPatientsCount(idx) >= 1);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -631,12 +631,12 @@ export function ClinicalAuditPage() {
 
           <Button
             onClick={handleSubmit}
-            disabled={totalCompletedAllDiseases < 1}
+            disabled={!allDiseasesHaveData}
             className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {totalCompletedAllDiseases < 1
-              ? "Isi minimal 1 rekam medis (salah satu penyakit) untuk melanjutkan"
-              : `Lanjut ke Patient Report (${diseases.map((_, i) => getCompletedPatientsCount(i)).join("+")} RM, Skor: ${specialtyScore})`}
+            {!allDiseasesHaveData
+              ? `Mohon isi minimal 1 RM untuk SETIAP penyakit`
+              : `Lanjut ke Patient Report (Semua Penyakit Terisi, Skor: ${specialtyScore})`}
             <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
         </div>
