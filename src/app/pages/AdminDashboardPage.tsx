@@ -40,14 +40,27 @@ export function AdminDashboardPage() {
     approvedRankings,
     hospitalAccounts,
     syncWithCloud,
+    forcePushToCloud,
+    submissions,
   } = useData();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [syncing, setSyncing] = useState(false);
+  const [pushing, setPushing] = useState(false);
 
   const handleManualSync = async () => {
     setSyncing(true);
     await syncWithCloud();
     setTimeout(() => setSyncing(false), 800);
+  };
+
+  const handleForcePush = async () => {
+    if (window.confirm("Ini akan mencoba mengirim data lokal yang belum ada di cloud. Lanjutkan?")) {
+      setPushing(true);
+      await forcePushToCloud();
+      await syncWithCloud();
+      setPushing(false);
+      alert("Proses sinkronisasi paksa selesai.");
+    }
   };
 
   if (!isAdmin) {
@@ -109,6 +122,30 @@ export function AdminDashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* Data Recovery Rescue Banner */}
+        {(hospitalAccounts.length > 10 || submissions.length > 5) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-[600] text-amber-900">Data Rescue Mode</h4>
+                <p className="text-sm text-amber-800">
+                  Terdeteksi {hospitalAccounts.length} akun dan {submissions.length} submission di device ini. 
+                  Jika di device lain datanya lebih sedikit, klik tombol di kanan untuk memaksa kirim data lokal ke Cloud.
+                </p>
+              </div>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={handleForcePush}
+              disabled={pushing}
+              className="bg-amber-600 hover:bg-amber-700 text-white whitespace-nowrap"
+            >
+              {pushing ? "Pushing..." : "Push Local Data to Cloud"}
+            </Button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-8 overflow-x-auto no-scrollbar">

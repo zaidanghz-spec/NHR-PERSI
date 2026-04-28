@@ -236,7 +236,8 @@ export async function getAllHospitalAccounts(): Promise<any[] | null> {
   if (!db) return null; // null = no connection, [] = genuinely empty
 
   try {
-    const rs = await db.execute("SELECT * FROM hospital_accounts ORDER BY registered_at DESC");
+    // SECURITY/PERF: Omit the heavy base64 PDF data in the list query to prevent payload timeouts
+    const rs = await db.execute("SELECT email, password, hospital_name, pic_name, province, city, status, surat_tugas_filename, registered_at FROM hospital_accounts ORDER BY registered_at DESC");
     return rs.rows.map((r: any) => ({
       email: r.email,
       password: r.password,
@@ -246,13 +247,32 @@ export async function getAllHospitalAccounts(): Promise<any[] | null> {
       city: r.city || "",
       status: r.status,
       suratTugasFileName: r.surat_tugas_filename,
-      suratTugasData: r.surat_tugas_data,
       registeredAt: r.registered_at
     }));
   } catch (err) {
     console.error("Get Accounts Error:", err);
     return null;
   }
+}
+
+/**
+ * Fetch heavy PDF data separately to keep lists fast
+ */
+export async function getHospitalSuratTugas(email: string): Promise<string | null> {
+  const db = getTurso();
+  if (!db) return null;
+  try {
+    const rs = await db.execute({
+      sql: "SELECT surat_tugas_data FROM hospital_accounts WHERE email = ?",
+      args: [email]
+    });
+    if (rs.rows.length > 0) {
+      return rs.rows[0].surat_tugas_data as string || null;
+    }
+  } catch (e) {
+    console.error("Fetch PDF Error:", e);
+  }
+  return null;
 }
 
 export async function updateAccountStatus(email: string, status: string): Promise<void> {

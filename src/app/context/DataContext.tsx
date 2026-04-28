@@ -222,10 +222,9 @@ interface DataContextType {
   publishRanking: (ranking: Omit<ApprovedRanking, "id">) => void;
 
   submissions: SubmissionType[];
-  addSubmission: (submission: Omit<SubmissionType, "id">) => void;
-  updateSubmissionStatus: (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any) => void;
   unpublishRanking: (submissionId: string) => void;
   syncWithCloud: () => Promise<void>;
+  forcePushToCloud: () => Promise<boolean>;
 }
 
 import { safeLocalStorageSet, loadFromStorage } from "../utils/storage";
@@ -312,6 +311,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     syncNewsAndEvents();
   }, []);
 
+  const forcePushToCloud = useCallback(async () => {
+    try {
+      // Pushes all local accounts and submissions to the cloud if they are missing
+      for (const account of hospitalAccounts) {
+        await addAccountToDb(account).catch(() => {});
+      }
+      for (const sub of submissions) {
+        await addSubmissionToDb(sub).catch(() => {});
+      }
+      return true;
+    } catch (err) {
+      console.error("Force push failed:", err);
+      return false;
+    }
+  }, [hospitalAccounts, submissions]);
+
   const syncWithCloud = useCallback(async () => {
     try {
       const [dbSubs, dbAccs, dbRankings, dbNews, dbEvents] = await Promise.all([
@@ -322,11 +337,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
         getAllEvents()
       ]);
 
-      if (dbSubs !== null) { setSubmissions(dbSubs); safeLocalStorageSet("persi_submissions", JSON.stringify(dbSubs)); }
-      if (dbAccs !== null) { setHospitalAccounts(dbAccs); safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(dbAccs)); }
-      if (dbRankings !== null) { setApprovedRankings(dbRankings); safeLocalStorageSet("persi_rankings", JSON.stringify(dbRankings)); }
-      if (dbNews !== null) { setNews(dbNews); safeLocalStorageSet("persi_news", JSON.stringify(dbNews)); }
-      if (dbEvents !== null) { setEvents(dbEvents); safeLocalStorageSet("persi_events", JSON.stringify(dbEvents)); }
+      // SAFETY MERGE: Never overwrite local data with nothing if local has contents.
+      // This solves the "tiba-tiba hilang" issue if cloud returns an empty or partial set.
+      
+      if (dbSubs !== null) {
+        setSubmissions(prev => {
+          const merged = [...dbSubs];
+          // Keep local submissions that haven't hit the cloud yet
+          prev.forEach(p => {
+            if (!merged.find(m => m.id === p.id)) merged.push(p);
+          });
+          return merged;
+        });
+      }
+      
+      if (dbAccs !== null) {
+        setHospitalAccounts(prev => {
+          const merged = [...dbAccs];
+          // Keep local accounts that haven't hit the cloud yet
+          prev.forEach(p => {
+            if (!merged.find(m => m.email.toLowerCase() === p.email.toLowerCase())) merged.push(p);
+          });
+          return merged;
+        });
+      }
+
+      if (dbRankings !== null) { setApprovedRankings(dbRankings); }
+      if (dbNews !== null) { setNews(dbNews); }
+      if (dbEvents !== null) { setEvents(dbEvents); }
       
       draftManager.syncWithCloud();
     } catch (err) {
@@ -601,7 +639,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       currentHospital, hospitalLogout,
       approvedRankings, publishRanking, unpublishRanking,
       submissions, addSubmission, updateSubmissionStatus,
-      syncWithCloud,
+      syncWithCloud, forcePushToCloud,
     }}>
       {children}
     </DataContext.Provider>
