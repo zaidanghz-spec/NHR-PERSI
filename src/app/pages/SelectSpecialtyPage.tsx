@@ -176,8 +176,8 @@ export function SelectSpecialtyPage() {
   const specialties = [
     {
       id: "cardiology",
-      name: "Cardiology",
-      nameId: "Kardiologi",
+      name: "Kardiologi",
+      nameEn: "Cardiology",
       description:
         "Penilaian untuk layanan jantung dan pembuluh darah, mencakup pemeriksaan EKG, revaskularisasi, stratifikasi risiko, dan intervensi koroner",
       icon: <Heart className="w-12 h-12" />,
@@ -193,8 +193,8 @@ export function SelectSpecialtyPage() {
     },
     {
       id: "neurology",
-      name: "Neurology",
-      nameId: "Neurologi",
+      name: "Neurologi",
+      nameEn: "Neurology",
       description:
         "Evaluasi layanan neurologi dan stroke, termasuk CT scan, pemberian trombolitik, pemeriksaan lab, dan antiplatelet/antikoagulan",
       icon: <Brain className="w-12 h-12" />,
@@ -210,8 +210,8 @@ export function SelectSpecialtyPage() {
     },
     {
       id: "oncology",
-      name: "Oncology",
-      nameId: "Onkologi",
+      name: "Onkologi",
+      nameEn: "Oncology",
       description:
         "Asesmen layanan kanker komprehensif mencakup Kanker Payudara dan Kanker Serviks, dengan evaluasi SDM, sarana bertingkat (Dasar s/d Paripurna), dan audit klinis",
       icon: <Activity className="w-12 h-12" />,
@@ -345,7 +345,7 @@ export function SelectSpecialtyPage() {
                       </p>
                       <p className="text-white/70 text-xs md:text-sm font-medium line-clamp-1">
                         {selectedSpecialties.map(id => 
-                          specialties.find(s => s.id === id)?.nameId
+                          specialties.find(s => s.id === id)?.name
                         ).join(" • ")}
                       </p>
                     </div>
@@ -462,8 +462,8 @@ function SpecialtyCard({
               {specialty.icon}
             </div>
           </div>
-          <h3 className="text-3xl font-extrabold mb-1 tracking-tight">{specialty.nameId}</h3>
-          <p className="text-white/80 font-medium tracking-wide uppercase text-xs">{specialty.name}</p>
+          <h3 className="text-3xl font-extrabold mb-1 tracking-tight">{specialty.name}</h3>
+          <p className="text-white/80 font-medium tracking-wide uppercase text-xs">{specialty.nameEn}</p>
         </div>
       </div>
 

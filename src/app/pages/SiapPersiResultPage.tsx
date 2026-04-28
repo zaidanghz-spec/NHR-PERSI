@@ -89,15 +89,16 @@ export function SiapPersiResultPage() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
+    const hCode = hospitalAuth.hospitalCode || hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "RS001";
     const draftId = draftManager.getCurrentDraftId();
     const draft = draftId ? draftManager.getDraftById(draftId) : null;
     
     // Loop through all selected specialties and create a submission for each
-    selectedSpecialties.forEach((spec) => {
+    for (const spec of selectedSpecialties) {
       const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
-      if (!info) return;
+      if (!info) continue;
 
       const rsbk = parseFloat(sessionStorage.getItem(`${spec}_rsbkScore`) || "0");
       const audit = parseFloat(sessionStorage.getItem(`${spec}_clinicalAuditScore`) || "0");
@@ -113,9 +114,71 @@ export function SiapPersiResultPage() {
       const auditSummary = auditSummaryStr ? JSON.parse(auditSummaryStr) : {};
       const prmSummary = prmSummaryStr ? JSON.parse(prmSummaryStr) : {};
 
+      // EXPANSED DATA FOR ADMIN: Detailed per-patient breakdown
+      const auditDetails: any[] = [];
+      const auditDraftKey = `nhr_persi_audit_draft_${spec}`;
+      const auditDraftRaw = localStorage.getItem(auditDraftKey);
+      if (auditDraftRaw) {
+        try {
+          const parsed = JSON.parse(auditDraftRaw);
+          const formData = parsed.formData || {};
+          info.diseases.forEach((d, dIdx) => {
+            for (let p = 1; p <= 30; p++) {
+              // Check if at least one question is answered for this patient
+              const isRelevant = d.questions.some(q => formData[`${dIdx}_p${p}_q${q.id}`]);
+              if (isRelevant) {
+                const diagnosisQs = d.questions.filter(q => q.category.toLowerCase().includes("diagnosa") || q.category.toLowerCase().includes("diagnosis"));
+                const treatmentQs = d.questions.filter(q => q.category.toLowerCase().includes("tatalaksana"));
+                const outcomeQs = d.questions.filter(q => q.category.toLowerCase().includes("outcome"));
+
+                const getCatScore = (qs: any[]) => {
+                   if (qs.length === 0) return 100;
+                   const answered = qs.filter(q => formData[`${dIdx}_p${p}_q${q.id}`]);
+                   if (answered.length === 0) return 0;
+                   const correct = answered.filter(q => formData[`${dIdx}_p${p}_q${q.id}`] !== "tidak-sesuai");
+                   return Math.round((correct.length / answered.length) * 100);
+                }
+
+                auditDetails.push({
+                  patientIndex: p,
+                  diseaseName: d.diseaseName,
+                  diagnosisScore: getCatScore(diagnosisQs),
+                  treatmentScore: getCatScore(treatmentQs),
+                  outcomeScore: getCatScore(outcomeQs),
+                  isComplete: d.questions.every(q => formData[`${dIdx}_p${p}_q${q.id}`])
+                });
+              }
+            }
+          });
+        } catch {}
+      }
+
+      // EXPANSED DATA FOR ADMIN: Detailed PRM patient list
+      const prmDetails: any[] = [];
+      try {
+        const patients = await api.getPatients(hCode, spec); // this might need a better key mapping but spec is often used
+        // fallback to specialized keys if needed
+        const patientsAlt = await api.getPatients(hCode, `${spec}-d0`);
+        const combinedPatients = [...patients, ...patientsAlt].filter((p, i, a) => a.findIndex(x => x.rm === p.rm) === i);
+        
+        for (const p of combinedPatients) {
+           const dKey = p.diseaseKey || `${spec}-d0`;
+           const response = await api.getSurveyByPatient(hCode, dKey, p.rm);
+           prmDetails.push({
+             rm: p.rm,
+             name: p.name,
+             specialty: p.specialty,
+             hasResponse: !!response,
+             premScore: response?.premScore || 0,
+             promScore: response?.promScore || 0,
+             submittedAt: response?.submittedAt
+           });
+        }
+      } catch {}
+
       addSubmission({
         hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
-        hospitalCode: hospitalAuth.hospitalCode || hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "RS001",
+        hospitalCode: hCode || "RS001",
         picName: hospitalAuth.picName || "Unknown PIC",
         specialty: info.name,
         disease: info.disease,
@@ -132,6 +195,8 @@ export function SiapPersiResultPage() {
           rsbkData: specProgress?.rsbk.data || {},
           auditData: auditSummary,
           prmData: prmSummary,
+          auditPatients: auditDetails,
+          prmPatients: prmDetails,
           rawProgress: specProgress,
         },
       });
@@ -142,7 +207,7 @@ export function SiapPersiResultPage() {
       sessionStorage.removeItem(`${spec}_auditSummary`);
       sessionStorage.removeItem(`${spec}_patientReportScore`);
       sessionStorage.removeItem(`${spec}_prmSummary`);
-    });
+    }
     
     // Save submitted specialties before cleanup so SubmissionSuccessPage can display them
     sessionStorage.setItem("lastSubmittedSpecialties", JSON.stringify(selectedSpecialties));
