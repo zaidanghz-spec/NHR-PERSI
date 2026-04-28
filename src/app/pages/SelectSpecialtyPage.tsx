@@ -4,9 +4,11 @@ import { Heart, Activity, Brain, ChevronRight, CheckCircle2, Clock, Trash2, Play
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { draftManager, DraftData } from "../utils/draftManager";
+import { useData } from "../context/DataContext";
 
 export function SelectSpecialtyPage() {
   const navigate = useNavigate();
+  const { submissions, currentHospital } = useData();
   const [authData, setAuthData] = useState<{ hospitalName: string; picName: string } | null>(null);
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<DraftData[]>([]);
@@ -44,6 +46,12 @@ export function SelectSpecialtyPage() {
   }, [navigate]);
 
   const toggleSpecialty = (id: string) => {
+    // Prevent toggling locked/submitted specialties
+    const spec = specialties.find(s => s.id === id);
+    if (spec && submittedSpecialties.includes(spec.name)) {
+      return;
+    }
+
     setSelectedSpecialties((prev) => {
       if (prev.includes(id)) {
         return prev.filter((s) => s !== id);
@@ -52,6 +60,10 @@ export function SelectSpecialtyPage() {
       }
     });
   };
+
+  const submittedSpecialties = submissions
+    .filter(s => s.hospitalName === (authData?.hospitalName || currentHospital?.hospitalName))
+    .map(s => s.specialty);
 
   const handleStartAssessment = () => {
     if (selectedSpecialties.length === 0) {
@@ -353,6 +365,7 @@ export function SelectSpecialtyPage() {
                   key={specialty.id}
                   specialty={specialty}
                   isSelected={selectedSpecialties.includes(specialty.id)}
+                  isLocked={submittedSpecialties.includes(specialty.name)}
                   onToggle={() => toggleSpecialty(specialty.id)}
                   onStartSingleAssessment={() => handleStartSingleAssessment(specialty.id)}
                 />
@@ -400,26 +413,36 @@ function SpecialtyCard({
   isSelected: boolean;
   onToggle: () => void;
   onStartSingleAssessment: () => void;
+  isLocked?: boolean;
 }) {
   return (
     <button
       onClick={onToggle}
+      disabled={isLocked}
       className={`group bg-white rounded-3xl border-2 overflow-hidden transition-all duration-300 text-left w-full relative flex flex-col h-full shadow-sm hover:shadow-2xl ${
-        isSelected
+        isLocked 
+          ? "opacity-75 grayscale-[0.5] cursor-not-allowed border-gray-200"
+          : isSelected
           ? `${specialty.borderColor} shadow-blue-100 ring-4 ring-offset-2 ring-blue-50 -translate-y-2`
           : "border-gray-100 hover:border-gray-200"
       }`}
     >
-      {/* Checkbox Indicator - Premium Style */}
+      {/* Checkbox/Locked Indicator - Premium Style */}
       <div className="absolute top-5 right-5 z-20">
         <div
           className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 transform ${
-            isSelected
+            isLocked
+              ? "bg-green-500 text-white shadow-lg"
+              : isSelected
               ? `bg-white text-[#0F4C81] scale-110 shadow-lg`
               : "bg-white/30 backdrop-blur-md border border-white/40 text-transparent scale-100"
           }`}
         >
-          <CheckCircle2 className={`w-6 h-6 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+          {isLocked ? (
+            <CheckCircle2 className="w-6 h-6 opacity-100" />
+          ) : (
+            <CheckCircle2 className={`w-6 h-6 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+          )}
         </div>
       </div>
 
@@ -471,11 +494,15 @@ function SpecialtyCard({
 
           {/* Footer Interaction */}
           <div className="pt-6 border-t border-gray-100 flex items-center justify-between">
-            <span className={`text-xs font-bold uppercase tracking-widest ${isSelected ? specialty.textColor : "text-gray-400 group-hover:text-gray-600"} transition-colors`}>
-              {isSelected ? "Terpilih" : "Belum Dipilih"}
+            <span className={`text-xs font-bold uppercase tracking-widest ${
+              isLocked ? "text-green-600" : isSelected ? specialty.textColor : "text-gray-400 group-hover:text-gray-600"
+            } transition-colors`}>
+              {isLocked ? "Assessment Terkirim" : isSelected ? "Terpilih" : "Belum Dipilih"}
             </span>
-            <div className={`p-2 rounded-xl transition-all ${isSelected ? specialty.bgLight : "bg-gray-50 group-hover:bg-gray-100"}`}>
-               <ChevronRight className={`w-5 h-5 ${isSelected ? specialty.textColor : "text-gray-400"}`} />
+            <div className={`p-2 rounded-xl transition-all ${
+              isLocked ? "bg-green-50" : isSelected ? specialty.bgLight : "bg-gray-50 group-hover:bg-gray-100"
+            }`}>
+               <ChevronRight className={`w-5 h-5 ${isLocked ? "text-green-600" : isSelected ? specialty.textColor : "text-gray-400"}`} />
             </div>
           </div>
         </div>
