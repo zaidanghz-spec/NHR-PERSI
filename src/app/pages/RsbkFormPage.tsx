@@ -309,76 +309,94 @@ export function RsbkFormPage() {
               </thead>
               <tbody>
                 {/* SDM Row */}
-                <tr className="border-b border-blue-100 bg-blue-50/40">
-                  <td className="py-3 px-4 font-semibold text-blue-900">
+                <tr className="border-b-2 border-blue-100 bg-blue-50/40">
+                  <td className="py-3 px-4 font-bold text-blue-900" colSpan={3}>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
                       SDM — Tenaga Medis
                     </div>
-                    <div className="mt-1.5 w-full bg-blue-200 rounded-full h-1.5">
-                      <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${sdmTargetPoints > 0 ? Math.min((sdmPoints / sdmTargetPoints) * 100, 100) : 0}%` }} />
-                    </div>
                   </td>
-                  <td className="py-3 px-4 text-center font-bold text-blue-700">{sdmPoints}</td>
-                  <td className="py-3 px-4 text-center text-gray-500">{sdmTargetPoints}</td>
                   <td className="py-3 px-4 text-center text-gray-500 font-medium">× 50</td>
                   <td className="py-3 px-4 text-center font-bold text-blue-800 text-xl">{sdmSubScore}</td>
                 </tr>
-                {/* Sarpras: Bed Row */}
-                <tr className="border-b border-teal-100 bg-teal-50/30">
-                  <td className="py-3 px-4 font-semibold text-teal-900">
+                <tr className="border-b border-blue-50 bg-white">
+                   <td className="py-2.5 px-6" colSpan={3}>
+                     <div className="mt-1 w-full bg-blue-100 rounded-full h-1.5">
+                       <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${sdmTargetPoints > 0 ? Math.min((sdmPoints / sdmTargetPoints) * 100, 100) : 0}%` }} />
+                     </div>
+                     <div className="flex justify-between text-[10px] mt-1 text-blue-600 font-medium">
+                       <span>{sdmPoints} Poin</span>
+                       <span>Target {sdmTargetPoints} Poin</span>
+                     </div>
+                   </td>
+                   <td colSpan={2}></td>
+                </tr>
+
+                {/* Sarana Header */}
+                <tr className="border-b border-teal-100 bg-teal-50/40">
+                  <td className="py-3 px-4 font-bold text-teal-900" colSpan={3}>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block"></span>
-                      Kapasitas Bed <span className="text-xs font-normal text-teal-600">(1 bed = 1 poin)</span>
-                    </div>
-                    <div className="mt-1.5 w-full bg-teal-100 rounded-full h-1.5">
-                      <div className="bg-teal-500 h-1.5 rounded-full transition-all" style={{ width: `${bedTargetPoints > 0 ? Math.min((bedPoints / bedTargetPoints) * 100, 100) : 0}%` }} />
+                      Sarana
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-center font-bold text-teal-700">{bedPoints}</td>
-                  <td className="py-3 px-4 text-center text-gray-500">{bedTargetPoints}</td>
-                  <td className="py-3 px-4 text-center text-gray-400 text-xs border-l border-teal-50" rowSpan={2}>
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-sm font-semibold text-teal-700">× 25</span>
-                      <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">(Sarana)</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-center font-bold text-teal-800 text-xl border-l border-teal-50" rowSpan={2}>{saranaSubScore}</td>
+                  <td className="py-3 px-4 text-center text-gray-500 font-medium">× 25</td>
+                  <td className="py-3 px-4 text-center font-bold text-teal-800 text-xl">{saranaSubScore}</td>
                 </tr>
-                {/* Sarpras: Ruangan */}
-                <tr className="border-b border-indigo-100 bg-indigo-50/20 text-gray-800">
-                  <td className="py-3 px-4 font-semibold text-indigo-900">
+
+                {/* Sarana: Bed Row */}
+                <tr className="border-b border-gray-100 bg-white">
+                  <td className="py-2.5 px-4 text-gray-700 pl-10">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
-                      Ruangan Khusus <span className="text-xs font-normal text-indigo-600">(1 ruangan = 5 poin)</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400 inline-block"></span>
+                      Kapasitas Bed <span className="text-xs font-normal text-gray-400">(1 bed = 1 poin)</span>
                     </div>
-                    <div className="mt-1.5 w-full bg-indigo-100 rounded-full h-1.5">
-                      <div className="bg-indigo-500 h-1.5 rounded-full transition-all" style={{ width: `${roomTargetPoints > 0 ? Math.min((roomPoints / roomTargetPoints) * 100, 100) : 0}%` }} />
+                    <div className="mt-1 w-full bg-teal-50 rounded-full h-1">
+                      <div className="bg-teal-500 h-1 rounded-full transition-all" style={{ width: `${bedTargetPoints > 0 ? Math.min((bedPoints / bedTargetPoints) * 100, 100) : 0}%` }} />
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-center font-bold text-indigo-700">{roomPoints}</td>
-                  <td className="py-3 px-4 text-center text-gray-500">{roomTargetPoints}</td>
+                  <td className="py-2.5 px-4 text-center font-semibold text-teal-700">{bedPoints}</td>
+                  <td className="py-2.5 px-4 text-center text-gray-500">{bedTargetPoints}</td>
+                  <td colSpan={2}></td>
                 </tr>
-                {/* Sarpras: Alat */}
-                <tr className="border-b border-purple-100 bg-purple-50/30">
-                  <td className="py-3 px-4 font-semibold text-purple-900">
+                {/* Sarana: Ruangan */}
+                <tr className="border-b border-gray-100 bg-white">
+                  <td className="py-2.5 px-4 text-gray-700 pl-10">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                      Ruangan Khusus <span className="text-xs font-normal text-gray-400">(1 ruangan = 5 poin)</span>
+                    </div>
+                    <div className="mt-1 w-full bg-indigo-50 rounded-full h-1">
+                      <div className="bg-indigo-500 h-1 rounded-full transition-all" style={{ width: `${roomTargetPoints > 0 ? Math.min((roomPoints / roomTargetPoints) * 100, 100) : 0}%` }} />
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-semibold text-indigo-700">{roomPoints}</td>
+                  <td className="py-2.5 px-4 text-center text-gray-500">{roomTargetPoints}</td>
+                  <td colSpan={2}></td>
+                </tr>
+
+                {/* Alat row */}
+                <tr className="border-b-2 border-purple-100 bg-purple-50/40">
+                  <td className="py-3 px-4 font-bold text-purple-900" colSpan={3}>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span>
-                      Alat Medis <span className="text-xs font-normal text-purple-600">(1 unit = 1 poin)</span>
-                    </div>
-                    <div className="mt-1.5 w-full bg-purple-200 rounded-full h-1.5">
-                      <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${alatTargetPoints > 0 ? Math.min((alatPoints / alatTargetPoints) * 100, 100) : 0}%` }} />
+                      Alat Medis
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-center font-bold text-purple-700">{alatPoints}</td>
-                  <td className="py-3 px-4 text-center text-gray-500">{alatTargetPoints}</td>
-                  <td className="py-3 px-4 text-center text-gray-400 text-xs border-l border-purple-50">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-sm font-semibold text-purple-700">× 25</span>
-                      <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">(Alat Medis)</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-center font-bold text-purple-800 text-xl border-l border-purple-50">{alatSubScore}</td>
+                  <td className="py-3 px-4 text-center text-gray-500 font-medium">× 25</td>
+                  <td className="py-3 px-4 text-center font-bold text-purple-800 text-xl">{alatSubScore}</td>
+                </tr>
+                <tr className="border-b border-purple-50 bg-white">
+                   <td className="py-2.5 px-6" colSpan={3}>
+                     <div className="mt-1 w-full bg-purple-100 rounded-full h-1.5">
+                       <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${alatTargetPoints > 0 ? Math.min((alatPoints / alatTargetPoints) * 100, 100) : 0}%` }} />
+                     </div>
+                     <div className="flex justify-between text-[10px] mt-1 text-purple-600 font-medium">
+                       <span>{alatPoints} Poin</span>
+                       <span>Target {alatTargetPoints} Poin</span>
+                     </div>
+                   </td>
+                   <td colSpan={2}></td>
                 </tr>
               </tbody>
               <tfoot>
