@@ -636,6 +636,36 @@ export async function getSurveys(hospitalCode: string, specialty: string): Promi
   }
 }
 
+export async function getSurveyByPatient(hospitalCode: string, specialty: string, patientRm: string): Promise<any | null> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return null;
+
+  try {
+    const rs = await db.execute({
+      sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
+      args: [hospitalCode, specialty, patientRm]
+    });
+    
+    if (rs.rows.length === 0) return null;
+    
+    const r = rs.rows[0];
+    return {
+      id: r.id,
+      patientName: r.patient_name,
+      medicalRecordNumber: r.patient_rm,
+      premScore: r.prem_score,
+      promScore: r.prom_score,
+      overallScore: r.overall_score,
+      answers: r.answers ? JSON.parse(r.answers as string) : {},
+      submittedAt: r.created_at
+    };
+  } catch (err) {
+    console.error("Get Survey By Patient Error:", err);
+    return null;
+  }
+}
+
 export async function resetSurveys(hospitalCode: string, specialty: string): Promise<void> {
   await initTursoTables();
   const db = getTurso();
@@ -705,6 +735,33 @@ export async function registerPatient(
   }
 }
 
+export async function getPatients(hospitalCode: string, specialty: string): Promise<any[]> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return [];
+
+  try {
+    // Search for variant column names across ALL possible patient tables
+    const info = await db.execute("PRAGMA table_info(patients)");
+    const cols = info.rows.map((r: any) => r.name);
+    
+    const hCol = cols.find(c => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
+    const sCol = cols.find(c => ["specialty", "specialtyName"].includes(c.toLowerCase())) || "specialty";
+    const nameCol = cols.find(c => ["name", "patient_name"].includes(c.toLowerCase())) || "name";
+    const rmCol = cols.find(c => ["rm", "patient_rm"].includes(c.toLowerCase())) || "rm";
+
+    const rs = await db.execute({
+      sql: `SELECT ${nameCol} as name, ${rmCol} as rm, ${sCol} as specialty FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY created_at DESC`,
+      args: [hospitalCode, specialty]
+    });
+    
+    return rs.rows;
+  } catch (err) {
+    console.error("Get Patients Error:", err);
+    return [];
+  }
+}
+
 /**
  * Custom Survey (PDF Upload) Sync with Turso
  */
@@ -768,55 +825,7 @@ export async function deleteCustomSurveyMetadata(hospitalCode: string, specialty
 }
 
 
-export async function getPatients(hospitalCode: string, specialty: string): Promise<any[]> {
-  await initTursoTables();
-  const db = getTurso();
-  if (!db) return [];
 
-  try {
-    const info = await db.execute("PRAGMA table_info(patients)");
-    const existingCols = info.rows.map((r: any) => r.name);
-    
-    // Find matching columns for the WHERE clause (be broad)
-    const sCols = existingCols.filter(c => ["specialty", "specialty_name", "specialtyname"].includes(c.toLowerCase()));
-    const hCols = existingCols.filter(c => ["hospital_code", "hospitalcode"].includes(c.toLowerCase()));
-
-    // Query by specialty first (usually more specific than hospital code across all hospitals)
-    // Or if sCols is empty, fall back to a generic query
-    const sCol = sCols[0] || "specialty";
-    
-    const rs = await db.execute({
-      sql: `SELECT * FROM patients WHERE ${sCol} = ?`,
-      args: [specialty]
-    });
-    
-    // Filter by hospitalCode in JS for maximum reliability
-    return rs.rows.filter((r: any) => {
-      // Check ALL possible hospital code columns in the row
-      return hCols.some(hCol => {
-        const val = r[hCol];
-        return val && val.toString().toUpperCase() === hospitalCode.toUpperCase();
-      });
-    }).map((r: any) => {
-      // Find name and rm dynamically from the row
-      const name = r.name || r.patient_name || r.patientName || r.patient_Name || "";
-      const rm = r.rm || r.patient_rm || r.patientRM || r.medical_record_number || r.medicalRecordNumber || r.patient_RM || "";
-      const createdAt = r.created_at || r.createdAt || r.registered_at || "";
-
-      return {
-        id: r.id,
-        name,
-        rm,
-        specialty,
-        hospitalCode,
-        createdAt
-      };
-    });
-  } catch (err) {
-    console.error("Get Patients Error:", err);
-    return [];
-  }
-}
 
 export async function removePatient(hospitalCode: string, specialty: string, patientId: string): Promise<void> {
   await initTursoTables();
