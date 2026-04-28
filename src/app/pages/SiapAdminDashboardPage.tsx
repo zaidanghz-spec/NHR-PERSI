@@ -1,15 +1,4 @@
-import { useState, useEffect } from "react";
-import { Download, ExternalLink } from "lucide-react";
-
-interface CustomSurveyDoc {
-  fileName: string;
-  base64: string;
-  uploadedAt: string;
-  hospitalCode: string;
-  hospitalName: string;
-  specialty: string;
-  diseaseName: string;
-}
+import { useState } from "react";
 import { Link } from "react-router";
 import {
   FileText,

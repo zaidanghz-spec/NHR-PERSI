@@ -673,6 +673,31 @@ export async function removePatient(hospitalCode: string, specialty: string, pat
 
 // ============ DRAFTS ============
 
+export async function getDraft(
+  type: "clinical-audit" | "patient-report",
+  hospitalCode: string,
+  specialty: string
+): Promise<any | null> {
+  await initTursoTables();
+  const db = getTurso();
+  if (!db) return null;
+
+  const draftId = `${type}-${hospitalCode}-${specialty}`;
+  try {
+    const rs = await db.execute({
+      sql: "SELECT data FROM drafts WHERE id = ?",
+      args: [draftId]
+    });
+    if (rs.rows.length > 0) {
+      return JSON.parse(rs.rows[0].data as string);
+    }
+    return null;
+  } catch (err) {
+    console.error("Get Draft Error:", err);
+    return null;
+  }
+}
+
 export async function saveDraft(
   type: "clinical-audit" | "patient-report",
   hospitalCode: string,

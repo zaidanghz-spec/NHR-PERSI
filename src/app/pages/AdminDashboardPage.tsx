@@ -762,6 +762,7 @@ function EventsTab({
                 placeholder="Jakarta / Online"
                 required
               />
+            </div>
             <div className="space-y-1.5 md:col-span-3">
               <Label className="text-sm font-[600]">Gambar Event (opsional)</Label>
               <div className="flex flex-col gap-2">

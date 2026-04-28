@@ -19,6 +19,7 @@ import {
   FileUp,
   UploadCloud,
   FileText,
+  Clock,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { QRCodeDisplay } from "../components/QRCodeGenerator";
@@ -68,6 +69,7 @@ export function PatientReportPage() {
   const [customSurveyUploaded, setCustomSurveyUploaded] = useState(false);
   const [customSurveyFileName, setCustomSurveyFileName] = useState<string>("");
   const [customSurveyPatientCount, setCustomSurveyPatientCount] = useState<number>(0);
+  // NOTE: PREM/PROM scores for PDF uploads are set ONLY by admin, not by the hospital
 
   const customSurveyKey = `custom-survey-${hospitalCode}-${diseaseSpecialtyKey}`;
 
@@ -121,7 +123,10 @@ export function PatientReportPage() {
         hospitalCode,
         hospitalName,
         specialty,
-        diseaseName: activeDisease?.diseaseName || ""
+        diseaseName: activeDisease?.diseaseName || "",
+        // premScore & promScore will be set by admin only
+        premScore: null,
+        promScore: null,
       };
       
       try {
@@ -129,7 +134,7 @@ export function PatientReportPage() {
         setCustomSurveyFileName(file.name);
         setCustomSurveyPatientCount(doc.patientCount);
         setCustomSurveyUploaded(true);
-        alert(`File PDF survei internal untuk jenis penyakit ${activeDisease?.diseaseName} berhasil diunggah!`);
+        alert(`Dokumen survei PREM/PROM untuk ${activeDisease?.diseaseName} berhasil diunggah! Tim admin PERSI akan meninjau dan memberikan penilaian.`);
       } catch (err) {
         alert("Gagal mengunggah file. Mungkin ukuran terlalu besar (Storage Penuh/Melebihi Kuota).");
       }
@@ -218,20 +223,21 @@ export function PatientReportPage() {
   // Calculate aggregated scores
   const patientCount = surveyResponses.length + (customSurveyUploaded ? customSurveyPatientCount : 0);
   
+  // If RS uploaded PDF: skor = 0 (menunggu penilaian admin). Admin override via Admin Review Page.
   const avgPremScore = customSurveyUploaded
-    ? 0 // Menunggu Review
+    ? 0
     : surveyResponses.length > 0
       ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / surveyResponses.length)
       : 0;
       
   const avgPromScore = customSurveyUploaded
-    ? 0 // Menunggu Review
+    ? 0
     : surveyResponses.length > 0
       ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / surveyResponses.length)
       : 0;
       
   const overallScore = customSurveyUploaded
-    ? 0 // Menunggu Review
+    ? 0  // Admin akan memberikan skor via Admin Review Page
     : surveyResponses.length > 0
       ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / surveyResponses.length)
       : 0;
@@ -331,31 +337,50 @@ export function PatientReportPage() {
     
     try {
       for (let i = 0; i < diseases.length; i++) {
-        const dKey = `${specialty}-d${i}`;  // Must match diseaseSpecialtyKey format used in PatientPremPromPage
+        const dKey = `${specialty}-d${i}`;  // Must match diseaseSpecialtyKey format
         const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
         
         let diseaseAvg = 0;
         const customSurveyStorageKey = `custom-survey-${hospitalCode}-${dKey}`;
-        const customDoc = localStorage.getItem(customSurveyStorageKey);
+        const customDocRaw = localStorage.getItem(customSurveyStorageKey);
         
-        if (customDoc) {
-          diseaseAvg = 0; // Menunggu Review
+        if (customDocRaw) {
+          // PDF uploaded by RS — use admin-entered scores if available
+          try {
+            const customDoc = JSON.parse(customDocRaw);
+            // Admin override stored in the custom survey doc (set by SiapAdminReviewPage)
+            const adminPrem = typeof customDoc.adminPremScore === "number" ? customDoc.adminPremScore : null;
+            const adminProm = typeof customDoc.adminPromScore === "number" ? customDoc.adminPromScore : null;
+            if (adminPrem !== null && adminProm !== null) {
+              diseaseAvg = Math.round(adminPrem * 0.6 + adminProm * 0.4);
+              prmSummary[`${dKey}_prem`] = adminPrem.toString();
+              prmSummary[`${dKey}_prom`] = adminProm.toString();
+              prmSummary[`${dKey}_source`] = "admin_override";
+            } else {
+              diseaseAvg = 0; // Menunggu penilaian admin
+              prmSummary[`${dKey}_source`] = "pending_admin";
+            }
+          } catch {
+            diseaseAvg = 0;
+          }
         } else if (diseaseSurveys.length > 0) {
           diseaseAvg = Math.round(diseaseSurveys.reduce((s, r) => s + (r.overallScore || 0), 0) / diseaseSurveys.length);
           
-          // Build summary for admin dashboard compatibility
-          const allQuestions = [...diseases[i].premQuestions, ...diseases[i].promQuestions];
+          // Build summary for admin dashboard — use questions array (premQuestions/promQuestions may not exist)
+          const allQuestions = [
+            ...(diseases[i].premQuestions || []),
+            ...(diseases[i].promQuestions || []),
+            ...(diseases[i].questions || [])
+          ].filter((q, idx, arr) => arr.findIndex(x => x.id === q.id) === idx); // dedupe
+          
           allQuestions.forEach(q => {
             let sum = 0, count = 0;
             diseaseSurveys.forEach(survey => {
                if (survey.answers && survey.answers[q.id]) {
                  count++;
-                 // In PatientSurvey, answer is "1" to "5" representing score 1 to 5.
                  sum += parseInt(survey.answers[q.id]);
                }
             });
-            // Dashboard expects value like "4", we store integer average scaled back to 1-5 range string if needed.
-            // Actually, PRM expects 0-5. So we parse Int and round!
             prmSummary[q.id] = count > 0 ? Math.round(sum / count).toString() : "0";
           });
         }
@@ -483,7 +508,7 @@ export function PatientReportPage() {
             </div>
             <p className="text-xs text-gray-500 mb-1">Skor PREM</p>
             {customSurveyUploaded ? (
-              <p className="text-xs font-bold text-gray-400 mt-3 border border-gray-200 py-1.5 px-3 rounded bg-gray-50">Menunggu Tim Review</p>
+              <p className="text-xs font-bold text-amber-500 mt-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">Menunggu Admin</p>
             ) : (
               <>
                 <p className="text-3xl font-bold text-[#0F4C81]">{avgPremScore}</p>
@@ -498,7 +523,7 @@ export function PatientReportPage() {
             </div>
             <p className="text-xs text-gray-500 mb-1">Skor PROM</p>
             {customSurveyUploaded ? (
-              <p className="text-xs font-bold text-gray-400 mt-3 border border-gray-200 py-1.5 px-3 rounded bg-gray-50">Menunggu Tim Review</p>
+              <p className="text-xs font-bold text-amber-500 mt-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">Menunggu Admin</p>
             ) : (
               <>
                 <p className="text-3xl font-bold text-[#14B8A6]">{avgPromScore}</p>
@@ -549,25 +574,41 @@ export function PatientReportPage() {
 
           <div className="bg-teal-50/50 border border-teal-100 rounded-xl p-5">
             {customSurveyUploaded ? (
-              <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-teal-200">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 shadow-sm bg-teal-100 rounded-lg">
-                    <FileText className="w-5 h-5 text-teal-700" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-teal-200">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 shadow-sm bg-teal-100 rounded-lg">
+                      <FileText className="w-5 h-5 text-teal-700" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm">{customSurveyFileName}</h4>
+                      <p className="text-xs text-green-600 font-medium tracking-wide">✓ Tersimpan — {customSurveyPatientCount} pasien — {activeDisease?.diseaseName}</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleRemoveFile}
+                    variant="outline"
+                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors"
+                    size="sm"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1.5" />
+                    Hapus File
+                  </Button>
+                </div>
+
+                {/* Info: waiting for admin scoring */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Clock className="w-4 h-4 text-amber-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900 text-sm">{customSurveyFileName}</h4>
-                    <p className="text-xs text-green-600 font-medium tracking-wide">✓ Tersimpan (Khusus tab {activeDisease?.diseaseName})</p>
+                    <p className="font-semibold text-amber-800 text-sm">Menunggu Penilaian Admin PERSI</p>
+                    <p className="text-amber-700 text-xs mt-1">
+                      Dokumen survei Anda telah diunggah. Tim reviewer PERSI akan meninjau PDF dan memberikan skor PREM &amp; PROM secara manual.
+                      Pastikan dokumen sudah lengkap sebelum melakukan submit.
+                    </p>
                   </div>
                 </div>
-                <Button
-                  onClick={handleRemoveFile}
-                  variant="outline"
-                  className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors"
-                  size="sm"
-                >
-                  <Trash2 className="w-4 h-4 mr-1.5" />
-                  Hapus File
-                </Button>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center border-2 border-dashed border-teal-300 rounded-xl p-8 bg-white transition-colors hover:bg-teal-50/60">
@@ -934,10 +975,12 @@ export function PatientReportPage() {
           <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Skor PRM - {activeDisease?.diseaseName} (Berbobot)</h3>
           
           {customSurveyUploaded ? (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-              <p className="font-bold text-yellow-800 text-lg mb-2">Nilai Menunggu Tim Review Pusat</p>
-              <p className="text-yellow-700 text-sm">
-                File survei mandiri (berisi {customSurveyPatientCount} pasien) telah diunggah. Tim validator nasional NHR PERSI akan meninjau dokumen PDF tersebut dan memberikan penilaian akhir secara manual ke dalam dashboard.
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+              <Clock className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+              <p className="font-bold text-amber-800 text-lg mb-1">Menunggu Penilaian Admin</p>
+              <p className="text-amber-700 text-sm">
+                Dokumen survei {activeDisease?.diseaseName} ({customSurveyPatientCount} pasien) telah diunggah.
+                Skor PREM &amp; PROM akan diberikan oleh tim reviewer PERSI setelah meninjau dokumen PDF Anda.
               </p>
             </div>
           ) : (
@@ -958,7 +1001,7 @@ export function PatientReportPage() {
                         <div className="font-medium text-gray-900">PREM (Patient Reported Experience)</div>
                         <div className="text-xs text-gray-500">Pengalaman pasien terhadap layanan</div>
                       </td>
-                      <td className="py-3 px-4 text-center font-bold text-blue-700">{avgPremScore}</td>
+                      <td className="py-3 px-4 text-center font-bold text-blue-700 text-xl">{avgPremScore}</td>
                       <td className="py-3 px-4 text-center text-gray-600">60%</td>
                       <td className="py-3 px-4 text-center font-bold text-blue-700">{(avgPremScore * 0.6).toFixed(1)}</td>
                     </tr>
@@ -967,7 +1010,7 @@ export function PatientReportPage() {
                         <div className="font-medium text-gray-900">PROM (Patient Reported Outcome)</div>
                         <div className="text-xs text-gray-500">Hasil kesehatan menurut pasien</div>
                       </td>
-                      <td className="py-3 px-4 text-center font-bold text-teal-700">{avgPromScore}</td>
+                      <td className="py-3 px-4 text-center font-bold text-teal-700 text-xl">{avgPromScore}</td>
                       <td className="py-3 px-4 text-center text-gray-600">40%</td>
                       <td className="py-3 px-4 text-center font-bold text-teal-700">{(avgPromScore * 0.4).toFixed(1)}</td>
                     </tr>
@@ -980,10 +1023,9 @@ export function PatientReportPage() {
                   </tfoot>
                 </table>
               </div>
-
               <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                <p><strong>Rumus:</strong> Total PRM = (PREM x 60%) + (PROM x 40%)</p>
-                <p className="mt-1">Berdasarkan {patientCount} survei pasien {activeDisease?.diseaseName} yang telah terkumpul.</p>
+                <p><strong>Rumus:</strong> Total PRM = (PREM × 60%) + (PROM × 40%)</p>
+                <p className="mt-1">Berdasarkan {patientCount} survei pasien {activeDisease?.diseaseName} yang telah terkumpul via QR Code.</p>
               </div>
             </>
           )}

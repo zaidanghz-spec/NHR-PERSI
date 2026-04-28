@@ -92,7 +92,15 @@ export function HospitalSubmissionPage() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Status Akun</p>
-                  <p className="font-semibold text-green-600">Aktif & Terverifikasi</p>
+                  {currentHospital?.status === "activated" ? (
+                    <p className="font-semibold text-green-600">Aktif &amp; Terverifikasi</p>
+                  ) : currentHospital?.status === "pending_activation" ? (
+                    <p className="font-semibold text-amber-600">Menunggu Aktivasi Admin</p>
+                  ) : currentHospital?.status === "rejected" ? (
+                    <p className="font-semibold text-red-600">Pendaftaran Ditolak</p>
+                  ) : (
+                    <p className="font-semibold text-green-600">Aktif &amp; Terverifikasi</p>
+                  )}
                 </div>
               </div>
 

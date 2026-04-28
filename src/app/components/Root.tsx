@@ -315,23 +315,32 @@ export function Root() {
             </div>
             <div>
               <h4 className="font-[600] text-sm mb-4">Kontak</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
+              <ul className="space-y-4 text-sm text-gray-400">
                 <li>
-                  <a
-                    href="mailto:persi@persi.or.id"
-                    className="hover:text-white transition-colors"
-                  >
-                    persi@persi.or.id
-                  </a>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-white font-[500]">Email:</span>
+                    <a href="mailto:persi@pacific.net.id" className="hover:text-white transition-colors">persi@pacific.net.id</a>
+                    <a href="mailto:sekretariat@persi.or.id" className="hover:text-white transition-colors">sekretariat@persi.or.id</a>
+                  </div>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    +62 21 8611 262
-                  </a>
+                  <div className="flex flex-col gap-1 text-gray-400">
+                    <div className="flex items-center gap-1">
+                      <span className="text-white font-[500]">Telp:</span>
+                      <a href="tel:+622183788722" className="hover:text-white transition-colors">(+62-21) 8378 8722</a>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-white font-[500]">Fax:</span>
+                      <span>(+62-21) 8378 8724</span>
+                    </div>
+                  </div>
                 </li>
-                <li className="text-gray-500 leading-relaxed">
-                  Jl. Boulevard Artha Gading, Kelapa Gading, Jakarta Utara
-                  14240
+                <li>
+                  <div className="flex flex-col gap-1 leading-relaxed">
+                    <span className="text-white font-[500]">Alamat:</span>
+                    <span>Crown Palace Blok E/6</span>
+                    <span>Jl. Prof Soepomo, SH No. 231, Tebet Jakarta Selatan 12870</span>
+                  </div>
                 </li>
               </ul>
             </div>

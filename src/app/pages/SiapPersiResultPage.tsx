@@ -65,6 +65,7 @@ export function SiapPersiResultPage() {
 
       addSubmission({
         hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
+        hospitalCode: hospitalAuth.hospitalCode || hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "RS001",
         picName: hospitalAuth.picName || "Unknown PIC",
         specialty: info.name,
         disease: info.disease,
@@ -79,9 +80,9 @@ export function SiapPersiResultPage() {
         details: { 
           specialties: [{ specialty: info.name, disease: info.disease }],
           rsbkData: specProgress?.rsbk.data || {},
-          auditData: auditSummary,   // Replaced with summarized data for Admin compatibility
-          prmData: prmSummary,       // Replaced with summarized data for Admin compatibility
-          rawProgress: specProgress, // Raw draft data to enable granular revisions without starting from scratch
+          auditData: auditSummary,
+          prmData: prmSummary,
+          rawProgress: specProgress,
         },
       });
 
