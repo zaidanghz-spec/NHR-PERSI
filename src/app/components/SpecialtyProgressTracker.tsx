@@ -129,12 +129,14 @@ export function SpecialtyProgressTracker({
             proportion = isCompleted ? 1 : (Object.keys(progress?.rsbk?.data || {}).length > 0 ? 0.5 : 0);
           } else if (stage === "clinical-audit") {
             isCompleted = progress?.clinicalAudit?.completed || false;
-            proportion = isCompleted ? 1 : ((progress?.clinicalAudit?.currentPatient || 0) / 30);
+            const sCount = sessionStorage.getItem(`${currentSpecialty}_auditPatientCount`);
+            const actualCount = sCount ? parseInt(sCount) : (progress?.clinicalAudit?.currentPatient || 0);
+            proportion = isCompleted ? 1 : (actualCount / 30);
           } else if (stage === "patient-report") {
             isCompleted = progress?.patientReport?.completed || false;
-            const pmcount = progress?.patientReport?.patientCount || 0;
-            // sometimes it's saved as 30 but completed=false if not submitted yet
-            proportion = isCompleted ? 1 : (pmcount / 30);
+            const sCount = sessionStorage.getItem(`${currentSpecialty}_prmPatientCount`);
+            const actualCount = sCount ? parseInt(sCount) : (progress?.patientReport?.patientCount || 0);
+            proportion = isCompleted ? 1 : (actualCount / 30);
           } else if (stage === "result") {
             isCompleted = !!(progress?.rsbk?.completed && progress?.clinicalAudit?.completed && progress?.patientReport?.completed);
           }
