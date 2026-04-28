@@ -146,6 +146,17 @@ export async function initTursoTables() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
     );
+    // Ensure columns exist for older tables
+    try { await db.execute("ALTER TABLE surveys ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+    try { await db.execute("ALTER TABLE surveys ADD COLUMN patient_name TEXT DEFAULT ''"); } catch(e) {}
+    try { await db.execute("ALTER TABLE surveys ADD COLUMN patient_rm TEXT DEFAULT ''"); } catch(e) {}
+    
+    try { await db.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+    try { await db.execute("ALTER TABLE patients ADD COLUMN specialty TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+    
+    try { await db.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+    try { await db.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''"); } catch(e) {}
+
     tablesInitialized = true;
   } catch (err) {
     console.warn("Failed to init Turso tables:", err);
