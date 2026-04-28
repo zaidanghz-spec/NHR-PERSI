@@ -713,10 +713,13 @@ export async function getPatients(hospitalCode: string, specialty: string): Prom
   try {
     const info = await db.execute("PRAGMA table_info(patients)");
     const existingCols = info.rows.map((r: any) => r.name);
-    let hCol = existingCols.includes("hospital_code") ? "hospital_code" : (existingCols.includes("hospitalCode") ? "hospitalCode" : "hospital_code");
+    
+    // Find matching columns for the WHERE clause
+    const hCol = existingCols.find(c => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
+    const sCol = existingCols.find(c => ["specialty", "specialty_name", "specialtyname"].includes(c.toLowerCase())) || "specialty";
 
     const rs = await db.execute({
-      sql: `SELECT * FROM patients WHERE ${hCol} = ? AND specialty = ? ORDER BY created_at ASC`,
+      sql: `SELECT * FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY created_at ASC`,
       args: [hospitalCode, specialty]
     });
     
