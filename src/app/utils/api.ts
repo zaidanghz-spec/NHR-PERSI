@@ -705,6 +705,69 @@ export async function registerPatient(
   }
 }
 
+/**
+ * Custom Survey (PDF Upload) Sync with Turso
+ */
+export async function saveCustomSurveyMetadata(hospitalCode: string, specialtyKey: string, data: any): Promise<void> {
+  const db = getTurso();
+  if (!db) return;
+  const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
+  const dataStr = JSON.stringify(data);
+  
+  try {
+    const info = await db.execute("PRAGMA table_info(drafts)");
+    const cols = info.rows.map((r: any) => r.name);
+    const hCol = cols.find(c => c.toLowerCase() === "hospitalcode" || c.toLowerCase() === "hospital_code") || "hospital_code";
+    const sCol = cols.find(c => c.toLowerCase() === "specialty" || c.toLowerCase() === "specialty_name") || "specialty";
+
+    await db.execute({
+      sql: `INSERT INTO drafts (id, type, ${hCol}, ${sCol}, data) 
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP`,
+      args: [draftId, "custom-survey", hospitalCode, specialtyKey, dataStr]
+    });
+  } catch (err) {
+    console.error("Save Custom Survey Error:", err);
+  }
+}
+
+export async function getCustomSurveyMetadata(hospitalCode: string, specialtyKey: string): Promise<any | null> {
+  const db = getTurso();
+  if (!db) return null;
+  const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
+  
+  try {
+    const rs = await db.execute({
+      sql: "SELECT data FROM drafts WHERE id = ?",
+      args: [draftId]
+    });
+    
+    if (rs.rows.length > 0) {
+      return JSON.parse(rs.rows[0].data as string);
+    }
+    return null;
+  } catch (err) {
+    console.error("Get Custom Survey Error:", err);
+    return null;
+  }
+}
+
+export async function deleteCustomSurveyMetadata(hospitalCode: string, specialtyKey: string): Promise<void> {
+  const db = getTurso();
+  if (!db) return;
+  const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
+  
+  try {
+    await db.execute({
+      sql: "DELETE FROM drafts WHERE id = ?",
+      args: [draftId]
+    });
+  } catch (err) {
+    console.error("Delete Custom Survey Error:", err);
+  }
+}
+
+
 export async function getPatients(hospitalCode: string, specialty: string): Promise<any[]> {
   await initTursoTables();
   const db = getTurso();

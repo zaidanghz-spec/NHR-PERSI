@@ -73,24 +73,22 @@ export function PatientReportPage() {
   const [diseaseCompletion, setDiseaseCompletion] = useState<Record<number, number>>({});
   // NOTE: PREM/PROM scores for PDF uploads are set ONLY by admin, not by the hospital
 
-  const customSurveyKey = `custom-survey-${hospitalCode}-${diseaseSpecialtyKey}`;
-
-  // Load existing custom survey upload from localStorage on mount & disease change
+  // Load existing custom survey upload from API on mount & disease change
   useEffect(() => {
-    const existing = localStorage.getItem(customSurveyKey);
-    if (existing) {
-      try {
-        const parsed = JSON.parse(existing);
-        setCustomSurveyFileName(parsed.fileName || "");
-        setCustomSurveyPatientCount(parsed.patientCount || 30);
+    const checkCustomSurvey = async () => {
+      const data = await api.getCustomSurveyMetadata(hospitalCode, diseaseSpecialtyKey);
+      if (data) {
         setCustomSurveyUploaded(true);
-      } catch {}
-    } else {
-      setCustomSurveyFileName("");
-      setCustomSurveyPatientCount(0);
-      setCustomSurveyUploaded(false);
-    }
-  }, [customSurveyKey]);
+        setCustomSurveyFileName(data.fileName);
+        setCustomSurveyPatientCount(data.patientCount);
+      } else {
+        setCustomSurveyUploaded(false);
+        setCustomSurveyFileName("");
+        setCustomSurveyPatientCount(0);
+      }
+    };
+    checkCustomSurvey();
+  }, [hospitalCode, diseaseSpecialtyKey]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,7 +113,7 @@ export function PatientReportPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       const doc = {
         fileName: file.name,
@@ -132,23 +130,28 @@ export function PatientReportPage() {
       };
       
       try {
-        safeLocalStorageSet(customSurveyKey, JSON.stringify(doc));
+        await api.saveCustomSurveyMetadata(hospitalCode, diseaseSpecialtyKey, doc);
         setCustomSurveyFileName(file.name);
         setCustomSurveyPatientCount(doc.patientCount);
         setCustomSurveyUploaded(true);
         alert(`Dokumen survei PREM/PROM untuk ${activeDisease?.diseaseName} berhasil diunggah! Tim admin PERSI akan meninjau dan memberikan penilaian.`);
       } catch (err) {
-        alert("Gagal mengunggah file. Mungkin ukuran terlalu besar (Storage Penuh/Melebihi Kuota).");
+        console.error("Upload error:", err);
+        alert("Gagal mengunggah status ke server.");
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveFile = () => {
-    localStorage.removeItem(customSurveyKey);
-    setCustomSurveyFileName("");
-    setCustomSurveyPatientCount(0);
-    setCustomSurveyUploaded(false);
+  const handleRemoveFile = async () => {
+    try {
+      await api.deleteCustomSurveyMetadata(hospitalCode, diseaseSpecialtyKey);
+      setCustomSurveyFileName("");
+      setCustomSurveyPatientCount(0);
+      setCustomSurveyUploaded(false);
+    } catch (err) {
+      console.error("Failed to remove file:", err);
+    }
   };
 
   const targetPatientCount = 30;
@@ -197,24 +200,21 @@ export function PatientReportPage() {
 
   // Check progress for ALL diseases (background)
   const checkAllDiseasesProgress = useCallback(async () => {
-    if (!specialty || !diseases.length) return;
+    if (!specData) return;
+    
     const progress: Record<number, number> = {};
     for (let i = 0; i < diseases.length; i++) {
       const dKey = `${specialty}-d${i}`;
       const surveys = await api.getSurveys(hospitalCode, dKey);
       
-      // Also check for PDF upload
-      const customKey = `custom-survey-${hospitalCode}-${dKey}`;
-      const customExists = localStorage.getItem(customKey);
-      let customCount = 0;
-      if (customExists) {
-        try { customCount = JSON.parse(customExists).patientCount || 30; } catch {}
-      }
+      // Check for PDF upload via API
+      const customData = await api.getCustomSurveyMetadata(hospitalCode, dKey);
+      const customCount = customData ? customData.patientCount : 0;
       
       progress[i] = surveys.length + customCount;
     }
     setDiseaseCompletion(progress);
-  }, [hospitalCode, specialty, diseases.length]);
+  }, [hospitalCode, specialty, diseases.length, specData]);
 
   // Initial load and on disease tab change
   useEffect(() => {
