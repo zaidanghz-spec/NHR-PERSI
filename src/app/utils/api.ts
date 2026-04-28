@@ -187,10 +187,10 @@ export async function addHospitalAccount(acc: any): Promise<void> {
   });
 }
 
-export async function getAllHospitalAccounts(): Promise<any[]> {
+export async function getAllHospitalAccounts(): Promise<any[] | null> {
   await initTursoTables();
   const db = getTurso();
-  if (!db) return [];
+  if (!db) return null; // null = no connection, [] = genuinely empty
 
   try {
     const rs = await db.execute("SELECT * FROM hospital_accounts ORDER BY registered_at DESC");
@@ -208,7 +208,7 @@ export async function getAllHospitalAccounts(): Promise<any[]> {
     }));
   } catch (err) {
     console.error("Get Accounts Error:", err);
-    return [];
+    return null;
   }
 }
 
@@ -254,10 +254,10 @@ export async function addSubmission(submission: any): Promise<void> {
   }
 }
 
-export async function getAllSubmissions(): Promise<any[]> {
+export async function getAllSubmissions(): Promise<any[] | null> {
   await initTursoTables();
   const db = getTurso();
-  if (!db) return [];
+  if (!db) return null;
 
   try {
     const rs = await db.execute("SELECT * FROM submissions ORDER BY created_at DESC");
@@ -273,7 +273,7 @@ export async function getAllSubmissions(): Promise<any[]> {
     }));
   } catch (err) {
     console.error("Get Submissions Error:", err);
-    return [];
+    return null;
   }
 }
 
@@ -366,10 +366,10 @@ export async function unpublishRankingFromDb(submissionId: string): Promise<void
   }
 }
 
-export async function getAllRankingsFromDb(): Promise<any[]> {
+export async function getAllRankingsFromDb(): Promise<any[] | null> {
   await initTursoTables();
   const db = getTurso();
-  if (!db) return [];
+  if (!db) return null;
 
   try {
     const rs = await db.execute("SELECT * FROM rankings ORDER BY final_score DESC");
@@ -389,7 +389,7 @@ export async function getAllRankingsFromDb(): Promise<any[]> {
     }));
   } catch (err) {
     console.error("Get All Rankings Error:", err);
-    return [];
+    return null;
   }
 }
 
@@ -428,10 +428,10 @@ export async function deleteNewsFromDb(id: string): Promise<void> {
   }
 }
 
-export async function getAllNews(): Promise<any[]> {
+export async function getAllNews(): Promise<any[] | null> {
   await initTursoTables();
   const db = getTurso();
-  if (!db) return [];
+  if (!db) return null;
 
   try {
     const rs = await db.execute("SELECT * FROM news ORDER BY published_at DESC");
@@ -449,7 +449,7 @@ export async function getAllNews(): Promise<any[]> {
     }));
   } catch (err) {
     console.error("Get All News Error:", err);
-    return [];
+    return null;
   }
 }
 
@@ -489,10 +489,10 @@ export async function deleteEventFromDb(id: string): Promise<void> {
   }
 }
 
-export async function getAllEvents(): Promise<any[]> {
+export async function getAllEvents(): Promise<any[] | null> {
   await initTursoTables();
   const db = getTurso();
-  if (!db) return [];
+  if (!db) return null;
 
   try {
     const rs = await db.execute("SELECT * FROM events ORDER BY date ASC");
@@ -511,7 +511,7 @@ export async function getAllEvents(): Promise<any[]> {
     }));
   } catch (err) {
     console.error("Get All Events Error:", err);
-    return [];
+    return null;
   }
 }
 
