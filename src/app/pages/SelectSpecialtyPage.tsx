@@ -62,7 +62,10 @@ export function SelectSpecialtyPage() {
   };
 
   const submittedSpecialties = submissions
-    .filter(s => s.hospitalName === (authData?.hospitalName || currentHospital?.hospitalName))
+    .filter(s => 
+      s.hospitalName === (authData?.hospitalName || currentHospital?.hospitalName) && 
+      (s.status === "Pending" || s.status === "Approved")
+    )
     .map(s => s.specialty);
 
   const handleStartAssessment = () => {
