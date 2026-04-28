@@ -660,16 +660,27 @@ export async function registerPatient(
   try {
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
     
-    // Dynamically determine column names to avoid 'NOT NULL' errors on different schema versions
+    // BE AGGRESSIVE: Find all columns that might be hospital code or RM and fill them ALL 
     const info = await db.execute("PRAGMA table_info(patients)");
     const existingCols = info.rows.map((r: any) => r.name);
     
-    let hCol = existingCols.includes("hospital_code") ? "hospital_code" : (existingCols.includes("hospitalCode") ? "hospitalCode" : "hospital_code");
-    let rmCol = existingCols.includes("rm") ? "rm" : (existingCols.includes("patient_rm") ? "patient_rm" : "rm");
+    // Logic to find all matching columns (case-insensitive and common variants)
+    const hCols = existingCols.filter(c => c.toLowerCase() === "hospitalcode" || c.toLowerCase() === "hospital_code");
+    const rCols = existingCols.filter(c => c.toLowerCase() === "rm" || c.toLowerCase() === "patientrm" || c.toLowerCase() === "patient_rm");
     
-    // Check if duplicate RM
+    // Build SQL dynamically based on what exists
+    const columns = ["id", "specialty", "name", ...hCols, ...rCols];
+    const placeholders = columns.map(() => "?").join(", ");
+    const args = [id, specialty, patient.name];
+    hCols.forEach(() => args.push(hospitalCode));
+    rCols.forEach(() => args.push(patient.rm || ""));
+
+    // Check duplicate using the first available hospital code and RM columns
+    const hColForSelect = hCols[0] || "hospital_code";
+    const rmColForSelect = rCols[0] || "rm";
+
     const existing = await db.execute({
-      sql: `SELECT id FROM patients WHERE ${hCol} = ? AND specialty = ? AND ${rmCol} = ?`,
+      sql: `SELECT id FROM patients WHERE ${hColForSelect} = ? AND specialty = ? AND ${rmColForSelect} = ?`,
       args: [hospitalCode, specialty, patient.rm || ""]
     });
     
@@ -678,8 +689,8 @@ export async function registerPatient(
     }
 
     await db.execute({
-      sql: `INSERT INTO patients (id, ${hCol}, specialty, name, ${rmCol}) VALUES (?, ?, ?, ?, ?)`,
-      args: [id, hospitalCode, specialty, patient.name, patient.rm]
+      sql: `INSERT INTO patients (${columns.join(", ")}) VALUES (${placeholders})`,
+      args: args
     });
     
     return { success: true, patient: { id, name: patient.name, rm: patient.rm } };
