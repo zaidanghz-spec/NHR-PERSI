@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { SimpleSelect } from "../components/SimpleSelect";
@@ -19,7 +20,14 @@ export function SiapAdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
-  const { submissions } = useData();
+  const { submissions, unpublishRanking, updateSubmissionStatus } = useData();
+
+  const handleUnpublish = (id: string) => {
+    if (window.confirm("Apakah Anda yakin ingin menarik submission ini dari Ranking publik?")) {
+      unpublishRanking(id);
+      updateSubmissionStatus(id, "Pending", "Ranking ditarik untuk peninjauan ulang oleh Admin Pusat.");
+    }
+  };
 
   const filteredSubmissions = submissions.filter((submission) => {
     const matchesSearch =
@@ -282,12 +290,25 @@ export function SiapAdminDashboardPage() {
                         <StatusBadge status={submission.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Link to={`/siap-persi/admin/review/${submission.id}`}>
-                          <Button size="sm" className="bg-[#0F4C81] hover:bg-[#0d3d66]">
-                            <Eye className="w-4 h-4 mr-2" />
-                            Review
-                          </Button>
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link to={`/siap-persi/admin/review/${submission.id}`}>
+                            <Button size="sm" className="bg-[#0F4C81] hover:bg-[#0d3d66]">
+                              <Eye className="w-4 h-4 mr-2" />
+                              Review
+                            </Button>
+                          </Link>
+                          {submission.status === "Approved" && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="border-amber-500 text-amber-600 hover:bg-amber-50"
+                              onClick={() => handleUnpublish(submission.id)}
+                            >
+                              <RotateCcw className="w-4 h-4 mr-1" />
+                              Pull Back
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
