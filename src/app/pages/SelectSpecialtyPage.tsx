@@ -396,6 +396,7 @@ function SpecialtyCard({
   isSelected,
   onToggle,
   onStartSingleAssessment,
+  isLocked,
 }: {
   specialty: {
     id: string;
