@@ -117,8 +117,8 @@ const cardiologyRsbkItems: RsbkItem[] = [
   // ASPEK KEPERAWATAN (SIAP PERSI)
   { id: "sdm-ners-spkmb-cv", name: "Jumlah Ners Sp.KMB (Spesialis Keperawatan Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
   { id: "sdm-ners-cert-cv", name: "Jumlah Ners dan Sertifikasi/ Fellowship Keperawatan Kardiovaskuler", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-cv-total", name: "Jumlah Ners (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
-  { id: "sdm-perawat-d3-cv", name: "Jumlah Perawat D3 (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-ners-cv-total", name: "Jumlah Ners", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-cv", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const cardiologyDiseases: DiseaseAudit[] = [
@@ -277,8 +277,8 @@ const neurologyRsbkItems: RsbkItem[] = [
   // ASPEK KEPERAWATAN (SIAP PERSI)
   { id: "sdm-ners-spkmb-neuro", name: "Jumlah Ners Sp.KMB (Spesialis Keperawatan Medikal Bedah)", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
   { id: "sdm-ners-cert-neuro", name: "Jumlah Ners dan Sertifikasi/Fellowship Keperawatan Neurologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-neuro-total", name: "Jumlah Ners (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
-  { id: "sdm-perawat-d3-neuro", name: "Jumlah D3 (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-ners-neuro-total", name: "Jumlah Ners", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-neuro", name: "Jumlah D3", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const neurologyDiseases: DiseaseAudit[] = [
@@ -393,8 +393,8 @@ const oncologyRsbkItems: RsbkItem[] = [
   // ASPEK KEPERAWATAN (SIAP PERSI)
   { id: "sdm-ners-sp-onk", name: "Jumlah Ners Sp.Kep Onkologi", category: "sdm", subCategory: "Keperawatan", target: 1, pointPerUnit: 1, inputUnit: "orang" },
   { id: "sdm-ners-cert-onk", name: "Jumlah Ners dan Sertifikasi/Fellowship Keperawatan Onkologi", category: "sdm", subCategory: "Keperawatan", target: 2, pointPerUnit: 1, inputUnit: "orang" },
-  { id: "sdm-ners-onk-total", name: "Jumlah Ners (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
-  { id: "sdm-perawat-d3-onk", name: "Jumlah Perawat D3 (tidak dimasukan ke rumus)", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-ners-onk-total", name: "Jumlah Ners", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
+  { id: "sdm-perawat-d3-onk", name: "Jumlah Perawat D3", category: "sdm", subCategory: "Keperawatan", target: 0, pointPerUnit: 0, inputUnit: "orang" },
 ];
 
 const oncologyDiseases: DiseaseAudit[] = [
