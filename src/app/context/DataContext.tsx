@@ -531,10 +531,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Admin Auth
   const adminLogin = useCallback((email: string, password: string): boolean => {
-    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || "admin@persi";
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || "admin123!";
+    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
     
-    if (email === adminEmail && password === adminPassword) {
+    if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
       setIsAdmin(true);
       sessionStorage.setItem("persi_admin", "true");
       return true;

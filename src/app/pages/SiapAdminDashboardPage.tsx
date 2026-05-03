@@ -20,7 +20,7 @@ export function SiapAdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
-  const { submissions, unpublishRanking, updateSubmissionStatus } = useData();
+  const { isAdmin, submissions, unpublishRanking, updateSubmissionStatus } = useData();
 
   const handleUnpublish = (id: string) => {
     if (window.confirm("Apakah Anda yakin ingin menarik submission ini dari Ranking publik?")) {
@@ -63,6 +63,27 @@ export function SiapAdminDashboardPage() {
     { name: "Approved", value: stats.approved, color: "#10B981" },
     { name: "Revision Required", value: stats.revision, color: "#EF4444" },
   ];
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-xl font-[700] text-gray-900 mb-2">
+            Akses Ditolak
+          </h2>
+          <p className="text-gray-500 mb-4">
+            Anda harus login sebagai admin untuk mengakses halaman ini.
+          </p>
+          <Link to="/admin/login">
+            <Button className="bg-[#1E3A8A] hover:bg-[#1a3278]">
+              Login Admin
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">

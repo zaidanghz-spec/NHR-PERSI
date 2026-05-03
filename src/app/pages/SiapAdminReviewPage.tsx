@@ -60,7 +60,7 @@ export function SiapAdminReviewPage() {
   const [adminScoreNotes, setAdminScoreNotes] = useState<Record<string, string>>({});
   const [scoreSaved, setScoreSaved] = useState(false);
 
-  const { submissions, updateSubmissionStatus, publishRanking, hospitalAccounts } = useData();
+  const { isAdmin, submissions, updateSubmissionStatus, publishRanking, hospitalAccounts } = useData();
   const actualSubmission = submissions.find(s => s.id === id);
 
   // Load custom survey PDFs — filtered to THIS submission's hospital only
@@ -236,6 +236,27 @@ export function SiapAdminReviewPage() {
     (adminScores.rsbk !== actualSubmission.scores.rsbk ||
      adminScores.clinicalAudit !== actualSubmission.scores.clinicalAudit ||
      adminScores.patientReport !== actualSubmission.scores.patientReport);
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <XCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-xl font-[700] text-gray-900 mb-2">
+            Akses Ditolak
+          </h2>
+          <p className="text-gray-500 mb-4">
+            Anda harus login sebagai admin untuk mengakses halaman review.
+          </p>
+          <Link to="/admin/login">
+            <Button className="bg-[#1E3A8A] hover:bg-[#1a3278]">
+              Login Admin
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
