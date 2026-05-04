@@ -2,14 +2,14 @@ import { Link, useLocation, useNavigate, useOutlet } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Building2,
-  User,
   Menu,
   X,
-  ChevronDown,
   LogOut,
   Shield,
   LayoutDashboard,
   ExternalLink,
+  ClipboardCheck,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { useData } from "../context/DataContext";
@@ -20,9 +20,13 @@ export function Root() {
   const outlet = useOutlet();
   const { isAdmin, adminLogout, currentHospital, hospitalLogout } = useData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/siap-persi/admin");
   const isAdminLoginRoute = location.pathname === "/admin/login";
+  const isHospitalPortalRoute =
+    location.pathname === "/submit" ||
+    location.pathname === "/submit-performance" ||
+    location.pathname === "/hospital/hasil-penilaian" ||
+    (location.pathname.startsWith("/siap-persi") && !location.pathname.startsWith("/siap-persi/admin"));
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
@@ -37,20 +41,29 @@ export function Root() {
     { label: "Metodologi", to: "/methodology" },
   ];
 
-  const isLoggedIn = Boolean(currentHospital);
-  const userName = currentHospital?.hospitalName || "";
-
-  const handleLogout = () => {
-    if (isAdmin) adminLogout();
-    if (currentHospital) hospitalLogout();
-    setUserMenuOpen(false);
-    navigate("/");
-  };
-
   const adminShellLogout = () => {
     adminLogout();
     navigate("/admin/login");
   };
+
+  const hospitalShellLogout = () => {
+    hospitalLogout();
+    navigate("/");
+  };
+
+  const hospitalAuth = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const hospitalName = currentHospital?.hospitalName || hospitalAuth.hospitalName || "Rumah Sakit";
+  const hospitalCode =
+    hospitalAuth.hospitalCode ||
+    currentHospital?.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) ||
+    hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) ||
+    "Portal RS";
 
   if (isAdminRoute) {
     if (isAdminLoginRoute) {
@@ -157,6 +170,116 @@ export function Root() {
     );
   }
 
+  if (isHospitalPortalRoute) {
+    const hospitalLinks = [
+      { label: "Home Portal", to: "/submit", icon: LayoutDashboard },
+      { label: "Pengisian Data", to: "/siap-persi/select-specialty", icon: ClipboardCheck },
+      { label: "Hasil & Review", to: "/hospital/hasil-penilaian", icon: FileText },
+      { label: "Website Publik", to: "/", icon: ExternalLink },
+    ];
+
+    const isHospitalLinkActive = (to: string) => {
+      if (to === "/siap-persi/select-specialty") {
+        return location.pathname.startsWith("/siap-persi") && !location.pathname.startsWith("/siap-persi/admin");
+      }
+      if (to === "/") return location.pathname === "/";
+      return location.pathname.startsWith(to);
+    };
+
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col">
+          <div className="px-6 py-6 border-b border-white/10">
+            <Link to="/submit" className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-white/10 rounded-xl flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-teal-300" />
+              </div>
+              <div>
+                <div className="font-black leading-tight">NHR PERSI</div>
+                <div className="text-xs text-slate-400">Portal Rumah Sakit</div>
+              </div>
+            </Link>
+          </div>
+
+          <div className="px-6 py-5 border-b border-white/10">
+            <div className="text-xs font-black uppercase tracking-widest text-teal-300 mb-2">Akun RS</div>
+            <div className="font-bold leading-tight truncate">{hospitalName}</div>
+            <div className="text-xs text-slate-400 mt-1">Kode: {hospitalCode}</div>
+          </div>
+
+          <nav className="flex-1 px-4 py-5 space-y-1">
+            {hospitalLinks.map(link => {
+              const Icon = link.icon;
+              const active = isHospitalLinkActive(link.to);
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${
+                    active ? "bg-white text-slate-950" : "text-slate-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="p-4 border-t border-white/10">
+            <button
+              onClick={hospitalShellLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-200 hover:bg-red-500/10 hover:text-red-100 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout RS
+            </button>
+          </div>
+        </aside>
+
+        <div className="lg:pl-72 min-h-screen flex flex-col">
+          <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+            <div className="h-16 px-6 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-teal-600">Portal Rumah Sakit</p>
+                <p className="font-black text-slate-900 truncate max-w-[54vw]">{hospitalName}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/"
+                  className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Lihat Website Publik
+                </Link>
+                <button
+                  onClick={hospitalShellLogout}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-950 text-white text-sm font-bold hover:bg-slate-800"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <AnimatePresence mode="wait">
+            <motion.main
+              key={location.pathname}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="flex-1"
+            >
+              {outlet}
+            </motion.main>
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Header */}
@@ -211,49 +334,6 @@ export function Root() {
               >
                 Portal Rumah Sakit
               </Link>
-
-              {/* User Menu */}
-              {isLoggedIn ? (
-                <div className="relative">
-                  <button
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="w-8 h-8 bg-[#1E3A8A] rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="text-sm font-[500] text-gray-700 hidden md:inline max-w-[120px] truncate">
-                      {userName}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-                  {userMenuOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setUserMenuOpen(false)}
-                      />
-                      <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-2">
-                        <div className="px-4 py-2 border-b border-gray-100">
-                          <p className="text-sm font-[600] text-gray-900 truncate">
-                            {userName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Rumah Sakit
-                          </p>
-                        </div>
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          Logout
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : null}
 
               {/* Mobile Menu Toggle */}
               <button

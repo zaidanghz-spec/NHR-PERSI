@@ -5,7 +5,6 @@ import {
   User,
   Mail,
   ArrowRight,
-  LogOut,
   Shield,
   ClipboardCheck,
   Calendar,
@@ -17,7 +16,7 @@ import { getHospitalCode } from "../utils/api";
 
 export function HospitalSubmissionPage() {
   const navigate = useNavigate();
-  const { currentHospital, hospitalLogout } = useData();
+  const { currentHospital } = useData();
   const [authData, setAuthData] = useState<{ hospitalName: string; picName: string; hospitalCode?: string; email?: string } | null>(null);
 
   // Check authentication on mount
@@ -198,22 +197,6 @@ export function HospitalSubmissionPage() {
               • Anda dapat menyimpan draft dan melanjutkan pengisian di lain waktu
             </p>
           </div>
-        </div>
-
-        {/* Logout */}
-        <div className="text-center">
-          <Button
-            variant="outline"
-            onClick={() => {
-              hospitalLogout();
-              sessionStorage.removeItem("hospitalAuth");
-              navigate("/");
-            }}
-            className="border-2 border-gray-300"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
         </div>
       </div>
     </div>
