@@ -581,17 +581,63 @@ async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data }: an
   });
 }
 
+async function saveCustomSurveyPdfChunk({ hospitalCode, specialtyKey, index, total, chunk }: any) {
+  await initTursoTables();
+  const client = db();
+  const draftId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
+  const info = await client.execute("PRAGMA table_info(drafts)");
+  const cols = info.rows.map((r: any) => r.name);
+  const hCol = cols.find((c: string) => ["hospitalcode", "hospital_code"].includes(c.toLowerCase())) || "hospital_code";
+  const sCol = cols.find((c: string) => ["specialty", "specialty_name"].includes(c.toLowerCase())) || "specialty";
+
+  await client.execute({
+    sql: `INSERT INTO drafts (id, type, ${hCol}, ${sCol}, data)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP`,
+    args: [
+      draftId,
+      "custom-survey-pdf",
+      hospitalCode,
+      specialtyKey,
+      JSON.stringify({ index, total, chunk }),
+    ],
+  });
+}
+
 async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
   await initTursoTables();
   const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
   const rs = await db().execute({ sql: "SELECT data FROM drafts WHERE id = ?", args: [draftId] });
-  return rs.rows[0] ? parseJson((rs.rows[0] as any).data, null) : null;
+  if (!rs.rows[0]) return null;
+
+  const metadata = parseJson((rs.rows[0] as any).data, null);
+  if (!metadata?.pdfStoredInChunks || !metadata?.pdfChunkCount) return metadata;
+
+  const chunks: string[] = [];
+  for (let index = 0; index < metadata.pdfChunkCount; index++) {
+    const chunkId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
+    const chunkRs = await db().execute({ sql: "SELECT data FROM drafts WHERE id = ?", args: [chunkId] });
+    const parsed = chunkRs.rows[0] ? parseJson((chunkRs.rows[0] as any).data, null) : null;
+    chunks.push(parsed?.chunk || "");
+  }
+
+  return {
+    ...metadata,
+    base64: chunks.join(""),
+  };
 }
 
 async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
   await initTursoTables();
   const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
+  const existing = await getCustomSurveyMetadata({ hospitalCode, specialtyKey });
   await db().execute({ sql: "DELETE FROM drafts WHERE id = ?", args: [draftId] });
+  if (existing?.pdfChunkCount) {
+    for (let index = 0; index < existing.pdfChunkCount; index++) {
+      const chunkId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
+      await db().execute({ sql: "DELETE FROM drafts WHERE id = ?", args: [chunkId] });
+    }
+  }
 }
 
 async function removePatient({ hospitalCode, patientId }: any) {
@@ -686,6 +732,7 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   registerPatient,
   getPatients,
   saveCustomSurveyMetadata,
+  saveCustomSurveyPdfChunk,
   getCustomSurveyMetadata,
   deleteCustomSurveyMetadata,
   removePatient,

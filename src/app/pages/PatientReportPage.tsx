@@ -148,9 +148,9 @@ export function PatientReportPage() {
         setCustomSurveyPatientCount(doc.patientCount);
         setCustomSurveyUploaded(true);
         alert(`Dokumen survei PREM/PROM untuk ${activeDisease?.diseaseName} berhasil diunggah! Tim admin PERSI akan meninjau dan memberikan penilaian.`);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Upload error:", err);
-        alert("Gagal mengunggah status ke server.");
+        alert(`Gagal mengunggah status ke server: ${err.message || "silakan coba PDF yang lebih kecil."}`);
       }
     };
     reader.readAsDataURL(file);
