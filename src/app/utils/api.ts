@@ -8,9 +8,17 @@ async function rpc<T>(operation: string, payload: Record<string, any> = {}): Pro
     body: JSON.stringify(payload),
   });
 
-  const body = await response.json().catch(() => ({}));
+  const raw = await response.text();
+  let body: any = {};
+  try {
+    body = raw ? JSON.parse(raw) : {};
+  } catch {
+    body = {};
+  }
+
   if (!response.ok) {
-    throw new Error(body.error || `API request failed: ${operation}`);
+    const details = body.error || raw || response.statusText || "Unknown server error";
+    throw new Error(`${operation} failed (${response.status}): ${details}`);
   }
 
   return body.result as T;
