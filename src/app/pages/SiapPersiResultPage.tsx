@@ -8,6 +8,11 @@ import { useData } from "../context/DataContext";
 import { draftManager } from "../utils/draftManager";
 import * as api from "../utils/api";
 
+type PatientCountBreakdown = {
+  diseaseName: string;
+  count: number;
+};
+
 export function SiapPersiResultPage() {
   const { specialty } = useParams<{ specialty: string }>();
   const navigate = useNavigate();
@@ -84,6 +89,30 @@ export function SiapPersiResultPage() {
 
   const [auditPatientCount, setAuditPatientCount] = useState(sessionStorage.getItem(`${specialty}_auditPatientCount`) || "0");
   const [prmPatientCount, setPrmPatientCount] = useState(sessionStorage.getItem(`${specialty}_prmPatientCount`) || "0");
+  const [auditPatientBreakdown, setAuditPatientBreakdown] = useState<PatientCountBreakdown[]>([]);
+  const [prmPatientBreakdown, setPrmPatientBreakdown] = useState<PatientCountBreakdown[]>([]);
+  const [showBackChoice, setShowBackChoice] = useState(false);
+
+  const renderPatientCount = (total: string, breakdown: PatientCountBreakdown[], unit: string) => {
+    const totalTarget = Math.max(1, breakdown.length) * 30;
+    return (
+      <div className="space-y-1">
+        <div className="text-xs text-gray-500">Total {total}/{totalTarget} {unit}</div>
+        {breakdown.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {breakdown.map((item) => (
+              <span
+                key={item.diseaseName}
+                className="inline-flex rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600"
+              >
+                {item.diseaseName}: {item.count}/30
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     async function recoverCounts() {
@@ -93,42 +122,86 @@ export function SiapPersiResultPage() {
 
       // 1. Recover PRM Count
       let totalPRM = 0;
+      const prmBreakdown: PatientCountBreakdown[] = [];
       if (specialtyInfo) {
         for (let i = 0; i < specialtyInfo.diseases.length; i++) {
           const dKey = `${specialty}-d${i}`;
           try {
             const surveys = await api.getSurveys(hCode, dKey);
             const customData = await api.getCustomSurveyMetadata(hCode, dKey);
-            totalPRM += surveys.length + (customData ? (customData.patientCount || 0) : 0);
+            const count = surveys.length + (customData ? (customData.patientCount || 0) : 0);
+            totalPRM += count;
+            prmBreakdown.push({
+              diseaseName: specialtyInfo.diseases[i]?.diseaseName || `Penyakit ${i + 1}`,
+              count,
+            });
           } catch {}
         }
       }
+      setPrmPatientBreakdown(prmBreakdown);
       setPrmPatientCount(totalPRM.toString());
       sessionStorage.setItem(`${specialty}_prmPatientCount`, totalPRM.toString());
 
       // 2. Recover Audit Count (from Draft)
-      const draftKey = `nhr_persi_audit_draft_${specialty}`;
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        try {
-          const parsed = JSON.parse(savedDraft);
-          const formData = parsed.formData || {};
-          let totalAudit = 0;
-          if (specialtyInfo) {
+      let totalAudit = 0;
+      const auditBreakdown: PatientCountBreakdown[] = [];
+      if (specialtyInfo) {
+        const currentDraft = draftId ? draftManager.getDraftById(draftId) : null;
+        const progressAudit = currentDraft?.progress?.[specialty]?.clinicalAudit;
+        let auditSource: any = progressAudit?.data && Object.keys(progressAudit.data).length > 0
+          ? {
+              formData: progressAudit.data,
+              patientMeta: progressAudit.patientMeta || {},
+            }
+          : null;
+
+        if (!auditSource) {
+          try {
+            const savedDraft = localStorage.getItem(`clinical-audit-draft-${hCode}-${specialty}`);
+            if (savedDraft) auditSource = JSON.parse(savedDraft);
+          } catch {}
+        }
+
+        if (auditSource?.formData || auditSource?.data) {
+          const formData = auditSource.formData || auditSource.data || {};
+          const patientMeta = auditSource.patientMeta || {};
+          const makeKey = (diseaseIdx: number, patientNum: number, questionId: string) =>
+            `d${diseaseIdx}-${patientNum}-${questionId}`;
+          const makePatientKey = (diseaseIdx: number, patientNum: number) =>
+            `d${diseaseIdx}-${patientNum}`;
+
+          specialtyInfo.diseases.forEach((d, dIdx) => {
+            let diseaseCount = 0;
+            for (let p = 1; p <= 30; p++) {
+              const meta = patientMeta[makePatientKey(dIdx, p)] || { initials: "", code: "" };
+              const isComplete = Boolean(meta.initials?.trim() && meta.code?.trim()) &&
+                d.questions.every(q => formData[makeKey(dIdx, p, q.id)]);
+              if (isComplete) diseaseCount++;
+            }
+            totalAudit += diseaseCount;
+            auditBreakdown.push({ diseaseName: d.diseaseName, count: diseaseCount });
+          });
+        } else {
+          try {
+            const auditPatients = JSON.parse(sessionStorage.getItem(`${specialty}_auditPatients`) || "[]");
             specialtyInfo.diseases.forEach((d, dIdx) => {
-              for (let p = 1; p <= 30; p++) {
-                const isComplete = d.questions.every(q => formData[`${dIdx}_p${p}_q${q.id}`]);
-                if (isComplete) totalAudit++;
-              }
+              const diseaseCount = auditPatients.filter((patient: any) =>
+                patient.diseaseIndex === dIdx && patient.isComplete
+              ).length;
+              totalAudit += diseaseCount;
+              auditBreakdown.push({ diseaseName: d.diseaseName, count: diseaseCount });
             });
+          } catch {
+            specialtyInfo.diseases.forEach((d) => auditBreakdown.push({ diseaseName: d.diseaseName, count: 0 }));
           }
-          setAuditPatientCount(totalAudit.toString());
-          sessionStorage.setItem(`${specialty}_auditPatientCount`, totalAudit.toString());
-        } catch {}
+        }
       }
+      setAuditPatientBreakdown(auditBreakdown);
+      setAuditPatientCount(totalAudit.toString());
+      sessionStorage.setItem(`${specialty}_auditPatientCount`, totalAudit.toString());
     }
     recoverCounts();
-  }, [specialty, specialtyInfo]);
+  }, [specialty, specialtyInfo, draftId]);
 
   const handleContinueToNext = () => {
     if (nextSpecialty) {
@@ -375,7 +448,7 @@ export function SiapPersiResultPage() {
                 <tr className="border-b border-gray-200 bg-purple-50/50">
                   <td className="py-4 px-4">
                     <div className="font-medium text-gray-900">Clinical Audit</div>
-                    <div className="text-xs text-gray-500">{auditPatientCount}/30 rekam medis pasien</div>
+                    {renderPatientCount(auditPatientCount, auditPatientBreakdown, "rekam medis pasien")}
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-purple-700">{clinicalAuditScore}</td>
                   <td className="py-4 px-4 text-center text-gray-600">60%</td>
@@ -389,7 +462,7 @@ export function SiapPersiResultPage() {
                 <tr className="border-b border-gray-200 bg-teal-50/50">
                   <td className="py-4 px-4">
                     <div className="font-medium text-gray-900">Patient Report (PREM & PROM)</div>
-                    <div className="text-xs text-gray-500">{prmPatientCount}/30 pasien</div>
+                    {renderPatientCount(prmPatientCount, prmPatientBreakdown, "pasien")}
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-teal-700">{patientReportScore}</td>
                   <td className="py-4 px-4 text-center text-gray-600">25%</td>
@@ -446,7 +519,7 @@ export function SiapPersiResultPage() {
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
                 <div>
                   <p className="font-semibold text-gray-900">Clinical Audit</p>
-                  <p className="text-sm text-gray-600">{auditPatientCount}/30 rekam medis pasien</p>
+                  {renderPatientCount(auditPatientCount, auditPatientBreakdown, "rekam medis pasien")}
                 </div>
               </div>
               <div className="text-right">
@@ -460,7 +533,7 @@ export function SiapPersiResultPage() {
                 <CheckCircle2 className="w-6 h-6 text-green-600" />
                 <div>
                   <p className="font-semibold text-gray-900">Patient Report (PREM & PROM)</p>
-                  <p className="text-sm text-gray-600">{prmPatientCount}/30 pasien</p>
+                  {renderPatientCount(prmPatientCount, prmPatientBreakdown, "pasien")}
                 </div>
               </div>
               <div className="text-right">
@@ -541,7 +614,7 @@ export function SiapPersiResultPage() {
         <div className="flex gap-4">
           <Button
             variant="outline"
-            onClick={() => navigate("/siap-persi/select-specialty")}
+            onClick={() => setShowBackChoice(true)}
             className="h-12 px-8 border-2 border-gray-300 font-semibold"
           >
             Kembali
@@ -565,6 +638,39 @@ export function SiapPersiResultPage() {
             </Button>
           )}
         </div>
+
+        {showBackChoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Kembali ke mana?</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Pilih tujuan setelah review data submission ini.
+              </p>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => navigate("/siap-persi/select-specialty")}
+                  className="w-full h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold"
+                >
+                  Ke Halaman Pengisian Data
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/submit")}
+                  className="w-full h-12 border-2 border-gray-300 font-semibold"
+                >
+                  Ke Home Portal Rumah Sakit
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowBackChoice(false)}
+                  className="w-full h-11 font-semibold"
+                >
+                  Batal
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

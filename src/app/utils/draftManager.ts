@@ -18,6 +18,8 @@ export interface DraftData {
       clinicalAudit: {
         completed: boolean;
         data: Record<string, string>;
+        patientMeta?: Record<string, { initials: string; code: string }>;
+        activeDiseaseIndex?: number;
         currentPatient?: number;
         score?: number;
       };
@@ -85,6 +87,8 @@ export const draftManager = {
       completed?: boolean;
       data?: Record<string, any>;
       score?: number;
+      patientMeta?: Record<string, { initials: string; code: string }>;
+      activeDiseaseIndex?: number;
       currentPatient?: number;
       patientCount?: number;
     }
