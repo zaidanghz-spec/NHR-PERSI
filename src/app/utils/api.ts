@@ -184,7 +184,33 @@ export async function getPatients(hospitalCode: string, specialty: string): Prom
   }
 }
 
+const CUSTOM_SURVEY_CHUNK_SIZE = 600_000;
+
 export async function saveCustomSurveyMetadata(hospitalCode: string, specialtyKey: string, data: any): Promise<void> {
+  const base64 = typeof data?.base64 === "string" ? data.base64 : "";
+
+  if (base64.length > CUSTOM_SURVEY_CHUNK_SIZE) {
+    const chunks = base64.match(new RegExp(`.{1,${CUSTOM_SURVEY_CHUNK_SIZE}}`, "g")) || [];
+    const metadata = {
+      ...data,
+      base64: "",
+      pdfStoredInChunks: true,
+      pdfChunkCount: chunks.length,
+    };
+
+    await rpc("saveCustomSurveyMetadata", { hospitalCode, specialtyKey, data: metadata });
+    for (let index = 0; index < chunks.length; index++) {
+      await rpc("saveCustomSurveyPdfChunk", {
+        hospitalCode,
+        specialtyKey,
+        index,
+        total: chunks.length,
+        chunk: chunks[index],
+      });
+    }
+    return;
+  }
+
   await rpc("saveCustomSurveyMetadata", { hospitalCode, specialtyKey, data });
 }
 
