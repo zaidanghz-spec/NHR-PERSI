@@ -471,8 +471,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (err) {
       console.error("Cloud account push failed:", err);
-      // Let caller know it failed (likely due to Payload Too Large)
-      return false;
+      throw err;
     }
   }, [hospitalAccounts]);
 

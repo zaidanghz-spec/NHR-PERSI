@@ -41,7 +41,11 @@ export default async function handler(req: any, res: any) {
   const path = getPath(req);
 
   if (req.method === "GET" && path === "/api/health") {
-    sendJson(res, 200, { status: "ok" });
+    sendJson(res, 200, {
+      status: "ok",
+      tursoDatabaseUrlConfigured: Boolean(process.env.TURSO_DATABASE_URL),
+      tursoAuthTokenConfigured: Boolean(process.env.TURSO_AUTH_TOKEN),
+    });
     return;
   }
 

@@ -160,19 +160,23 @@ export function HospitalLoginPage() {
     const reader = new FileReader();
     reader.onload = async () => {
       const base64Data = reader.result as string;
-      const ok = await registerHospitalFull(
-        regEmail, regPassword, regHospitalName.trim(), regPicName,
-        suratTugasFile.name, base64Data, regProvince, regCity
-      );
-      if (ok) {
-        setSuccess(`Registrasi berhasil untuk ${regHospitalName.trim()}! Akun Anda akan diaktivasi oleh admin PERSI.`);
-        setMode("login");
-        setLoginEmail(regEmail);
-        setRegEmail(""); setRegPassword(""); setRegConfirmPassword("");
-        setRegHospitalName(""); setRegPicName(""); setSuratTugasFile(null);
-        setRegProvince(""); setRegCity(""); setProvinceQuery(""); setCityQuery("");
-      } else {
-        setError("Registrasi gagal. Email mungkin sudah terdaftar, atau file terlalu besar untuk sistem.");
+      try {
+        const ok = await registerHospitalFull(
+          regEmail, regPassword, regHospitalName.trim(), regPicName,
+          suratTugasFile.name, base64Data, regProvince, regCity
+        );
+        if (ok) {
+          setSuccess(`Registrasi berhasil untuk ${regHospitalName.trim()}! Akun Anda akan diaktivasi oleh admin PERSI.`);
+          setMode("login");
+          setLoginEmail(regEmail);
+          setRegEmail(""); setRegPassword(""); setRegConfirmPassword("");
+          setRegHospitalName(""); setRegPicName(""); setSuratTugasFile(null);
+          setRegProvince(""); setRegCity(""); setProvinceQuery(""); setCityQuery("");
+        } else {
+          setError("Registrasi gagal. Email mungkin sudah terdaftar.");
+        }
+      } catch (err: any) {
+        setError(err?.message || "Registrasi gagal karena server tidak bisa menyimpan akun.");
       }
       setLoading(false);
     };
