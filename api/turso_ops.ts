@@ -249,9 +249,14 @@ async function initTursoTables() {
     }
 
     if (table === "submissions") {
+      if (!existingColumns.includes("id")) await client.execute("ALTER TABLE submissions ADD COLUMN id TEXT");
+      if (!existingColumns.includes("hospital_name")) await client.execute("ALTER TABLE submissions ADD COLUMN hospital_name TEXT DEFAULT ''");
       if (!existingColumns.includes("hospital_code")) {
         await client.execute("ALTER TABLE submissions ADD COLUMN hospital_code TEXT DEFAULT ''");
       }
+      if (!existingColumns.includes("specialty")) await client.execute("ALTER TABLE submissions ADD COLUMN specialty TEXT DEFAULT ''");
+      if (!existingColumns.includes("pic_name")) await client.execute("ALTER TABLE submissions ADD COLUMN pic_name TEXT DEFAULT ''");
+      if (!existingColumns.includes("submitted_date")) await client.execute("ALTER TABLE submissions ADD COLUMN submitted_date TEXT DEFAULT ''");
       if (!existingColumns.includes("details")) await client.execute("ALTER TABLE submissions ADD COLUMN details TEXT DEFAULT '{}'");
       if (!existingColumns.includes("scores")) await client.execute("ALTER TABLE submissions ADD COLUMN scores TEXT DEFAULT '{}'");
       if (!existingColumns.includes("status")) await client.execute("ALTER TABLE submissions ADD COLUMN status TEXT DEFAULT 'Pending'");
@@ -355,11 +360,11 @@ async function getAllSubmissions() {
     const details = parseJson(r.details, {});
     return {
       id: r.id,
-      hospitalName: r.hospital_name || details.hospitalName || "",
+      hospitalName: r.hospital_name || r.hospitalName || details.hospitalName || "",
       hospitalCode: r.hospital_code || r.hospitalCode || details.hospitalCode || "",
-      specialty: r.specialty,
-      picName: r.pic_name,
-      submittedDate: r.submitted_date,
+      specialty: r.specialty || details.specialty || "",
+      picName: r.pic_name || r.picName || details.picName || "",
+      submittedDate: r.submitted_date || r.submittedDate || "",
       status: r.status,
       scores: parseJson(r.scores, {}),
       details,
