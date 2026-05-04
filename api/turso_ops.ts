@@ -171,7 +171,7 @@ async function initTursoTables() {
       if (!existingColumns.includes("rm") && !existingColumns.includes("patient_rm")) {
         await client.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''");
       }
-      if (!existingColumns.includes("created_at")) await client.execute("ALTER TABLE patients ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+      if (!existingColumns.includes("created_at")) await client.execute("ALTER TABLE patients ADD COLUMN created_at TEXT DEFAULT ''");
       if (!existingColumns.includes("id")) await client.execute("ALTER TABLE patients ADD COLUMN id TEXT");
       if (existingColumns.includes("hospitalCode") && !existingColumns.includes("hospital_code")) {
         await client.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
