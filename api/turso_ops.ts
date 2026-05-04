@@ -29,6 +29,54 @@ function parseJson(value: unknown, fallback: any) {
   }
 }
 
+async function getDraftSchema(client: any) {
+  const info = await client.execute("PRAGMA table_info(drafts)");
+  const cols = info.rows.map((r: any) => r.name);
+
+  let idCol = cols.find((c: string) => ["id", "draft_id", "draftId"].includes(c));
+  if (!idCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN id TEXT");
+    cols.push("id");
+    idCol = "id";
+  }
+
+  let typeCol = cols.find((c: string) => ["type", "draft_type", "draftType"].includes(c));
+  if (!typeCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN type TEXT NOT NULL DEFAULT ''");
+    cols.push("type");
+    typeCol = "type";
+  }
+
+  let dataCol = cols.find((c: string) => ["data", "draft_data", "draftData"].includes(c));
+  if (!dataCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN data TEXT DEFAULT '{}'");
+    cols.push("data");
+    dataCol = "data";
+  }
+
+  let hCol = cols.find((c: string) => ["hospital_code", "hospitalCode"].includes(c));
+  if (!hCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+    cols.push("hospital_code");
+    hCol = "hospital_code";
+  }
+
+  let sCol = cols.find((c: string) => ["specialty", "specialty_name", "specialtyName"].includes(c));
+  if (!sCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+    cols.push("specialty");
+    sCol = "specialty";
+  }
+
+  let updatedCol = cols.find((c: string) => ["updated_at", "updatedAt"].includes(c));
+  if (!updatedCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN updated_at TEXT DEFAULT ''");
+    updatedCol = "updated_at";
+  }
+
+  return { idCol, typeCol, dataCol, hCol, sCol, updatedCol };
+}
+
 async function initTursoTables() {
   if (tablesInitialized) return;
   const client = db();
@@ -179,8 +227,24 @@ async function initTursoTables() {
     }
 
     if (table === "drafts") {
-      if (!existingColumns.includes("hospital_code")) await client.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
-      if (!existingColumns.includes("specialty")) await client.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.some((c: string) => ["id", "draft_id", "draftId"].includes(c))) {
+        await client.execute("ALTER TABLE drafts ADD COLUMN id TEXT");
+      }
+      if (!existingColumns.some((c: string) => ["type", "draft_type", "draftType"].includes(c))) {
+        await client.execute("ALTER TABLE drafts ADD COLUMN type TEXT NOT NULL DEFAULT ''");
+      }
+      if (!existingColumns.some((c: string) => ["data", "draft_data", "draftData"].includes(c))) {
+        await client.execute("ALTER TABLE drafts ADD COLUMN data TEXT DEFAULT '{}'");
+      }
+      if (!existingColumns.some((c: string) => ["hospital_code", "hospitalCode"].includes(c))) {
+        await client.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+      }
+      if (!existingColumns.some((c: string) => ["specialty", "specialty_name", "specialtyName"].includes(c))) {
+        await client.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+      }
+      if (!existingColumns.some((c: string) => ["updated_at", "updatedAt"].includes(c))) {
+        await client.execute("ALTER TABLE drafts ADD COLUMN updated_at TEXT DEFAULT ''");
+      }
     }
   }
 
@@ -568,46 +632,50 @@ async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data }: an
   await initTursoTables();
   const client = db();
   const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
-  const info = await client.execute("PRAGMA table_info(drafts)");
-  const cols = info.rows.map((r: any) => r.name);
-  const hCol = cols.find((c: string) => ["hospitalcode", "hospital_code"].includes(c.toLowerCase())) || "hospital_code";
-  const sCol = cols.find((c: string) => ["specialty", "specialty_name"].includes(c.toLowerCase())) || "specialty";
+  const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+  const dataJson = JSON.stringify(data);
 
-  await client.execute({
-    sql: `INSERT INTO drafts (id, type, ${hCol}, ${sCol}, data)
-          VALUES (?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP`,
-    args: [draftId, "custom-survey", hospitalCode, specialtyKey, JSON.stringify(data)],
-  });
+  if (existing.rows.length > 0) {
+    await client.execute({
+      sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
+      args: [dataJson, draftId],
+    });
+  } else {
+    await client.execute({
+      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
+      args: [draftId, "custom-survey", hospitalCode, specialtyKey, dataJson],
+    });
+  }
 }
 
 async function saveCustomSurveyPdfChunk({ hospitalCode, specialtyKey, index, total, chunk }: any) {
   await initTursoTables();
   const client = db();
   const draftId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
-  const info = await client.execute("PRAGMA table_info(drafts)");
-  const cols = info.rows.map((r: any) => r.name);
-  const hCol = cols.find((c: string) => ["hospitalcode", "hospital_code"].includes(c.toLowerCase())) || "hospital_code";
-  const sCol = cols.find((c: string) => ["specialty", "specialty_name"].includes(c.toLowerCase())) || "specialty";
+  const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+  const dataJson = JSON.stringify({ index, total, chunk });
 
-  await client.execute({
-    sql: `INSERT INTO drafts (id, type, ${hCol}, ${sCol}, data)
-          VALUES (?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP`,
-    args: [
-      draftId,
-      "custom-survey-pdf",
-      hospitalCode,
-      specialtyKey,
-      JSON.stringify({ index, total, chunk }),
-    ],
-  });
+  if (existing.rows.length > 0) {
+    await client.execute({
+      sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
+      args: [dataJson, draftId],
+    });
+  } else {
+    await client.execute({
+      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
+      args: [draftId, "custom-survey-pdf", hospitalCode, specialtyKey, dataJson],
+    });
+  }
 }
 
 async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
   await initTursoTables();
+  const client = db();
+  const { idCol, dataCol } = await getDraftSchema(client);
   const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
-  const rs = await db().execute({ sql: "SELECT data FROM drafts WHERE id = ?", args: [draftId] });
+  const rs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (!rs.rows[0]) return null;
 
   const metadata = parseJson((rs.rows[0] as any).data, null);
@@ -616,7 +684,7 @@ async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
   const chunks: string[] = [];
   for (let index = 0; index < metadata.pdfChunkCount; index++) {
     const chunkId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
-    const chunkRs = await db().execute({ sql: "SELECT data FROM drafts WHERE id = ?", args: [chunkId] });
+    const chunkRs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [chunkId] });
     const parsed = chunkRs.rows[0] ? parseJson((chunkRs.rows[0] as any).data, null) : null;
     chunks.push(parsed?.chunk || "");
   }
@@ -629,13 +697,15 @@ async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
 
 async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
   await initTursoTables();
+  const client = db();
+  const { idCol } = await getDraftSchema(client);
   const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
   const existing = await getCustomSurveyMetadata({ hospitalCode, specialtyKey });
-  await db().execute({ sql: "DELETE FROM drafts WHERE id = ?", args: [draftId] });
+  await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (existing?.pdfChunkCount) {
     for (let index = 0; index < existing.pdfChunkCount; index++) {
       const chunkId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
-      await db().execute({ sql: "DELETE FROM drafts WHERE id = ?", args: [chunkId] });
+      await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [chunkId] });
     }
   }
 }
@@ -654,21 +724,24 @@ async function removePatient({ hospitalCode, patientId }: any) {
 
 async function getDraft({ type, hospitalCode, specialty }: any) {
   await initTursoTables();
+  const client = db();
+  const { idCol, dataCol } = await getDraftSchema(client);
   const draftId = `${type}-${hospitalCode}-${specialty}`;
-  const rs = await db().execute({ sql: "SELECT data FROM drafts WHERE id = ?", args: [draftId] });
+  const rs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   return rs.rows[0] ? parseJson((rs.rows[0] as any).data, null) : null;
 }
 
 async function saveDraft({ type, hospitalCode, specialty, draft }: any) {
   await initTursoTables();
   const client = db();
+  const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = `${type}-${hospitalCode}-${specialty}`;
-  const existing = await client.execute({ sql: "SELECT id FROM drafts WHERE id = ?", args: [draftId] });
+  const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (existing.rows.length > 0) {
-    await client.execute({ sql: "UPDATE drafts SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", args: [JSON.stringify(draft), draftId] });
+    await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [JSON.stringify(draft), draftId] });
   } else {
     await client.execute({
-      sql: "INSERT INTO drafts (id, type, hospital_code, specialty, data) VALUES (?, ?, ?, ?, ?)",
+      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
       args: [draftId, type, hospitalCode, specialty, JSON.stringify(draft)],
     });
   }
@@ -677,13 +750,14 @@ async function saveDraft({ type, hospitalCode, specialty, draft }: any) {
 async function saveHospitalDraft({ draft }: any) {
   await initTursoTables();
   const client = db();
+  const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = draft.draftId;
-  const existing = await client.execute({ sql: "SELECT id FROM drafts WHERE id = ?", args: [draftId] });
+  const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (existing.rows.length > 0) {
-    await client.execute({ sql: "UPDATE drafts SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", args: [JSON.stringify(draft), draftId] });
+    await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [JSON.stringify(draft), draftId] });
   } else {
     await client.execute({
-      sql: "INSERT INTO drafts (id, type, hospital_code, specialty, data) VALUES (?, ?, ?, ?, ?)",
+      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
       args: [draftId, "hospital-assessment", draft.hospitalName, "Multiple", JSON.stringify(draft)],
     });
   }
@@ -691,13 +765,17 @@ async function saveHospitalDraft({ draft }: any) {
 
 async function getAllHospitalDrafts() {
   await initTursoTables();
-  const rs = await db().execute("SELECT data FROM drafts WHERE type = 'hospital-assessment' ORDER BY updated_at DESC");
+  const client = db();
+  const { typeCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const rs = await client.execute(`SELECT ${dataCol} as data FROM drafts WHERE ${typeCol} = 'hospital-assessment' ORDER BY ${updatedCol} DESC`);
   return rs.rows.map((r: any) => parseJson(r.data, null)).filter(Boolean);
 }
 
 async function deleteHospitalDraft({ draftId }: any) {
   await initTursoTables();
-  await db().execute({ sql: "DELETE FROM drafts WHERE id = ?", args: [draftId] });
+  const client = db();
+  const { idCol } = await getDraftSchema(client);
+  await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
 }
 
 async function bulkAddSurveys({ hospitalCode, specialty, surveys }: any) {
