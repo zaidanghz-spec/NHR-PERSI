@@ -17,8 +17,8 @@ import { specialtyAuditData } from "../data/specialtyAuditData";
 
 export function HospitalReviewResultPage() {
   const navigate = useNavigate();
-  const { currentHospital, submissions } = useData();
-  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string } | null>(null);
+  const { currentHospital, submissions, syncWithCloud } = useData();
+  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string; email?: string; hospitalCode?: string } | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -33,16 +33,34 @@ export function HospitalReviewResultPage() {
       setAuthData({
         hospitalName: currentHospital.hospitalName,
         picName: currentHospital.picName,
+        email: currentHospital.email,
       });
     }
   }, [navigate, currentHospital]);
 
+  useEffect(() => {
+    syncWithCloud().catch(console.error);
+  }, [syncWithCloud]);
+
   if (!authData) return null;
 
+  const normalize = (value?: string) => (value || "").trim().toLowerCase();
+  const deriveHospitalCode = (email?: string) =>
+    email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
+  const authHospitalCode = authData.hospitalCode || deriveHospitalCode(authData.email);
+
   // Get hospital's submissions
-  const hospitalSubmissions = submissions.filter(
-    (s) => s.hospitalName === authData.hospitalName
-  );
+  const hospitalSubmissions = submissions.filter((submission: any) => {
+    const submissionHospitalCode =
+      submission.hospitalCode ||
+      submission.details?.hospitalCode ||
+      submission.details?.hospital?.hospitalCode ||
+      "";
+    return (
+      normalize(submission.hospitalName) === normalize(authData.hospitalName) ||
+      Boolean(authHospitalCode && submissionHospitalCode && authHospitalCode === submissionHospitalCode)
+    );
+  });
 
   const getStatusColor = (status: string) => {
     const s = status.toLowerCase();

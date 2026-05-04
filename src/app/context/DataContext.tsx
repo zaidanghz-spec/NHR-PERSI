@@ -76,6 +76,7 @@ export interface ApprovedRanking {
 export interface SubmissionType {
   id: string;
   hospitalName: string;
+  hospitalCode?: string;
   picName: string;
   specialty: string;
   disease: string;
@@ -222,6 +223,8 @@ interface DataContextType {
   publishRanking: (ranking: Omit<ApprovedRanking, "id">) => void;
 
   submissions: SubmissionType[];
+  addSubmission: (sub: Omit<SubmissionType, "id">) => Promise<void>;
+  updateSubmissionStatus: (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any, revisionNotes?: any) => Promise<void>;
   unpublishRanking: (submissionId: string) => void;
   syncWithCloud: () => Promise<void>;
   forcePushToCloud: () => Promise<boolean>;

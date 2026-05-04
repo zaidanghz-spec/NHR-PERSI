@@ -221,6 +221,8 @@ export function SiapPersiResultPage() {
           final,
         },
         details: { 
+          hospitalCode: hCode || "RS001",
+          hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
           specialties: [{ specialty: info.name, disease: info.disease }],
           rsbkData: specProgress?.rsbk.data || {},
           auditData: auditSummary,
