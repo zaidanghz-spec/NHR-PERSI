@@ -287,6 +287,8 @@ export function PatientReportPage() {
     : surveyResponses.length > 0
       ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / surveyResponses.length)
       : 0;
+  const sampleValidityWeight = getSampleValidityWeight(patientCount);
+  const adjustedOverallScore = Number((overallScore * sampleValidityWeight).toFixed(1));
 
   const progress = Math.min((patientCount / targetPatientCount) * 100, 100);
   const isQRLocked = customSurveyUploaded && customSurveyPatientCount >= 30;
@@ -411,6 +413,7 @@ export function PatientReportPage() {
         const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
         
         let diseaseAvg = 0;
+        let diseasePatientCount = diseaseSurveys.length;
         const customSurveyStorageKey = `custom-survey-${hospitalCode}-${dKey}`;
         const customDocRaw = localStorage.getItem(customSurveyStorageKey);
         
@@ -418,6 +421,7 @@ export function PatientReportPage() {
           // PDF uploaded by RS — use admin-entered scores if available
           try {
             const customDoc = JSON.parse(customDocRaw);
+            diseasePatientCount = customDoc.patientCount || 0;
             // Admin override stored in the custom survey doc (set by SiapAdminReviewPage)
             const adminPrem = typeof customDoc.adminPremScore === "number" ? customDoc.adminPremScore : null;
             const adminProm = typeof customDoc.adminPromScore === "number" ? customDoc.adminPromScore : null;
@@ -457,12 +461,20 @@ export function PatientReportPage() {
         
         const weightMatch = diseases[i].weight.match(/(\d+)%/);
         const weight = weightMatch ? parseInt(weightMatch[1]) / 100 : 1;
-        
-        finalScore += diseaseAvg * weight;
+        const validity = getSampleValidityWeight(diseasePatientCount);
+        const adjustedDiseaseScore = Number((diseaseAvg * validity).toFixed(1));
+
+        prmSummary[`${dKey}_rawScore`] = diseaseAvg.toString();
+        prmSummary[`${dKey}_patientCount`] = diseasePatientCount.toString();
+        prmSummary[`${dKey}_validity`] = Math.round(validity * 100).toString();
+        prmSummary[`${dKey}_adjustedScore`] = adjustedDiseaseScore.toString();
+        prmSummary[`${dKey}_diseaseWeight`] = Math.round(weight * 100).toString();
+
+        finalScore += adjustedDiseaseScore * weight;
       }
     } catch (e) {
       console.error("Failed to fetch all disease surveys for accurate final score:", e);
-      finalScore = overallScore;
+      finalScore = adjustedOverallScore;
     }
 
     let totalPRMPatients = 0;
@@ -1102,15 +1114,29 @@ export function PatientReportPage() {
                   </tbody>
                   <tfoot>
                     <tr className="bg-[#0F4C81]/10">
-                      <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={3}>Total PRM</td>
+                      <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={3}>Total PRM Sebelum Validitas</td>
                       <td className="py-3 px-4 text-center font-bold text-[#0F4C81] text-2xl">{overallScore}</td>
+                    </tr>
+                    <tr className="bg-amber-50">
+                      <td className="py-3 px-4 font-bold text-amber-700" colSpan={3}>
+                        Bobot Validitas Sampel ({patientCount} pasien)
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-amber-700 text-xl">
+                        {(sampleValidityWeight * 100).toFixed(0)}%
+                      </td>
+                    </tr>
+                    <tr className="bg-green-50">
+                      <td className="py-3 px-4 font-black text-green-700 text-lg" colSpan={3}>Skor PRM Penyakit Setelah Validitas</td>
+                      <td className="py-3 px-4 text-center font-black text-green-700 text-2xl">{adjustedOverallScore}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
               <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                <p><strong>Rumus:</strong> Total PRM = (PREM × 60%) + (PROM × 40%)</p>
-                <p className="mt-1">Berdasarkan {patientCount} survei pasien {activeDisease?.diseaseName} yang telah terkumpul via QR Code.</p>
+                <p><strong>Rumus per penyakit:</strong> ((PREM x 60%) + (PROM x 40%)) x bobot validitas sampel.</p>
+                <p className="mt-1">
+                  Skor PRM akhir menjumlahkan skor tiap penyakit setelah validitas dikalikan bobot penyakitnya masing-masing.
+                </p>
               </div>
             </>
           )}
@@ -1145,7 +1171,7 @@ export function PatientReportPage() {
           >
             {Object.values(diseaseCompletion).length < diseases.length || Object.values(diseaseCompletion).some(count => count < 1)
               ? `Mohon isi minimal 1 pasien untuk SETIAP penyakit`
-              : `Lanjut ke Hasil Akhir (Skor: ${overallScore})`}
+              : `Lanjut ke Hasil Akhir (Skor: ${adjustedOverallScore})`}
             <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
         </div>
