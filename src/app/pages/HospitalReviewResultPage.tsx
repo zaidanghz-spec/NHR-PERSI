@@ -66,11 +66,31 @@ export function HospitalReviewResultPage() {
     return { grade: "Tier 5", name: "Developing", color: "text-slate-600", bg: "bg-slate-50" };
   };
 
-  const handleReviseSubmission = (submission: any) => {
+  const revisionSections = [
+    { key: "rsbk", stage: "rsbk", label: "Hospital Structure" },
+    { key: "clinicalAudit", stage: "clinical-audit", label: "Clinical Audit" },
+    { key: "patientReport", stage: "patient-report", label: "Patient Report" },
+  ];
+
+  const getRevisionItems = (submission: any) => {
+    const targets = submission.details?.revisionTargets || {};
+    const notes = submission.details?.revisionNotes || {};
+    return revisionSections
+      .filter(section => targets[section.key])
+      .map(section => ({
+        ...section,
+        note: notes[section.key] || "",
+      }));
+  };
+
+  const handleReviseSubmission = (submission: any, forcedStage?: string) => {
     // Determine technical specialty key
     const specKey = Object.keys(specialtyAuditData).find(
       key => specialtyAuditData[key as keyof typeof specialtyAuditData].name === submission.specialty
     ) || "cardiology";
+    const revisionItems = getRevisionItems(submission);
+    const revisionTargets = submission.details?.revisionTargets || {};
+    const hasSpecificTargets = revisionItems.length > 0;
 
     // 1. Create a fresh draft
     const draft = draftManager.createDraft(
@@ -82,10 +102,16 @@ export function HospitalReviewResultPage() {
     // 2. Hydrate with rawProgress from submission if available, otherwise fallback to empty initialized progress
     if (submission.details && submission.details.rawProgress) {
       draft.progress[specKey] = submission.details.rawProgress;
-      // Ensure it is marked incomplete so the user has to re-submit
-      draft.progress[specKey].rsbk.completed = false;
-      draft.progress[specKey].clinicalAudit.completed = false;
-      draft.progress[specKey].patientReport.completed = false;
+      // Mark only the requested sections as incomplete so correct sections stay intact.
+      if (hasSpecificTargets) {
+        if (revisionTargets.rsbk) draft.progress[specKey].rsbk.completed = false;
+        if (revisionTargets.clinicalAudit) draft.progress[specKey].clinicalAudit.completed = false;
+        if (revisionTargets.patientReport) draft.progress[specKey].patientReport.completed = false;
+      } else {
+        draft.progress[specKey].rsbk.completed = false;
+        draft.progress[specKey].clinicalAudit.completed = false;
+        draft.progress[specKey].patientReport.completed = false;
+      }
       
       // Force update the draft in draftManager
       const allDrafts = draftManager.getAllDrafts();
@@ -99,15 +125,13 @@ export function HospitalReviewResultPage() {
     // 3. Set as active draft and jump into it!
     draftManager.setCurrentDraftId(draft.draftId);
     sessionStorage.setItem("selectedSpecialties", JSON.stringify([specKey]));
+    sessionStorage.setItem("activeRevisionContext", JSON.stringify({
+      submissionId: submission.id,
+      revisionTargets,
+      revisionNotes: submission.details?.revisionNotes || {},
+    }));
     
-    // Auto-navigate to whichever stage was marked for revision by admin 
-    // If admin requested specific revision target, we can route directly. 
-    // Defaulting to the first stage: rsbk
-    let targetStage = "rsbk";
-    if (submission.details?.revisionTargets) {
-      if (submission.details.revisionTargets.patientReport) targetStage = "patient-report";
-      else if (submission.details.revisionTargets.clinicalAudit) targetStage = "clinical-audit";
-    }
+    const targetStage = forcedStage || revisionItems[0]?.stage || "rsbk";
 
     navigate(`/siap-persi/${targetStage}/${specKey}`);
   };
@@ -239,7 +263,32 @@ export function HospitalReviewResultPage() {
 
                         {isRevision && (
                           <div className="mt-4">
-                            {submission.details?.revisionTargets && (
+                            {getRevisionItems(submission).length > 0 && (
+                              <div className="mb-4 space-y-3">
+                                <p className="font-semibold text-gray-800 text-sm">Bagian yang perlu diperbaiki:</p>
+                                {getRevisionItems(submission).map(item => (
+                                  <div key={item.key} className="rounded-xl border border-red-100 bg-red-50 p-3">
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                      <span className="bg-white text-red-700 px-2 py-0.5 rounded text-xs font-bold border border-red-100">
+                                        {item.label}
+                                      </span>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 border-red-200 text-red-700 hover:bg-red-100 text-xs font-bold"
+                                        onClick={() => handleReviseSubmission(submission, item.stage)}
+                                      >
+                                        Perbaiki Ini
+                                      </Button>
+                                    </div>
+                                    <p className="text-sm text-red-900 whitespace-pre-wrap leading-relaxed">
+                                      {item.note || "Periksa kembali bagian ini sesuai arahan reviewer."}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {getRevisionItems(submission).length === 0 && submission.details?.revisionTargets && (
                               <div className="mb-3 text-sm flex gap-2">
                                 <span className="font-semibold text-gray-700">Fokus Perbaikan:</span>
                                 <div className="flex gap-2">
@@ -253,7 +302,7 @@ export function HospitalReviewResultPage() {
                               className="w-full bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all"
                               onClick={() => handleReviseSubmission(submission)}
                             >
-                              Perbaiki & Upload Ulang
+                              Perbaiki Sesuai Catatan
                             </Button>
                           </div>
                         )}
