@@ -52,7 +52,7 @@ export default async function handler(req: any, res: any) {
   const rpcMatch = path.match(/^\/api\/rpc\/([^/?#]+)/);
   if (req.method === "POST" && rpcMatch) {
     try {
-      const { handleTursoOperation } = await import("./turso_ops");
+      const { handleTursoOperation } = await import("./turso_ops.js");
       const result = await handleTursoOperation(decodeURIComponent(rpcMatch[1]), parseBody(req.body));
       sendJson(res, 200, { result: result ?? null });
     } catch (err: any) {

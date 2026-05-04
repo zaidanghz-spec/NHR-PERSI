@@ -43,7 +43,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { handleTursoOperation } = await import("../turso_ops");
+    const { handleTursoOperation } = await import("../turso_ops.js");
     const result = await handleTursoOperation(operation, parseBody(req.body));
     sendJson(res, 200, { result: result ?? null });
   } catch (err: any) {
