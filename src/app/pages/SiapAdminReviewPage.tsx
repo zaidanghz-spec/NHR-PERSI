@@ -211,14 +211,33 @@ export function SiapAdminReviewPage() {
 
   const calculateManualPrmTotal = (docs: CustomSurveyDoc[], scores: Record<string, { prem: string; prom: string }>) => {
     let total = 0;
-    docs.forEach(doc => {
-      const key = getCustomSurveyDocKey(doc);
-      const prem = Number(scores[key]?.prem ?? doc.adminPremScore ?? 0);
-      const prom = Number(scores[key]?.prom ?? doc.adminPromScore ?? 0);
-      const rawScore = prem * 0.6 + prom * 0.4;
-      const adjustedScore = rawScore * getSampleValidityWeight(doc.patientCount || 0);
-      total += adjustedScore * getDiseaseWeightForDoc(doc);
+    const specKey = (submissionData as any).specialtyKey || getSpecialtyKey(submissionData.specialty);
+    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+    const prmPatients = ((submissionData as any).details?.prmPatients || []) as any[];
+
+    specData.diseases.forEach((disease, diseaseIndex) => {
+      const doc = docs.find(item => item.diseaseName === disease.diseaseName);
+      const qrPatients = prmPatients.filter((patient: any) =>
+        (patient.diseaseName === disease.diseaseName || patient.diseaseIndex === diseaseIndex) &&
+        patient.hasResponse
+      );
+      const qrCount = qrPatients.length;
+      const qrAvg = qrCount > 0
+        ? qrPatients.reduce((sum: number, patient: any) => sum + (Number(patient.overallScore) || 0), 0) / qrCount
+        : 0;
+      const pdfCount = doc?.patientCount || 0;
+      const docKey = doc ? getCustomSurveyDocKey(doc) : "";
+      const prem = doc ? Number(scores[docKey]?.prem ?? doc.adminPremScore ?? 0) : 0;
+      const prom = doc ? Number(scores[docKey]?.prom ?? doc.adminPromScore ?? 0) : 0;
+      const pdfAvg = doc ? (prem * 0.6 + prom * 0.4) : 0;
+      const scoredCount = qrCount + (doc ? pdfCount : 0);
+      const rawScore = scoredCount > 0 ? ((qrAvg * qrCount) + (pdfAvg * (doc ? pdfCount : 0))) / scoredCount : 0;
+      const adjustedScore = rawScore * getSampleValidityWeight(scoredCount);
+      const weightMatch = disease.weight.match(/(\d+)%/);
+      const diseaseWeight = weightMatch ? parseInt(weightMatch[1]) / 100 : 1 / Math.max(specData.diseases.length, 1);
+      total += adjustedScore * diseaseWeight;
     });
+
     return Number(total.toFixed(1));
   };
 
@@ -348,13 +367,13 @@ export function SiapAdminReviewPage() {
         scores: nextScores,
         notes: {
           ...adminScoreNotes,
-          patientReport: "Dinilai manual dari dokumen PDF PRM: PREM 60% + PROM 40%, dikalikan validitas sampel per penyakit.",
+          patientReport: "PRM digabung dari pasien QR/non-PDF dan dokumen PDF: PREM 60% + PROM 40%, proporsional jumlah pasien, lalu dikalikan validitas sampel per penyakit.",
         },
         savedAt: reviewedAt,
       }));
       setAdminScoreNotes(prev => ({
         ...prev,
-        patientReport: "Dinilai manual dari dokumen PDF PRM: PREM 60% + PROM 40%, dikalikan validitas sampel per penyakit.",
+        patientReport: "PRM digabung dari pasien QR/non-PDF dan dokumen PDF: PREM 60% + PROM 40%, proporsional jumlah pasien, lalu dikalikan validitas sampel per penyakit.",
       }));
       setCustomSurveyDocs(prev => prev.map(doc => {
         const updated = updatedDocs.find(d => getCustomSurveyDocKey(d) === getCustomSurveyDocKey(doc));
@@ -1035,7 +1054,7 @@ export function SiapAdminReviewPage() {
                         Skor PRM Manual dari PDF
                       </h4>
                       <p className="text-sm text-indigo-700 leading-relaxed">
-                        Sistem menghitung skor PRM dari nilai PREM/PROM per dokumen, dikalikan validitas sampel per penyakit, lalu dikalikan bobot penyakit.
+                        Sistem menggabungkan nilai pasien QR/non-PDF dan nilai manual PDF secara proporsional berdasarkan jumlah pasien, lalu dikalikan validitas sampel dan bobot penyakit.
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
