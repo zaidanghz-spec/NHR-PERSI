@@ -114,65 +114,95 @@ export function SiapPersiResultPage() {
       const auditSummary = auditSummaryStr ? JSON.parse(auditSummaryStr) : {};
       const prmSummary = prmSummaryStr ? JSON.parse(prmSummaryStr) : {};
 
-      // EXPANSED DATA FOR ADMIN: Detailed per-patient breakdown
-      const auditDetails: any[] = [];
-      const auditDraftKey = `nhr_persi_audit_draft_${spec}`;
-      const auditDraftRaw = localStorage.getItem(auditDraftKey);
-      if (auditDraftRaw) {
+      // EXPANDED DATA FOR ADMIN: Detailed per-patient clinical audit breakdown
+      let auditDetails: any[] = [];
+      const auditPatientsStr = sessionStorage.getItem(`${spec}_auditPatients`);
+      if (auditPatientsStr) {
         try {
-          const parsed = JSON.parse(auditDraftRaw);
-          const formData = parsed.formData || {};
-          info.diseases.forEach((d, dIdx) => {
-            for (let p = 1; p <= 30; p++) {
-              // Check if at least one question is answered for this patient
-              const isRelevant = d.questions.some(q => formData[`${dIdx}_p${p}_q${q.id}`]);
-              if (isRelevant) {
+          auditDetails = JSON.parse(auditPatientsStr);
+        } catch {
+          auditDetails = [];
+        }
+      }
+
+      if (auditDetails.length === 0) {
+        const auditDraftKey = `clinical-audit-draft-${hCode}-${spec}`;
+        const auditDraftRaw = localStorage.getItem(auditDraftKey);
+        if (auditDraftRaw) {
+          try {
+            const parsed = JSON.parse(auditDraftRaw);
+            const formData = parsed.formData || {};
+            const patientMeta = parsed.patientMeta || {};
+            const makeKey = (diseaseIdx: number, patientNum: number, questionId: string) =>
+              `d${diseaseIdx}-${patientNum}-${questionId}`;
+            const makePatientKey = (diseaseIdx: number, patientNum: number) =>
+              `d${diseaseIdx}-${patientNum}`;
+
+            info.diseases.forEach((d, dIdx) => {
+              for (let p = 1; p <= 30; p++) {
+                const meta = patientMeta[makePatientKey(dIdx, p)] || { initials: "", code: "" };
+                const answeredQuestions = d.questions.filter(q => formData[makeKey(dIdx, p, q.id)]);
+                if (!meta.initials && !meta.code && answeredQuestions.length === 0) continue;
+
                 const diagnosisQs = d.questions.filter(q => q.category.toLowerCase().includes("diagnosa") || q.category.toLowerCase().includes("diagnosis"));
                 const treatmentQs = d.questions.filter(q => q.category.toLowerCase().includes("tatalaksana"));
                 const outcomeQs = d.questions.filter(q => q.category.toLowerCase().includes("outcome"));
 
                 const getCatScore = (qs: any[]) => {
-                   if (qs.length === 0) return 100;
-                   const answered = qs.filter(q => formData[`${dIdx}_p${p}_q${q.id}`]);
-                   if (answered.length === 0) return 0;
-                   const correct = answered.filter(q => formData[`${dIdx}_p${p}_q${q.id}`] !== "tidak-sesuai");
-                   return Math.round((correct.length / answered.length) * 100);
-                }
+                  if (qs.length === 0) return 100;
+                  const answered = qs.filter(q => formData[makeKey(dIdx, p, q.id)]);
+                  if (answered.length === 0) return 0;
+                  const correct = answered.filter(q => formData[makeKey(dIdx, p, q.id)] !== "tidak-sesuai");
+                  return Math.round((correct.length / answered.length) * 100);
+                };
 
                 auditDetails.push({
                   patientIndex: p,
+                  initials: meta.initials,
+                  code: meta.code,
+                  diseaseIndex: dIdx,
                   diseaseName: d.diseaseName,
                   diagnosisScore: getCatScore(diagnosisQs),
                   treatmentScore: getCatScore(treatmentQs),
                   outcomeScore: getCatScore(outcomeQs),
-                  isComplete: d.questions.every(q => formData[`${dIdx}_p${p}_q${q.id}`])
+                  isComplete: Boolean(meta.initials && meta.code) && d.questions.every(q => formData[makeKey(dIdx, p, q.id)]),
+                  answers: d.questions.map(q => ({
+                    id: q.id,
+                    question: q.question,
+                    category: q.category,
+                    answer: formData[makeKey(dIdx, p, q.id)] || "",
+                  })),
                 });
               }
-            }
-          });
-        } catch {}
+            });
+          } catch {}
+        }
       }
 
-      // EXPANSED DATA FOR ADMIN: Detailed PRM patient list
+      // EXPANDED DATA FOR ADMIN: Detailed PRM patient list
       const prmDetails: any[] = [];
       try {
-        const patients = await api.getPatients(hCode, spec); // this might need a better key mapping but spec is often used
-        // fallback to specialized keys if needed
-        const patientsAlt = await api.getPatients(hCode, `${spec}-d0`);
-        const combinedPatients = [...patients, ...patientsAlt].filter((p, i, a) => a.findIndex(x => x.rm === p.rm) === i);
-        
-        for (const p of combinedPatients) {
-           const dKey = p.diseaseKey || `${spec}-d0`;
-           const response = await api.getSurveyByPatient(hCode, dKey, p.rm);
-           prmDetails.push({
-             rm: p.rm,
-             name: p.name,
-             specialty: p.specialty,
-             hasResponse: !!response,
-             premScore: response?.premScore || 0,
-             promScore: response?.promScore || 0,
-             submittedAt: response?.submittedAt
-           });
+        for (let dIdx = 0; dIdx < info.diseases.length; dIdx++) {
+          const dKey = `${spec}-d${dIdx}`;
+          const patients = await api.getPatients(hCode, dKey);
+
+          for (const p of patients) {
+            const response = await api.getSurveyByPatient(hCode, dKey, p.rm);
+            prmDetails.push({
+              rm: p.rm,
+              name: p.name,
+              specialty: p.specialty || spec,
+              diseaseIndex: dIdx,
+              diseaseKey: dKey,
+              diseaseName: info.diseases[dIdx]?.diseaseName || "",
+              hasResponse: !!response,
+              premScore: response?.premScore || 0,
+              promScore: response?.promScore || 0,
+              overallScore: response?.overallScore || 0,
+              answers: response?.answers || {},
+              submittedAt: response?.submittedAt,
+            });
+          }
         }
       } catch {}
 
@@ -205,6 +235,7 @@ export function SiapPersiResultPage() {
       sessionStorage.removeItem(`${spec}_rsbkScore`);
       sessionStorage.removeItem(`${spec}_clinicalAuditScore`);
       sessionStorage.removeItem(`${spec}_auditSummary`);
+      sessionStorage.removeItem(`${spec}_auditPatients`);
       sessionStorage.removeItem(`${spec}_patientReportScore`);
       sessionStorage.removeItem(`${spec}_prmSummary`);
     }
