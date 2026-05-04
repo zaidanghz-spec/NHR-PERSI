@@ -330,26 +330,43 @@ async function updateAccountStatus({ email, status }: any) {
 
 async function addSubmission({ submission }: any) {
   await initTursoTables();
+  const client = db();
   const hospitalCode = submission.hospitalCode || submission.details?.hospitalCode || "";
   const details = {
     ...(submission.details || {}),
     hospitalCode,
     hospitalName: submission.hospitalName,
   };
-  await db().execute({
-    sql: `INSERT OR REPLACE INTO submissions (id, hospital_name, hospital_code, specialty, pic_name, submitted_date, status, scores, details)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [
-      submission.id,
-      submission.hospitalName,
-      hospitalCode,
-      submission.specialty,
-      submission.picName,
-      submission.submittedDate,
-      submission.status,
-      JSON.stringify(submission.scores),
-      JSON.stringify(details),
-    ],
+
+  const info = await client.execute("PRAGMA table_info(submissions)");
+  const existingColumns = info.rows.map((r: any) => r.name);
+  const createdAt = new Date().toISOString();
+  const valuesByColumn: Record<string, any> = {
+    id: submission.id,
+    hospital_name: submission.hospitalName,
+    hospitalName: submission.hospitalName,
+    hospital_code: hospitalCode,
+    hospitalCode,
+    specialty: submission.specialty,
+    disease: submission.disease || "",
+    pic_name: submission.picName,
+    picName: submission.picName,
+    submitted_date: submission.submittedDate,
+    submittedDate: submission.submittedDate,
+    status: submission.status,
+    scores: JSON.stringify(submission.scores || {}),
+    details: JSON.stringify(details),
+    created_at: createdAt,
+    createdAt,
+  };
+  const insertColumns = existingColumns.filter((column: string) =>
+    Object.prototype.hasOwnProperty.call(valuesByColumn, column)
+  );
+
+  await client.execute({
+    sql: `INSERT OR REPLACE INTO submissions (${insertColumns.join(", ")})
+          VALUES (${insertColumns.map(() => "?").join(", ")})`,
+    args: insertColumns.map((column: string) => valuesByColumn[column]),
   });
 }
 
