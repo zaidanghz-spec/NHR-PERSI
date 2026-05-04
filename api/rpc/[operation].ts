@@ -1,5 +1,3 @@
-import { handleTursoOperation } from "../turso_ops";
-
 function sendJson(res: any, status: number, body: unknown) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -45,6 +43,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    const { handleTursoOperation } = await import("../turso_ops");
     const result = await handleTursoOperation(operation, parseBody(req.body));
     sendJson(res, 200, { result: result ?? null });
   } catch (err: any) {
