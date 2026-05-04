@@ -266,29 +266,22 @@ export function PatientReportPage() {
     };
   });
 
-  // Calculate aggregated scores
-  const patientCount = surveyResponses.length + (customSurveyUploaded ? customSurveyPatientCount : 0);
-  
-  // If RS uploaded PDF: skor = 0 (menunggu penilaian admin). Admin override via Admin Review Page.
-  const avgPremScore = customSurveyUploaded
-    ? 0
-    : surveyResponses.length > 0
-      ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / surveyResponses.length)
-      : 0;
-      
-  const avgPromScore = customSurveyUploaded
-    ? 0
-    : surveyResponses.length > 0
-      ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / surveyResponses.length)
-      : 0;
-      
-  const overallScore = customSurveyUploaded
-    ? 0  // Admin akan memberikan skor via Admin Review Page
-    : surveyResponses.length > 0
-      ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / surveyResponses.length)
-      : 0;
+  // Calculate aggregated scores for QR/non-PDF responses. PDF scores are reviewed by admin.
+  const qrPatientCount = surveyResponses.length;
+  const pdfPatientCount = customSurveyUploaded ? customSurveyPatientCount : 0;
+  const patientCount = qrPatientCount + pdfPatientCount;
+  const avgPremScore = qrPatientCount > 0
+    ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / qrPatientCount)
+    : 0;
+  const avgPromScore = qrPatientCount > 0
+    ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / qrPatientCount)
+    : 0;
+  const overallScore = qrPatientCount > 0
+    ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / qrPatientCount)
+    : 0;
   const sampleValidityWeight = getSampleValidityWeight(patientCount);
-  const adjustedOverallScore = Number((overallScore * sampleValidityWeight).toFixed(1));
+  const qrValidityWeight = getSampleValidityWeight(qrPatientCount);
+  const adjustedOverallScore = Number((overallScore * qrValidityWeight).toFixed(1));
 
   const progress = Math.min((patientCount / targetPatientCount) * 100, 100);
   const isQRLocked = customSurveyUploaded && customSurveyPatientCount >= 30;
@@ -412,34 +405,34 @@ export function PatientReportPage() {
         const dKey = `${specialty}-d${i}`;  // Must match diseaseSpecialtyKey format
         const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
         
-        let diseaseAvg = 0;
-        let diseasePatientCount = diseaseSurveys.length;
-        const customSurveyStorageKey = `custom-survey-${hospitalCode}-${dKey}`;
-        const customDocRaw = localStorage.getItem(customSurveyStorageKey);
-        
-        if (customDocRaw) {
-          // PDF uploaded by RS — use admin-entered scores if available
-          try {
-            const customDoc = JSON.parse(customDocRaw);
-            diseasePatientCount = customDoc.patientCount || 0;
-            // Admin override stored in the custom survey doc (set by SiapAdminReviewPage)
-            const adminPrem = typeof customDoc.adminPremScore === "number" ? customDoc.adminPremScore : null;
-            const adminProm = typeof customDoc.adminPromScore === "number" ? customDoc.adminPromScore : null;
-            if (adminPrem !== null && adminProm !== null) {
-              diseaseAvg = Math.round(adminPrem * 0.6 + adminProm * 0.4);
-              prmSummary[`${dKey}_prem`] = adminPrem.toString();
-              prmSummary[`${dKey}_prom`] = adminProm.toString();
-              prmSummary[`${dKey}_source`] = "admin_override";
-            } else {
-              diseaseAvg = 0; // Menunggu penilaian admin
-              prmSummary[`${dKey}_source`] = "pending_admin";
-            }
-          } catch {
-            diseaseAvg = 0;
+        const customDoc = await api.getCustomSurveyMetadata(hospitalCode, dKey);
+        const qrCount = diseaseSurveys.length;
+        const pdfCount = customDoc ? (customDoc.patientCount || 0) : 0;
+        const qrAvg = qrCount > 0
+          ? diseaseSurveys.reduce((s, r) => s + (r.overallScore || 0), 0) / qrCount
+          : 0;
+        const adminPrem = typeof customDoc?.adminPremScore === "number" ? customDoc.adminPremScore : null;
+        const adminProm = typeof customDoc?.adminPromScore === "number" ? customDoc.adminPromScore : null;
+        const pdfHasScore = adminPrem !== null && adminProm !== null;
+        const pdfAvg = pdfHasScore ? (adminPrem * 0.6 + adminProm * 0.4) : 0;
+        const scoredPatientCount = qrCount + (pdfHasScore ? pdfCount : 0);
+        const diseasePatientCount = qrCount + pdfCount;
+        const diseaseAvg = scoredPatientCount > 0
+          ? Number((((qrAvg * qrCount) + (pdfAvg * (pdfHasScore ? pdfCount : 0))) / scoredPatientCount).toFixed(1))
+          : 0;
+
+        if (customDoc) {
+          prmSummary[`${dKey}_pdfPatientCount`] = pdfCount.toString();
+          prmSummary[`${dKey}_source`] = pdfHasScore ? "mixed_admin_scored" : "mixed_pending_admin";
+          if (pdfHasScore) {
+            prmSummary[`${dKey}_pdfPrem`] = String(adminPrem);
+            prmSummary[`${dKey}_pdfProm`] = String(adminProm);
           }
-        } else if (diseaseSurveys.length > 0) {
-          diseaseAvg = Math.round(diseaseSurveys.reduce((s, r) => s + (r.overallScore || 0), 0) / diseaseSurveys.length);
-          
+        }
+        if (diseaseSurveys.length > 0) {
+          prmSummary[`${dKey}_qrScore`] = Math.round(qrAvg).toString();
+          prmSummary[`${dKey}_qrPatientCount`] = qrCount.toString();
+
           // Build summary for admin dashboard — use questions array (premQuestions/promQuestions may not exist)
           const allQuestions = [
             ...(diseases[i].premQuestions || []),
@@ -461,11 +454,12 @@ export function PatientReportPage() {
         
         const weightMatch = diseases[i].weight.match(/(\d+)%/);
         const weight = weightMatch ? parseInt(weightMatch[1]) / 100 : 1;
-        const validity = getSampleValidityWeight(diseasePatientCount);
+        const validity = getSampleValidityWeight(scoredPatientCount);
         const adjustedDiseaseScore = Number((diseaseAvg * validity).toFixed(1));
 
         prmSummary[`${dKey}_rawScore`] = diseaseAvg.toString();
         prmSummary[`${dKey}_patientCount`] = diseasePatientCount.toString();
+        prmSummary[`${dKey}_scoredPatientCount`] = scoredPatientCount.toString();
         prmSummary[`${dKey}_validity`] = Math.round(validity * 100).toString();
         prmSummary[`${dKey}_adjustedScore`] = adjustedDiseaseScore.toString();
         prmSummary[`${dKey}_diseaseWeight`] = Math.round(weight * 100).toString();
@@ -594,7 +588,7 @@ export function PatientReportPage() {
               />
             </div>
             <div className="flex items-center justify-between mt-2 text-xs text-white/60">
-              <span>{customSurveyUploaded ? "Via Upload internal" : `${registeredPatients.length} pasien terdaftar`}</span>
+              <span>{qrPatientCount} QR/non-PDF + {pdfPatientCount} PDF</span>
               <span>{patientCount} survei masuk</span>
             </div>
           </div>
@@ -604,13 +598,10 @@ export function PatientReportPage() {
               <MessageSquare className="w-5 h-5" />
             </div>
             <p className="text-xs text-gray-500 mb-1">Skor PREM</p>
-            {customSurveyUploaded ? (
-              <p className="text-xs font-bold text-amber-500 mt-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">Menunggu Admin</p>
-            ) : (
-              <>
-                <p className="text-3xl font-bold text-[#0F4C81]">{avgPremScore}</p>
-                <p className="text-xs text-gray-400">Bobot 60%</p>
-              </>
+            <p className="text-3xl font-bold text-[#0F4C81]">{avgPremScore}</p>
+            <p className="text-xs text-gray-400">QR/non-PDF sementara</p>
+            {customSurveyUploaded && (
+              <p className="text-[10px] font-bold text-amber-600 mt-2">PDF dinilai admin</p>
             )}
           </div>
 
@@ -619,15 +610,38 @@ export function PatientReportPage() {
               <Heart className="w-5 h-5" />
             </div>
             <p className="text-xs text-gray-500 mb-1">Skor PROM</p>
-            {customSurveyUploaded ? (
-              <p className="text-xs font-bold text-amber-500 mt-2 px-2 py-1 bg-amber-50 border border-amber-200 rounded-lg">Menunggu Admin</p>
-            ) : (
-              <>
-                <p className="text-3xl font-bold text-[#14B8A6]">{avgPromScore}</p>
-                <p className="text-xs text-gray-400">Bobot 40%</p>
-              </>
+            <p className="text-3xl font-bold text-[#14B8A6]">{avgPromScore}</p>
+            <p className="text-xs text-gray-400">QR/non-PDF sementara</p>
+            {customSurveyUploaded && (
+              <p className="text-[10px] font-bold text-amber-600 mt-2">PDF dinilai admin</p>
             )}
           </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
+          <h3 className="font-bold text-gray-900 mb-4">Rekap Sumber Data PRM - {activeDisease?.diseaseName}</h3>
+          <div className="grid md:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-blue-700 mb-1">QR / Non-PDF</p>
+              <p className="text-2xl font-black text-blue-900">{qrPatientCount} pasien</p>
+              <p className="text-xs text-blue-700 mt-1">Skor rata-rata: {overallScore || 0}</p>
+            </div>
+            <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-700 mb-1">PDF Internal</p>
+              <p className="text-2xl font-black text-amber-900">{pdfPatientCount} pasien</p>
+              <p className="text-xs text-amber-700 mt-1">{customSurveyUploaded ? "Menunggu nilai manual admin" : "Belum ada PDF"}</p>
+            </div>
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-emerald-700 mb-1">Total Sampel</p>
+              <p className="text-2xl font-black text-emerald-900">{patientCount} pasien</p>
+              <p className="text-xs text-emerald-700 mt-1">Validitas sampel total: {(sampleValidityWeight * 100).toFixed(0)}%</p>
+            </div>
+          </div>
+          {customSurveyUploaded && qrPatientCount > 0 && (
+            <p className="mt-3 text-xs text-gray-600">
+              Nilai akhir akan digabung oleh admin: skor QR/non-PDF + skor manual PDF, dihitung proporsional berdasarkan jumlah pasien per sumber data.
+            </p>
+          )}
         </div>
 
         {/* Scoring Range Info for Patient Report */}
@@ -1071,7 +1085,7 @@ export function PatientReportPage() {
         <div className="bg-white rounded-xl border-2 border-[#0F4C81] p-6 mb-6">
           <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Skor PRM - {activeDisease?.diseaseName} (Berbobot)</h3>
           
-          {customSurveyUploaded ? (
+          {customSurveyUploaded && qrPatientCount === 0 ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
               <Clock className="w-8 h-8 text-amber-500 mx-auto mb-3" />
               <p className="font-bold text-amber-800 text-lg mb-1">Menunggu Penilaian Admin</p>
@@ -1122,11 +1136,11 @@ export function PatientReportPage() {
                         Bobot Validitas Sampel ({patientCount} pasien)
                       </td>
                       <td className="py-3 px-4 text-center font-bold text-amber-700 text-xl">
-                        {(sampleValidityWeight * 100).toFixed(0)}%
+                        {(qrValidityWeight * 100).toFixed(0)}%
                       </td>
                     </tr>
                     <tr className="bg-green-50">
-                      <td className="py-3 px-4 font-black text-green-700 text-lg" colSpan={3}>Skor PRM Penyakit Setelah Validitas</td>
+                      <td className="py-3 px-4 font-black text-green-700 text-lg" colSpan={3}>Skor PRM QR/Non-PDF Sementara Setelah Validitas</td>
                       <td className="py-3 px-4 text-center font-black text-green-700 text-2xl">{adjustedOverallScore}</td>
                     </tr>
                   </tfoot>
@@ -1137,6 +1151,11 @@ export function PatientReportPage() {
                 <p className="mt-1">
                   Skor PRM akhir menjumlahkan skor tiap penyakit setelah validitas dikalikan bobot penyakitnya masing-masing.
                 </p>
+                {customSurveyUploaded && (
+                  <p className="mt-1 text-amber-700">
+                    Karena ada PDF, skor akhir penyakit ini akan digabung ulang oleh admin setelah nilai PREM/PROM PDF diinput.
+                  </p>
+                )}
               </div>
             </>
           )}

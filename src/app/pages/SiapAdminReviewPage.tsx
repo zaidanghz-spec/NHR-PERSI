@@ -211,14 +211,33 @@ export function SiapAdminReviewPage() {
 
   const calculateManualPrmTotal = (docs: CustomSurveyDoc[], scores: Record<string, { prem: string; prom: string }>) => {
     let total = 0;
-    docs.forEach(doc => {
-      const key = getCustomSurveyDocKey(doc);
-      const prem = Number(scores[key]?.prem ?? doc.adminPremScore ?? 0);
-      const prom = Number(scores[key]?.prom ?? doc.adminPromScore ?? 0);
-      const rawScore = prem * 0.6 + prom * 0.4;
-      const adjustedScore = rawScore * getSampleValidityWeight(doc.patientCount || 0);
-      total += adjustedScore * getDiseaseWeightForDoc(doc);
+    const specKey = (submissionData as any).specialtyKey || getSpecialtyKey(submissionData.specialty);
+    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+    const prmPatients = ((submissionData as any).details?.prmPatients || []) as any[];
+
+    specData.diseases.forEach((disease, diseaseIndex) => {
+      const doc = docs.find(item => item.diseaseName === disease.diseaseName);
+      const qrPatients = prmPatients.filter((patient: any) =>
+        (patient.diseaseName === disease.diseaseName || patient.diseaseIndex === diseaseIndex) &&
+        patient.hasResponse
+      );
+      const qrCount = qrPatients.length;
+      const qrAvg = qrCount > 0
+        ? qrPatients.reduce((sum: number, patient: any) => sum + (Number(patient.overallScore) || 0), 0) / qrCount
+        : 0;
+      const pdfCount = doc?.patientCount || 0;
+      const docKey = doc ? getCustomSurveyDocKey(doc) : "";
+      const prem = doc ? Number(scores[docKey]?.prem ?? doc.adminPremScore ?? 0) : 0;
+      const prom = doc ? Number(scores[docKey]?.prom ?? doc.adminPromScore ?? 0) : 0;
+      const pdfAvg = doc ? (prem * 0.6 + prom * 0.4) : 0;
+      const scoredCount = qrCount + (doc ? pdfCount : 0);
+      const rawScore = scoredCount > 0 ? ((qrAvg * qrCount) + (pdfAvg * (doc ? pdfCount : 0))) / scoredCount : 0;
+      const adjustedScore = rawScore * getSampleValidityWeight(scoredCount);
+      const weightMatch = disease.weight.match(/(\d+)%/);
+      const diseaseWeight = weightMatch ? parseInt(weightMatch[1]) / 100 : 1 / Math.max(specData.diseases.length, 1);
+      total += adjustedScore * diseaseWeight;
     });
+
     return Number(total.toFixed(1));
   };
 
@@ -259,6 +278,106 @@ export function SiapAdminReviewPage() {
   const selectedPrmDetail = selectedPrmPatient
     ? prmPatientsForReview.find((patient: any) => getPrmPatientKey(patient) === selectedPrmPatient || patient.rm === selectedPrmPatient)
     : null;
+  const reviewSpecData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
+
+  const getAuditOptionScore = (value: string) => value === "sesuai" || value === "tidak-sesuai-pengecualian" ? 1 : 0;
+  const getDiseaseWeight = (weight: string, fallbackCount: number) => {
+    const match = weight?.match(/(\d+)%/);
+    return match ? parseInt(match[1]) / 100 : 1 / Math.max(fallbackCount, 1);
+  };
+
+  const rsbkBreakdown = (() => {
+    const data = (submissionData as any).details?.rsbkData || {};
+    const config: Record<string, { label: string; maxScore: number }> = {
+      sdm: { label: "SDM", maxScore: 50 },
+      sarana: { label: "Sarana", maxScore: 25 },
+      alat: { label: "Alat", maxScore: 25 },
+    };
+    return Object.entries(config).map(([category, meta]) => {
+      const items = reviewSpecData.rsbkItems.filter(item => item.category === category);
+      const earnedPoints = items.reduce((sum, item) => {
+        const rawValue = data[item.id];
+        const value = Number(rawValue ?? 0) || 0;
+        return sum + Math.min(value, item.target) * item.pointPerUnit;
+      }, 0);
+      const targetPoints = items.reduce((sum, item) => sum + item.target * item.pointPerUnit, 0);
+      const score = targetPoints > 0 ? Number(((earnedPoints / targetPoints) * meta.maxScore).toFixed(1)) : 0;
+      return {
+        category,
+        label: meta.label,
+        itemCount: items.length,
+        earnedPoints: Number(earnedPoints.toFixed(1)),
+        targetPoints: Number(targetPoints.toFixed(1)),
+        maxScore: meta.maxScore,
+        score,
+      };
+    });
+  })();
+
+  const auditBreakdown = reviewSpecData.diseases.map((disease, diseaseIndex) => {
+    const patients = auditPatientsForReview.filter((patient: any) =>
+      patient.isComplete && (patient.diseaseIndex === diseaseIndex || patient.diseaseName === disease.diseaseName)
+    );
+    const categories: Record<string, { total: number; count: number; weight: number }> = {};
+    patients.forEach((patient: any) => {
+      (patient.answers || []).forEach((answer: any) => {
+        const categoryName = String(answer.category || "").replace(/\s*\(\d+%\)/, "") || "Lainnya";
+        const weightMatch = String(answer.category || "").match(/(\d+)%/);
+        const weight = weightMatch ? parseInt(weightMatch[1]) / 100 : 0.25;
+        if (!categories[categoryName]) categories[categoryName] = { total: 0, count: 0, weight };
+        categories[categoryName].total += getAuditOptionScore(answer.answer);
+        categories[categoryName].count++;
+      });
+    });
+    const rawScore = Number(Object.values(categories).reduce((sum, category) => {
+      if (category.count === 0) return sum;
+      return sum + (category.total / category.count) * 100 * category.weight;
+    }, 0).toFixed(1));
+    const validity = getSampleValidityWeight(patients.length);
+    const scoreAfterValidity = Number((rawScore * validity).toFixed(1));
+    const diseaseWeight = getDiseaseWeight(disease.weight, reviewSpecData.diseases.length);
+    return {
+      diseaseName: disease.diseaseName,
+      patientCount: patients.length,
+      rawScore,
+      validity,
+      scoreAfterValidity,
+      diseaseWeight,
+      contribution: Number((scoreAfterValidity * diseaseWeight).toFixed(1)),
+    };
+  });
+
+  const prmBreakdown = reviewSpecData.diseases.map((disease, diseaseIndex) => {
+    const qrPatients = prmPatientsForReview.filter((patient: any) =>
+      patient.hasResponse && (patient.diseaseIndex === diseaseIndex || patient.diseaseName === disease.diseaseName)
+    );
+    const qrCount = qrPatients.length;
+    const qrAvg = qrCount > 0
+      ? qrPatients.reduce((sum: number, patient: any) => sum + (Number(patient.overallScore) || 0), 0) / qrCount
+      : 0;
+    const doc = filteredDocs.find(item => item.diseaseName === disease.diseaseName);
+    const docKey = doc ? getCustomSurveyDocKey(doc) : "";
+    const pdfPrem = doc ? Number(customSurveyScores[docKey]?.prem ?? doc.adminPremScore ?? 0) : 0;
+    const pdfProm = doc ? Number(customSurveyScores[docKey]?.prom ?? doc.adminPromScore ?? 0) : 0;
+    const pdfCount = doc?.patientCount || 0;
+    const pdfScore = doc ? (pdfPrem * 0.6 + pdfProm * 0.4) : 0;
+    const scoredCount = qrCount + (doc ? pdfCount : 0);
+    const rawScore = scoredCount > 0 ? Number((((qrAvg * qrCount) + (pdfScore * (doc ? pdfCount : 0))) / scoredCount).toFixed(1)) : 0;
+    const validity = getSampleValidityWeight(scoredCount);
+    const scoreAfterValidity = Number((rawScore * validity).toFixed(1));
+    const diseaseWeight = getDiseaseWeight(disease.weight, reviewSpecData.diseases.length);
+    return {
+      diseaseName: disease.diseaseName,
+      qrCount,
+      qrAvg: Number(qrAvg.toFixed(1)),
+      pdfCount,
+      pdfScore: Number(pdfScore.toFixed(1)),
+      rawScore,
+      validity,
+      diseaseWeight,
+      contribution: Number((scoreAfterValidity * diseaseWeight).toFixed(1)),
+    };
+  });
 
   const getPrmQuestionGroups = (patient: any) => {
     const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
@@ -348,13 +467,13 @@ export function SiapAdminReviewPage() {
         scores: nextScores,
         notes: {
           ...adminScoreNotes,
-          patientReport: "Dinilai manual dari dokumen PDF PRM: PREM 60% + PROM 40%, dikalikan validitas sampel per penyakit.",
+          patientReport: "PRM digabung dari pasien QR/non-PDF dan dokumen PDF: PREM 60% + PROM 40%, proporsional jumlah pasien, lalu dikalikan validitas sampel per penyakit.",
         },
         savedAt: reviewedAt,
       }));
       setAdminScoreNotes(prev => ({
         ...prev,
-        patientReport: "Dinilai manual dari dokumen PDF PRM: PREM 60% + PROM 40%, dikalikan validitas sampel per penyakit.",
+        patientReport: "PRM digabung dari pasien QR/non-PDF dan dokumen PDF: PREM 60% + PROM 40%, proporsional jumlah pasien, lalu dikalikan validitas sampel per penyakit.",
       }));
       setCustomSurveyDocs(prev => prev.map(doc => {
         const updated = updatedDocs.find(d => getCustomSurveyDocKey(d) === getCustomSurveyDocKey(doc));
@@ -727,6 +846,50 @@ export function SiapAdminReviewPage() {
                   </div>
                 ))}
               </div>
+
+              <div className="mt-8 bg-gray-50 border border-gray-200 rounded-2xl p-5">
+                <h4 className="font-black text-gray-900 mb-4 flex items-center gap-2">
+                  <Info className="w-5 h-5 text-indigo-600" />
+                  Justifikasi Skor Final
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-gray-500">
+                        <th className="py-2 px-3 text-left font-bold">Komponen</th>
+                        <th className="py-2 px-3 text-center font-bold">Skor Komponen</th>
+                        <th className="py-2 px-3 text-center font-bold">Bobot Nasional</th>
+                        <th className="py-2 px-3 text-center font-bold">Rumus</th>
+                        <th className="py-2 px-3 text-center font-bold">Kontribusi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "Hospital Structure", score: effectiveScores.rsbk, weight: 0.15 },
+                        { label: "Clinical Audit", score: effectiveScores.clinicalAudit, weight: 0.60 },
+                        { label: "Patient Report (PRM)", score: effectiveScores.patientReport, weight: 0.25 },
+                      ].map(row => {
+                        const contribution = Number((row.score * row.weight).toFixed(1));
+                        return (
+                          <tr key={row.label} className="border-b border-gray-100">
+                            <td className="py-3 px-3 font-semibold text-gray-900">{row.label}</td>
+                            <td className="py-3 px-3 text-center font-black text-gray-900">{row.score}</td>
+                            <td className="py-3 px-3 text-center">{Math.round(row.weight * 100)}%</td>
+                            <td className="py-3 px-3 text-center font-mono text-xs text-gray-600">{row.score} x {Math.round(row.weight * 100)}%</td>
+                            <td className="py-3 px-3 text-center font-black text-indigo-700">{contribution}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-white">
+                        <td className="py-3 px-3 font-black text-indigo-900" colSpan={4}>Total Final Score</td>
+                        <td className="py-3 px-3 text-center font-black text-2xl text-indigo-700">{effectiveFinal}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -737,6 +900,46 @@ export function SiapAdminReviewPage() {
             <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight">
               Hospital Structure Detail
             </h3>
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-8">
+              <h4 className="font-black text-blue-900 mb-4">Rumus Skor Hospital Structure</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm bg-white rounded-xl overflow-hidden">
+                  <thead className="bg-blue-900 text-white">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Subkomponen</th>
+                      <th className="py-3 px-4 text-center">Item Dinilai</th>
+                      <th className="py-3 px-4 text-center">Poin Didapat</th>
+                      <th className="py-3 px-4 text-center">Target Poin</th>
+                      <th className="py-3 px-4 text-center">Skor Maks</th>
+                      <th className="py-3 px-4 text-center">Skor Subkomponen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rsbkBreakdown.map(row => (
+                      <tr key={row.category} className="border-b border-blue-50">
+                        <td className="py-3 px-4 font-bold text-gray-900">{row.label}</td>
+                        <td className="py-3 px-4 text-center">{row.itemCount}</td>
+                        <td className="py-3 px-4 text-center font-semibold">{row.earnedPoints}</td>
+                        <td className="py-3 px-4 text-center">{row.targetPoints}</td>
+                        <td className="py-3 px-4 text-center">{row.maxScore}</td>
+                        <td className="py-3 px-4 text-center font-black text-blue-700">{row.score}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-blue-50">
+                      <td className="py-3 px-4 font-black text-blue-900" colSpan={5}>Total Hospital Structure</td>
+                      <td className="py-3 px-4 text-center font-black text-blue-900 text-xl">
+                        {rsbkBreakdown.reduce((sum, row) => sum + row.score, 0).toFixed(1)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <p className="text-xs text-blue-800 mt-3">
+                Rumus: poin aktual dibatasi sampai target, lalu dinormalisasi ke skor maksimal subkomponen. SDM maks 50, Sarana maks 25, Alat maks 25.
+              </p>
+            </div>
             <div className="space-y-8">
               {["sdm", "sarana", "alat"].map((category) => {
                 const labels: Record<string, string> = {
@@ -808,6 +1011,49 @@ export function SiapAdminReviewPage() {
 
               return (
                 <div className="space-y-6">
+                  <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5">
+                    <h4 className="font-black text-purple-900 mb-4">Rumus Skor Clinical Audit per Penyakit</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm bg-white rounded-xl overflow-hidden">
+                        <thead className="bg-purple-900 text-white">
+                          <tr>
+                            <th className="py-3 px-4 text-left">Penyakit</th>
+                            <th className="py-3 px-4 text-center">Pasien Lengkap</th>
+                            <th className="py-3 px-4 text-center">Skor Kepatuhan</th>
+                            <th className="py-3 px-4 text-center">Validitas Sampel</th>
+                            <th className="py-3 px-4 text-center">Setelah Validitas</th>
+                            <th className="py-3 px-4 text-center">Bobot Penyakit</th>
+                            <th className="py-3 px-4 text-center">Kontribusi</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {auditBreakdown.map(row => (
+                            <tr key={row.diseaseName} className="border-b border-purple-50">
+                              <td className="py-3 px-4 font-bold text-gray-900">{row.diseaseName}</td>
+                              <td className="py-3 px-4 text-center">{row.patientCount}</td>
+                              <td className="py-3 px-4 text-center font-semibold">{row.rawScore}</td>
+                              <td className="py-3 px-4 text-center">{Math.round(row.validity * 100)}%</td>
+                              <td className="py-3 px-4 text-center font-semibold">{row.scoreAfterValidity}</td>
+                              <td className="py-3 px-4 text-center">{Math.round(row.diseaseWeight * 100)}%</td>
+                              <td className="py-3 px-4 text-center font-black text-purple-700">{row.contribution}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-purple-50">
+                            <td className="py-3 px-4 font-black text-purple-900" colSpan={6}>Total Clinical Audit</td>
+                            <td className="py-3 px-4 text-center font-black text-purple-900 text-xl">
+                              {auditBreakdown.reduce((sum, row) => sum + row.contribution, 0).toFixed(1)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <p className="text-xs text-purple-800 mt-3">
+                      Skor kepatuhan dihitung dari jawaban sesuai dan tidak sesuai dengan pengecualian klinis sebagai poin benar. Hanya pasien lengkap yang masuk validitas sampel.
+                    </p>
+                  </div>
+
                   <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
                     <table className="w-full text-sm">
                       <thead className="bg-[#0F4C81] text-white">
@@ -892,6 +1138,56 @@ export function SiapAdminReviewPage() {
         {/* ========== TAB: PATIENT REPORT (PRM) ========== */}
         {activeTab === "prm" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8">
+            <div className="bg-white rounded-xl border-2 border-teal-200 p-8">
+              <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Justifikasi Skor PRM</h3>
+              <p className="text-gray-500 text-sm mb-6 font-medium">
+                Skor PRM dihitung per penyakit dari gabungan pasien QR/non-PDF dan PDF internal yang dinilai manual.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-teal-700 text-white">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Penyakit</th>
+                      <th className="py-3 px-4 text-center">QR Pasien</th>
+                      <th className="py-3 px-4 text-center">Skor QR</th>
+                      <th className="py-3 px-4 text-center">PDF Pasien</th>
+                      <th className="py-3 px-4 text-center">Skor PDF</th>
+                      <th className="py-3 px-4 text-center">Skor Gabungan</th>
+                      <th className="py-3 px-4 text-center">Validitas</th>
+                      <th className="py-3 px-4 text-center">Bobot Penyakit</th>
+                      <th className="py-3 px-4 text-center">Kontribusi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prmBreakdown.map(row => (
+                      <tr key={row.diseaseName} className="border-b border-teal-50">
+                        <td className="py-3 px-4 font-bold text-gray-900">{row.diseaseName}</td>
+                        <td className="py-3 px-4 text-center">{row.qrCount}</td>
+                        <td className="py-3 px-4 text-center">{row.qrAvg}</td>
+                        <td className="py-3 px-4 text-center">{row.pdfCount}</td>
+                        <td className="py-3 px-4 text-center">{row.pdfCount > 0 ? row.pdfScore : "—"}</td>
+                        <td className="py-3 px-4 text-center font-semibold">{row.rawScore}</td>
+                        <td className="py-3 px-4 text-center">{Math.round(row.validity * 100)}%</td>
+                        <td className="py-3 px-4 text-center">{Math.round(row.diseaseWeight * 100)}%</td>
+                        <td className="py-3 px-4 text-center font-black text-teal-700">{row.contribution}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-teal-50">
+                      <td className="py-3 px-4 font-black text-teal-900" colSpan={8}>Total PRM</td>
+                      <td className="py-3 px-4 text-center font-black text-teal-900 text-xl">
+                        {prmBreakdown.reduce((sum, row) => sum + row.contribution, 0).toFixed(1)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <p className="text-xs text-teal-800 mt-3">
+                Rumus per penyakit: ((skor QR x pasien QR) + (skor PDF x pasien PDF)) / total pasien dinilai, lalu dikalikan validitas sampel dan bobot penyakit.
+              </p>
+            </div>
+
             {/* Custom Survey PDFs — with admin scoring */}
             {filteredDocs.length > 0 && (
               <div className="bg-white rounded-xl border-2 border-amber-200 p-8">
@@ -1035,7 +1331,7 @@ export function SiapAdminReviewPage() {
                         Skor PRM Manual dari PDF
                       </h4>
                       <p className="text-sm text-indigo-700 leading-relaxed">
-                        Sistem menghitung skor PRM dari nilai PREM/PROM per dokumen, dikalikan validitas sampel per penyakit, lalu dikalikan bobot penyakit.
+                        Sistem menggabungkan nilai pasien QR/non-PDF dan nilai manual PDF secara proporsional berdasarkan jumlah pasien, lalu dikalikan validitas sampel dan bobot penyakit.
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
@@ -1239,6 +1535,9 @@ export function SiapAdminReviewPage() {
                               : "bg-gray-100 text-gray-500"
                         }`}>
                           {getAuditAnswerLabel(answer.answer)}
+                        </span>
+                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap bg-gray-100 text-gray-700">
+                          Poin: {getAuditOptionScore(answer.answer)}
                         </span>
                       </div>
                     </div>
