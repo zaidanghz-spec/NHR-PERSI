@@ -66,9 +66,24 @@ export function ClinicalAuditPage() {
   useEffect(() => {
     if (!specialty) return;
     async function loadDraft() {
+      const currentDraftId = draftManager.getCurrentDraftId();
+      const currentDraft = currentDraftId ? draftManager.getDraftById(currentDraftId) : null;
+      const currentClinical = currentDraft?.progress?.[specialty!]?.clinicalAudit;
+      const activeRevisionContext = sessionStorage.getItem("activeRevisionContext");
+      const allowUnscopedDraft = !currentDraftId || Boolean(activeRevisionContext);
+      const canUseSavedDraft = (draft: any) => allowUnscopedDraft || draft?.draftId === currentDraftId;
+
+      if (currentClinical?.data && Object.keys(currentClinical.data).length > 0) {
+        setFormData(currentClinical.data);
+        if (currentClinical.patientMeta) setPatientMeta(currentClinical.patientMeta);
+        if (currentClinical.currentPatient) setCurrentPatient(currentClinical.currentPatient);
+        if (typeof currentClinical.activeDiseaseIndex === "number") setActiveDiseaseIndex(currentClinical.activeDiseaseIndex);
+        return;
+      }
+
       try {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
-        if (serverDraft && serverDraft.formData) {
+        if (serverDraft && serverDraft.formData && canUseSavedDraft(serverDraft)) {
           setFormData(serverDraft.formData);
           if (serverDraft.patientMeta) setPatientMeta(serverDraft.patientMeta);
           if (serverDraft.currentPatient) setCurrentPatient(serverDraft.currentPatient);
@@ -80,6 +95,7 @@ export function ClinicalAuditPage() {
         const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
         if (saved) {
           const draft = JSON.parse(saved);
+          if (!canUseSavedDraft(draft)) return;
           if (draft.formData) setFormData(draft.formData);
           if (draft.patientMeta) setPatientMeta(draft.patientMeta);
           if (draft.currentPatient) setCurrentPatient(draft.currentPatient);
@@ -284,6 +300,7 @@ export function ClinicalAuditPage() {
   const handleSaveDraft = () => {
     if (!specialty) return;
     const draft = {
+      draftId: draftManager.getCurrentDraftId(),
       formData,
       patientMeta,
       currentPatient,
@@ -347,6 +364,7 @@ export function ClinicalAuditPage() {
         patientMeta,
         score: specialtyScore,
         currentPatient,
+        activeDiseaseIndex,
       });
     }, 1000); // 1s debounce to prevent flooding
 
