@@ -46,8 +46,9 @@ export function PatientReportPage() {
 
   // Get hospital code — must match Turso's hospital_code column (derived from email, the Turso PK)
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
-  const hospitalName = authData.hospitalName || "Unknown Hospital";
-  const hospitalCode = authData.hospitalCode || getHospitalCode(authData.email || "");
+  const hasHospitalAuth = Boolean(authData.hospitalName && (authData.hospitalCode || authData.email));
+  const hospitalName = hasHospitalAuth ? authData.hospitalName : "";
+  const hospitalCode = hasHospitalAuth ? authData.hospitalCode || getHospitalCode(authData.email || "") : "";
 
   const [activeDiseaseIndex, setActiveDiseaseIndex] = useState(0);
   const activeDisease = diseases[activeDiseaseIndex];
@@ -73,9 +74,16 @@ export function PatientReportPage() {
   const [diseaseCompletion, setDiseaseCompletion] = useState<Record<number, number>>({});
   // NOTE: PREM/PROM scores for PDF uploads are set ONLY by admin, not by the hospital
 
+  useEffect(() => {
+    if (!hasHospitalAuth) {
+      navigate("/hospital-login");
+    }
+  }, [hasHospitalAuth, navigate]);
+
   // Load existing custom survey upload from API on mount & disease change
   useEffect(() => {
     const checkCustomSurvey = async () => {
+      if (!hasHospitalAuth || !hospitalCode || !specialty) return;
       const data = await api.getCustomSurveyMetadata(hospitalCode, diseaseSpecialtyKey);
       if (data) {
         setCustomSurveyUploaded(true);
@@ -88,9 +96,14 @@ export function PatientReportPage() {
       }
     };
     checkCustomSurvey();
-  }, [hospitalCode, diseaseSpecialtyKey]);
+  }, [hasHospitalAuth, hospitalCode, diseaseSpecialtyKey, specialty]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!hasHospitalAuth || !hospitalCode) {
+      navigate("/hospital-login");
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -144,6 +157,11 @@ export function PatientReportPage() {
   };
 
   const handleRemoveFile = async () => {
+    if (!hasHospitalAuth || !hospitalCode) {
+      navigate("/hospital-login");
+      return;
+    }
+
     try {
       await api.deleteCustomSurveyMetadata(hospitalCode, diseaseSpecialtyKey);
       setCustomSurveyFileName("");
@@ -174,18 +192,18 @@ export function PatientReportPage() {
 
   // Load registered patients from server
   const loadRegisteredPatients = useCallback(async () => {
-    if (!specialty) return;
+    if (!hasHospitalAuth || !hospitalCode || !specialty) return;
     try {
       const patients = await api.getPatients(hospitalCode, diseaseSpecialtyKey);
       setRegisteredPatients(patients);
     } catch (err) {
       console.error("Failed to load patients:", err);
     }
-  }, [hospitalCode, diseaseSpecialtyKey, specialty]);
+  }, [hasHospitalAuth, hospitalCode, diseaseSpecialtyKey, specialty]);
 
   // Load survey responses from server
   const loadResponses = useCallback(async () => {
-    if (!specialty) return;
+    if (!hasHospitalAuth || !hospitalCode || !specialty) return;
     try {
       const surveys = await api.getSurveys(hospitalCode, diseaseSpecialtyKey);
       setSurveyResponses(surveys);
@@ -196,11 +214,11 @@ export function PatientReportPage() {
     } catch (err) {
       console.error("Failed to load surveys:", err);
     }
-  }, [hospitalCode, diseaseSpecialtyKey, specialty, activeDiseaseIndex, customSurveyUploaded, customSurveyPatientCount]);
+  }, [hasHospitalAuth, hospitalCode, diseaseSpecialtyKey, specialty, activeDiseaseIndex, customSurveyUploaded, customSurveyPatientCount]);
 
   // Check progress for ALL diseases (background)
   const checkAllDiseasesProgress = useCallback(async () => {
-    if (!specData) return;
+    if (!hasHospitalAuth || !hospitalCode || !specData) return;
     
     const progress: Record<number, number> = {};
     for (let i = 0; i < diseases.length; i++) {
@@ -214,7 +232,7 @@ export function PatientReportPage() {
       progress[i] = surveys.length + customCount;
     }
     setDiseaseCompletion(progress);
-  }, [hospitalCode, specialty, diseases.length, specData]);
+  }, [hasHospitalAuth, hospitalCode, specialty, diseases.length, specData]);
 
   // Initial load and on disease tab change
   useEffect(() => {
@@ -288,6 +306,11 @@ export function PatientReportPage() {
     e.preventDefault();
     setRegisterError("");
 
+    if (!hasHospitalAuth || !hospitalCode) {
+      navigate("/hospital-login");
+      return;
+    }
+
     if (!newPatientName.trim() || !newPatientRM.trim()) {
       setRegisterError("Nama dan nomor rekam medis wajib diisi.");
       return;
@@ -326,6 +349,11 @@ export function PatientReportPage() {
 
   // Remove registered patient
   const handleRemovePatient = async (id: string) => {
+    if (!hasHospitalAuth || !hospitalCode) {
+      navigate("/hospital-login");
+      return;
+    }
+
     try {
       await api.removePatient(hospitalCode, diseaseSpecialtyKey, id);
       await loadRegisteredPatients();
@@ -335,6 +363,11 @@ export function PatientReportPage() {
   };
 
   const handleCopyLink = (patient: RegisteredPatient) => {
+    if (!hasHospitalAuth || !hospitalCode) {
+      navigate("/hospital-login");
+      return;
+    }
+
     navigator.clipboard.writeText(buildSurveyUrl(patient));
     alert(`Link survei untuk ${patient.name} telah disalin!`);
   };
@@ -349,7 +382,7 @@ export function PatientReportPage() {
 
   // Save draft
   const handleSaveDraft = async () => {
-    if (!specialty) return;
+    if (!hasHospitalAuth || !hospitalCode || !specialty) return;
     try {
       await api.saveDraft("patient-report", hospitalCode, specialty, {
         registeredPatients,
@@ -361,6 +394,11 @@ export function PatientReportPage() {
   };
 
   const handleContinue = async () => {
+    if (!hasHospitalAuth || !hospitalCode) {
+      navigate("/hospital-login");
+      return;
+    }
+
     await handleSaveDraft();
     
     // Calculate final score across ALL diseases for this specialty
@@ -451,6 +489,10 @@ export function PatientReportPage() {
   };
 
   if (loading) {
+    if (!hasHospitalAuth) {
+      return null;
+    }
+
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

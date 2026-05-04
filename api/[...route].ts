@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import * as kv from "./kv_store";
+import { handleTursoOperation } from "./turso_ops";
 const app = new Hono();
 
 // Enable logger
@@ -23,6 +24,18 @@ app.use(
 // ============ HEALTH CHECK ============
 app.get("/api/health", (c) => {
   return c.json({ status: "ok" });
+});
+
+app.post("/api/rpc/:operation", async (c) => {
+  try {
+    const { operation } = c.req.param();
+    const payload = await c.req.json().catch(() => ({}));
+    const result = await handleTursoOperation(operation, payload);
+    return c.json({ result: result ?? null });
+  } catch (err: any) {
+    console.log("RPC error:", err.message);
+    return c.json({ error: err.message || "RPC operation failed" }, 500);
+  }
 });
 
 // ============ KEY HELPERS ============
