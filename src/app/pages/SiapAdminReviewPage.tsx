@@ -19,6 +19,7 @@ import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { useData } from "../context/DataContext";
 import { specialtyAuditData } from "../data/specialtyAuditData";
+import * as api from "../utils/api";
 
 interface CustomSurveyDoc {
   fileName: string;
@@ -29,6 +30,10 @@ interface CustomSurveyDoc {
   specialty: string;
   diseaseName: string;
   patientCount?: number;
+  adminPremScore?: number | null;
+  adminPromScore?: number | null;
+  adminPrmScore?: number | null;
+  reviewedAt?: string;
 }
 
 // ============ EDITABLE SCORE TABLE ============
@@ -42,6 +47,14 @@ function calcFinal(scores: EditableScores): number {
   return Number((scores.rsbk * 0.15 + scores.clinicalAudit * 0.6 + scores.patientReport * 0.25).toFixed(1));
 }
 
+function getSampleValidityWeight(count: number): number {
+  if (count <= 0) return 0;
+  if (count <= 5) return 0.80;
+  if (count <= 10) return 0.85;
+  if (count <= 20) return 0.92;
+  return 1.0;
+}
+
 export function SiapAdminReviewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -50,6 +63,7 @@ export function SiapAdminReviewPage() {
   const [action, setAction] = useState<"approve" | "reject" | "">("");
   const [revisionTargets, setRevisionTargets] = useState({ rsbk: false, clinicalAudit: false, patientReport: false });
   const [customSurveyDocs, setCustomSurveyDocs] = useState<CustomSurveyDoc[]>([]);
+  const [customSurveyScores, setCustomSurveyScores] = useState<Record<string, { prem: string; prom: string }>>({});
   const [activeTab, setActiveTab] = useState<"summary" | "rsbk" | "audit" | "prm">("summary");
   const [selectedAuditPatient, setSelectedAuditPatient] = useState<number | null>(null);
   const [selectedPrmPatient, setSelectedPrmPatient] = useState<string | null>(null);
@@ -63,30 +77,66 @@ export function SiapAdminReviewPage() {
   const { isAdmin, submissions, updateSubmissionStatus, publishRanking, hospitalAccounts } = useData();
   const actualSubmission = submissions.find(s => s.id === id);
 
+  const getSpecialtyKey = (name: string) =>
+    Object.keys(specialtyAuditData).find(key => specialtyAuditData[key].name === name) || "cardiology";
+
   // Load custom survey PDFs — filtered to THIS submission's hospital only
   useEffect(() => {
     if (!actualSubmission) return;
-    const docs: CustomSurveyDoc[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("custom-survey-")) {
-        try {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw) as CustomSurveyDoc;
-            // Only include docs belonging to this submission's hospital
-            if (parsed.hospitalName === actualSubmission.hospitalName) {
-              docs.push(parsed);
-            }
-          }
-        } catch {}
-      }
-    }
-    setCustomSurveyDocs(docs);
-  }, [actualSubmission]);
 
-  const getSpecialtyKey = (name: string) =>
-    Object.keys(specialtyAuditData).find(key => specialtyAuditData[key].name === name) || "cardiology";
+    let cancelled = false;
+    const loadCustomSurveyDocs = async () => {
+      const docs: CustomSurveyDoc[] = [];
+      const seen = new Set<string>();
+      const addDoc = (doc: CustomSurveyDoc) => {
+        const key = `${doc.hospitalCode || ""}:${doc.specialty}:${doc.diseaseName}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        docs.push(doc);
+      };
+
+      const hospitalCode = (actualSubmission as any).hospitalCode || "";
+      const specialtyKey = getSpecialtyKey(actualSubmission.specialty);
+      const specData = specialtyAuditData[specialtyKey] || specialtyAuditData.cardiology;
+
+      if (hospitalCode) {
+        await Promise.all(specData.diseases.map(async (disease, idx) => {
+          const dKey = `${specialtyKey}-d${idx}`;
+          const serverDoc = await api.getCustomSurveyMetadata(hospitalCode, dKey);
+          if (serverDoc) {
+            addDoc({
+              ...serverDoc,
+              hospitalCode,
+              specialty: serverDoc.specialty || specialtyKey,
+              diseaseName: serverDoc.diseaseName || disease.diseaseName,
+            });
+          }
+        }));
+      }
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("custom-survey-")) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw) as CustomSurveyDoc;
+              if (parsed.hospitalName === actualSubmission.hospitalName) {
+                addDoc(parsed);
+              }
+            }
+          } catch {}
+        }
+      }
+
+      if (!cancelled) setCustomSurveyDocs(docs);
+    };
+
+    loadCustomSurveyDocs();
+    return () => {
+      cancelled = true;
+    };
+  }, [actualSubmission]);
 
   const submissionData = actualSubmission ? {
     ...actualSubmission,
@@ -129,8 +179,67 @@ export function SiapAdminReviewPage() {
 
   const filteredDocs = customSurveyDocs.filter(d =>
     d.hospitalName === submissionData.hospitalName &&
-    (submissionData.specialty === "Multiple" || d.specialty === submissionData.specialty)
+    (
+      submissionData.specialty === "Multiple" ||
+      d.specialty === submissionData.specialty ||
+      d.specialty === (submissionData as any).specialtyKey
+    )
   );
+
+  const getCustomSurveyDocKey = (doc: CustomSurveyDoc) => {
+    const specKey = specialtyAuditData[doc.specialty] ? doc.specialty : (submissionData as any).specialtyKey;
+    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+    const diseaseIndex = Math.max(0, specData.diseases.findIndex(d => d.diseaseName === doc.diseaseName));
+    return `${doc.hospitalCode || (submissionData as any).hospitalCode || ""}:${specKey}-d${diseaseIndex}`;
+  };
+
+  const getCustomSurveyApiKey = (doc: CustomSurveyDoc) => {
+    const specKey = specialtyAuditData[doc.specialty] ? doc.specialty : (submissionData as any).specialtyKey;
+    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+    const diseaseIndex = Math.max(0, specData.diseases.findIndex(d => d.diseaseName === doc.diseaseName));
+    return `${specKey}-d${diseaseIndex}`;
+  };
+
+  const getDiseaseWeightForDoc = (doc: CustomSurveyDoc) => {
+    const specKey = specialtyAuditData[doc.specialty] ? doc.specialty : (submissionData as any).specialtyKey;
+    const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
+    const disease = specData.diseases.find(d => d.diseaseName === doc.diseaseName);
+    const weightMatch = disease?.weight.match(/(\d+)%/);
+    return weightMatch ? parseInt(weightMatch[1]) / 100 : 1 / Math.max(specData.diseases.length, 1);
+  };
+
+  const calculateManualPrmTotal = (docs: CustomSurveyDoc[], scores: Record<string, { prem: string; prom: string }>) => {
+    let total = 0;
+    docs.forEach(doc => {
+      const key = getCustomSurveyDocKey(doc);
+      const prem = Number(scores[key]?.prem ?? doc.adminPremScore ?? 0);
+      const prom = Number(scores[key]?.prom ?? doc.adminPromScore ?? 0);
+      const rawScore = prem * 0.6 + prom * 0.4;
+      const adjustedScore = rawScore * getSampleValidityWeight(doc.patientCount || 0);
+      total += adjustedScore * getDiseaseWeightForDoc(doc);
+    });
+    return Number(total.toFixed(1));
+  };
+
+  useEffect(() => {
+    setCustomSurveyScores(prev => {
+      let changed = false;
+      const next = { ...prev };
+      filteredDocs.forEach(doc => {
+        const key = getCustomSurveyDocKey(doc);
+        if (!next[key]) {
+          next[key] = {
+            prem: doc.adminPremScore != null ? String(doc.adminPremScore) : "",
+            prom: doc.adminPromScore != null ? String(doc.adminPromScore) : "",
+          };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [customSurveyDocs, submissionData.hospitalName, submissionData.specialty]);
+
+  const manualPrmPreviewScore = calculateManualPrmTotal(filteredDocs, customSurveyScores);
 
   const getTier = (score: number) => {
     if (score >= 90) return { grade: "Tier 1", name: "Platinum", color: "text-purple-700", bg: "bg-purple-100" };
@@ -185,30 +294,76 @@ export function SiapAdminReviewPage() {
       savedAt: new Date().toISOString(),
     }));
 
-    // Back-propagate PRM scores to custom survey docs so the hospital can read them
-    filteredDocs.forEach(doc => {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("custom-survey-")) {
-           try {
-             const raw = localStorage.getItem(key);
-             if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed.hospitalName === doc.hospitalName && parsed.specialty === doc.specialty && parsed.diseaseName === doc.diseaseName) {
-                   parsed.adminPremScore = adminScores.patientReport;
-                   parsed.adminPromScore = adminScores.patientReport;
-                   localStorage.setItem(key, JSON.stringify(parsed));
-                   break;
-                }
-             }
-           } catch { /* ignore */ }
-        }
-      }
-    });
-
     setScoreSaved(true);
     setEditingScores(false);
     setTimeout(() => setScoreSaved(false), 3000);
+  };
+
+  const handleSavePrmPdfScores = async () => {
+    if (!adminScores || filteredDocs.length === 0) return;
+
+    const incompleteDoc = filteredDocs.find(doc => {
+      const key = getCustomSurveyDocKey(doc);
+      const prem = customSurveyScores[key]?.prem ?? (doc.adminPremScore != null ? String(doc.adminPremScore) : "");
+      const prom = customSurveyScores[key]?.prom ?? (doc.adminPromScore != null ? String(doc.adminPromScore) : "");
+      return prem === "" || prom === "";
+    });
+
+    if (incompleteDoc) {
+      alert(`Isi nilai PREM dan PROM untuk dokumen ${incompleteDoc.fileName}.`);
+      return;
+    }
+
+    const reviewedAt = new Date().toISOString();
+    const updatedDocs = filteredDocs.map(doc => {
+      const key = getCustomSurveyDocKey(doc);
+      const premValue = customSurveyScores[key]?.prem ?? doc.adminPremScore ?? 0;
+      const promValue = customSurveyScores[key]?.prom ?? doc.adminPromScore ?? 0;
+      const prem = Math.max(0, Math.min(100, Number(premValue) || 0));
+      const prom = Math.max(0, Math.min(100, Number(promValue) || 0));
+      return {
+        ...doc,
+        adminPremScore: prem,
+        adminPromScore: prom,
+        adminPrmScore: Number((prem * 0.6 + prom * 0.4).toFixed(1)),
+        reviewedAt,
+      };
+    });
+
+    try {
+      await Promise.all(updatedDocs.map(async doc => {
+        const hospitalCode = doc.hospitalCode || (submissionData as any).hospitalCode || "";
+        const apiKey = getCustomSurveyApiKey(doc);
+        if (hospitalCode) {
+          await api.saveCustomSurveyMetadata(hospitalCode, apiKey, doc);
+        }
+        localStorage.setItem(`custom-survey-${hospitalCode}-${apiKey}`, JSON.stringify(doc));
+      }));
+
+      const patientReport = calculateManualPrmTotal(updatedDocs, customSurveyScores);
+      const nextScores = { ...adminScores, patientReport };
+      setAdminScores(nextScores);
+      localStorage.setItem(`admin-score-override-${id}`, JSON.stringify({
+        scores: nextScores,
+        notes: {
+          ...adminScoreNotes,
+          patientReport: "Dinilai manual dari dokumen PDF PRM: PREM 60% + PROM 40%, dikalikan validitas sampel per penyakit.",
+        },
+        savedAt: reviewedAt,
+      }));
+      setAdminScoreNotes(prev => ({
+        ...prev,
+        patientReport: "Dinilai manual dari dokumen PDF PRM: PREM 60% + PROM 40%, dikalikan validitas sampel per penyakit.",
+      }));
+      setCustomSurveyDocs(prev => prev.map(doc => {
+        const updated = updatedDocs.find(d => getCustomSurveyDocKey(d) === getCustomSurveyDocKey(doc));
+        return updated || doc;
+      }));
+      setScoreSaved(true);
+      setTimeout(() => setScoreSaved(false), 3000);
+    } catch (err: any) {
+      alert(err.message || "Gagal menyimpan nilai PRM PDF.");
+    }
   };
 
   const handleResetScores = () => {
@@ -401,48 +556,28 @@ export function SiapAdminReviewPage() {
         {/* ========== TAB: SUMMARY ========== */}
         {activeTab === "summary" && (
           <div className="space-y-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* ====== ADMIN EDITABLE SCORING TABLE ====== */}
+            {/* ====== ADMIN SCORING SUMMARY ====== */}
             <div className="bg-white rounded-xl border-2 border-indigo-300 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <Star className="w-5 h-5 text-indigo-600" />
-                    Tabel Penilaian Admin
+                    Ringkasan Skor Assessment
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Admin dapat mengubah skor dan menambahkan catatan per komponen sebelum approval
+                    Nilai PRM dari dokumen PDF diisi manual di tab Patient Report (PRM), bukan di tabel ringkasan.
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  {editingScores ? (
-                    <>
-                      <Button
-                        onClick={handleResetScores}
-                        variant="outline"
-                        className="border-gray-300 text-gray-600 font-semibold"
-                        size="sm"
-                      >
-                        <RotateCcw className="w-4 h-4 mr-1.5" />
-                        Reset
-                      </Button>
-                      <Button
-                        onClick={handleSaveScoreOverride}
-                        className="bg-indigo-600 hover:bg-indigo-700 font-semibold"
-                        size="sm"
-                      >
-                        <Save className="w-4 h-4 mr-1.5" />
-                        Simpan Penilaian
-                      </Button>
-                    </>
-                  ) : (
+                  {filteredDocs.length > 0 && (
                     <Button
-                      onClick={() => setEditingScores(true)}
+                      onClick={() => setActiveTab("prm")}
                       variant="outline"
                       className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 font-semibold"
                       size="sm"
                     >
-                      <Edit3 className="w-4 h-4 mr-1.5" />
-                      Edit Penilaian
+                      <FileText className="w-4 h-4 mr-1.5" />
+                      Nilai PDF PRM
                     </Button>
                   )}
                 </div>
@@ -472,7 +607,7 @@ export function SiapAdminReviewPage() {
                     {[
                       { key: "rsbk" as const, label: "Hospital Structure", weight: 0.15, color: "blue", editable: false },
                       { key: "clinicalAudit" as const, label: "Clinical Audit", weight: 0.60, color: "purple", editable: false },
-                      { key: "patientReport" as const, label: "Patient Report (PRM)", weight: 0.25, color: "teal", editable: true },
+                      { key: "patientReport" as const, label: "Patient Report (PRM)", weight: 0.25, color: "teal", editable: false },
                     ].map(component => {
                       const systemScore = (submissionData.scores as any)[component.key] || 0;
                       const adminVal = adminScores ? adminScores[component.key] : systemScore;
@@ -760,92 +895,151 @@ export function SiapAdminReviewPage() {
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5 flex items-start gap-2 text-sm">
                   <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <span className="text-amber-800">
-                    RS menggunakan survei internal — skor PRM perlu dinilai manual oleh admin melalui <strong>Tabel Penilaian Admin</strong> di tab Ringkasan.
+                    RS menggunakan survei internal — buka preview PDF di bawah, lalu isi nilai <strong>PREM</strong> dan <strong>PROM</strong> untuk setiap penyakit.
                   </span>
                 </div>
 
-                <div className="space-y-4">
-                  {filteredDocs.map((doc, i) => (
-                    <div key={i} className="flex items-start gap-4 p-5 border border-amber-100 rounded-xl bg-amber-50/30 hover:bg-amber-50/60 transition-colors">
-                      <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-5 h-5 text-amber-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                            <Building2 className="w-3 h-3" />
-                            {doc.hospitalName || doc.hospitalCode}
-                          </span>
-                          {doc.diseaseName && (
-                            <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                              {doc.diseaseName}
-                            </span>
-                          )}
-                          {doc.patientCount && (
-                            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                              {doc.patientCount} pasien
-                            </span>
-                          )}
+                <div className="space-y-6">
+                  {filteredDocs.map((doc, i) => {
+                    const docKey = getCustomSurveyDocKey(doc);
+                    const scoreInput = customSurveyScores[docKey] || { prem: "", prom: "" };
+                    const prem = Number(scoreInput.prem || 0);
+                    const prom = Number(scoreInput.prom || 0);
+                    const rawPrm = Number((prem * 0.6 + prom * 0.4).toFixed(1));
+                    const validity = getSampleValidityWeight(doc.patientCount || 0);
+                    const adjusted = Number((rawPrm * validity).toFixed(1));
+
+                    return (
+                      <div key={docKey || i} className="grid lg:grid-cols-[1.35fr_0.9fr] gap-5 p-5 border border-amber-100 rounded-xl bg-amber-50/30">
+                        <div className="min-w-0">
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-gray-900 truncate">{doc.fileName}</p>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                  <Building2 className="w-3 h-3" />
+                                  {doc.hospitalName || doc.hospitalCode}
+                                </span>
+                                {doc.diseaseName && (
+                                  <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                                    {doc.diseaseName}
+                                  </span>
+                                )}
+                                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                  {doc.patientCount || 0} pasien
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                Upload: {new Date(doc.uploadedAt).toLocaleString("id-ID")}
+                              </p>
+                            </div>
+                            <a
+                              href={doc.base64}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors flex-shrink-0"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              Buka
+                            </a>
+                          </div>
+                          <iframe
+                            title={`Preview PDF ${doc.fileName}`}
+                            src={doc.base64}
+                            className="w-full h-72 rounded-lg border border-amber-200 bg-white"
+                          />
                         </div>
-                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Upload: {new Date(doc.uploadedAt).toLocaleString("id-ID")}
-                        </p>
+
+                        <div className="bg-white rounded-xl border border-amber-100 p-5">
+                          <h4 className="font-black text-gray-900 mb-1">Penilaian Manual PRM</h4>
+                          <p className="text-xs text-gray-500 mb-5">
+                            Isi nilai 0-100 berdasarkan dokumen survei internal untuk penyakit ini.
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-3 mb-5">
+                            <label className="block">
+                              <span className="block text-[10px] font-black uppercase tracking-widest text-blue-700 mb-1">PREM</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={scoreInput.prem}
+                                onChange={(e) => {
+                                  const val = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                  setCustomSurveyScores(prev => ({
+                                    ...prev,
+                                    [docKey]: { ...(prev[docKey] || { prem: "", prom: "" }), prem: e.target.value === "" ? "" : String(val) },
+                                  }));
+                                }}
+                                className="w-full h-12 bg-blue-50 border-2 border-blue-100 rounded-lg text-center text-xl font-black text-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="block text-[10px] font-black uppercase tracking-widest text-emerald-700 mb-1">PROM</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={scoreInput.prom}
+                                onChange={(e) => {
+                                  const val = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                  setCustomSurveyScores(prev => ({
+                                    ...prev,
+                                    [docKey]: { ...(prev[docKey] || { prem: "", prom: "" }), prom: e.target.value === "" ? "" : String(val) },
+                                  }));
+                                }}
+                                className="w-full h-12 bg-emerald-50 border-2 border-emerald-100 rounded-lg text-center text-xl font-black text-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">PREM 60% + PROM 40%</span>
+                              <span className="font-black text-gray-900">{rawPrm}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Validitas sampel</span>
+                              <span className="font-black text-amber-700">{Math.round(validity * 100)}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Skor setelah validitas</span>
+                              <span className="font-black text-green-700">{adjusted}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <a
-                        href={doc.base64}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors flex-shrink-0"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Buka PDF
-                      </a>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                 <div className="mt-8 p-6 bg-indigo-50 border border-indigo-200 rounded-2xl">
-                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                     <div className="flex-1">
-                       <h4 className="text-lg font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                         <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                         Input Skor Survei Mandiri (PDF)
-                       </h4>
-                       <p className="text-sm text-indigo-700 leading-relaxed mb-4">
-                         Setelah mereview dokumen PDF di atas, masukkan skor evaluasi untuk Patient Report (PRM) di sini. Skor ini akan otomatis mengupdate <strong>Ringkasan Penilaian</strong>.
-                       </p>
-                       <div className="flex items-center gap-3">
-                         <div className="relative">
-                            <input 
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={adminScores?.patientReport || 0}
-                              onChange={(e) => {
-                                const val = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                                setAdminScores(prev => prev ? { ...prev, patientReport: val } : null);
-                              }}
-                              className="w-32 h-14 bg-white border-2 border-indigo-300 rounded-xl text-center text-2xl font-black text-indigo-900 focus:outline-none focus:ring-4 focus:ring-indigo-200 transition-all"
-                            />
-                            <span className="absolute -top-2.5 left-4 bg-indigo-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Score 0-100</span>
-                         </div>
-                         <div className="text-indigo-400 font-bold">PTS</div>
-                         <Button
-                           onClick={handleSaveScoreOverride}
-                           className="h-14 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-200 transition-all flex items-center gap-2"
-                         >
-                           <Save className="w-5 h-5" />
-                           Update Ringkasan
-                         </Button>
-                       </div>
-                     </div>
-                     <div className="md:w-64 bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-indigo-100 italic text-[11px] text-indigo-600 leading-tight">
-                       "Nilai ini akan memberikan bobot 25% pada skor akhir rumah sakit. Pastikan kualitas data pada kuesioner mandiri sudah sesuai standar."
-                     </div>
-                   </div>
-                 </div>
+                <div className="mt-8 p-6 bg-indigo-50 border border-indigo-200 rounded-2xl">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                        Skor PRM Manual dari PDF
+                      </h4>
+                      <p className="text-sm text-indigo-700 leading-relaxed">
+                        Sistem menghitung skor PRM dari nilai PREM/PROM per dokumen, dikalikan validitas sampel per penyakit, lalu dikalikan bobot penyakit.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Skor PRM</p>
+                        <p className="text-4xl font-black text-indigo-900">{manualPrmPreviewScore}</p>
+                      </div>
+                      <Button
+                        onClick={handleSavePrmPdfScores}
+                        className="h-12 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-200 transition-all flex items-center gap-2"
+                      >
+                        <Save className="w-5 h-5" />
+                        Simpan Nilai PRM
+                      </Button>
+                    </div>
+                  </div>
+                </div>
                </div>
              )}
 
