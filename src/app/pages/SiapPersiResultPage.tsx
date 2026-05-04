@@ -13,6 +13,53 @@ export function SiapPersiResultPage() {
   const navigate = useNavigate();
   const { addSubmission } = useData();
   const specialtyInfo = specialtyAuditData[specialty as keyof typeof specialtyAuditData];
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const draftId = draftManager.getCurrentDraftId();
+  const draft = draftId ? draftManager.getDraftById(draftId) : null;
+
+  const calculateRsbkScoreFromData = (spec: string | undefined, data: Record<string, any> = {}) => {
+    const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+    if (!info) return 0;
+    const getActual = (id: string) => {
+      const value = data[id];
+      if (value === null || value === undefined || value === "") return 0;
+      const parsed = typeof value === "number" ? value : parseFloat(String(value));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const calcPoints = (category: string) =>
+      info.rsbkItems
+        .filter(item => item.category === category)
+        .reduce((sum, item) => sum + Math.min(getActual(item.id), item.target) * item.pointPerUnit, 0);
+    const calcTargetPoints = (category: string) =>
+      info.rsbkItems
+        .filter(item => item.category === category)
+        .reduce((sum, item) => sum + item.target * item.pointPerUnit, 0);
+
+    const sdmTarget = calcTargetPoints("sdm");
+    const saranaTarget = calcTargetPoints("sarana");
+    const alatTarget = calcTargetPoints("alat");
+    const sdm = sdmTarget > 0 ? (calcPoints("sdm") / sdmTarget) * 50 : 0;
+    const sarana = saranaTarget > 0 ? (calcPoints("sarana") / saranaTarget) * 25 : 0;
+    const alat = alatTarget > 0 ? (calcPoints("alat") / alatTarget) * 25 : 0;
+    return Number((sdm + sarana + alat).toFixed(1));
+  };
+
+  const getStoredScore = (spec: string | undefined, stage: "rsbk" | "clinicalAudit" | "patientReport") => {
+    if (!spec) return 0;
+    const sessionKey =
+      stage === "rsbk"
+        ? `${spec}_rsbkScore`
+        : stage === "clinicalAudit"
+        ? `${spec}_clinicalAuditScore`
+        : `${spec}_patientReportScore`;
+    const sessionValue = parseFloat(sessionStorage.getItem(sessionKey) || "");
+    if (Number.isFinite(sessionValue)) return sessionValue;
+
+    const draftStage = draft?.progress?.[spec]?.[stage];
+    if (typeof draftStage?.score === "number") return draftStage.score;
+    if (stage === "rsbk") return calculateRsbkScoreFromData(spec, draftStage?.data || {});
+    return 0;
+  };
 
   // Get selected specialties
   const selectedSpecialtiesStr = sessionStorage.getItem("selectedSpecialties");
@@ -25,9 +72,9 @@ export function SiapPersiResultPage() {
   const nextSpecialty = !isLastSpecialty ? selectedSpecialties[currentIndex + 1] : null;
 
   // Get scores from session (Specialty Specific)
-  const rsbkScore = parseFloat(sessionStorage.getItem(`${specialty}_rsbkScore`) || "0");
-  const clinicalAuditScore = parseFloat(sessionStorage.getItem(`${specialty}_clinicalAuditScore`) || "0");
-  const patientReportScore = parseFloat(sessionStorage.getItem(`${specialty}_patientReportScore`) || "0");
+  const rsbkScore = getStoredScore(specialty, "rsbk");
+  const clinicalAuditScore = getStoredScore(specialty, "clinicalAudit");
+  const patientReportScore = getStoredScore(specialty, "patientReport");
 
   // Calculate weighted total: Hospital Structure 15%, Clinical Audit 60%, Patient Report 25%
   const rsbkWeighted = Number((rsbkScore * 0.15).toFixed(2));
@@ -90,20 +137,20 @@ export function SiapPersiResultPage() {
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
     const hCode = hospitalAuth.hospitalCode || hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "RS001";
-    const draftId = draftManager.getCurrentDraftId();
-    const draft = draftId ? draftManager.getDraftById(draftId) : null;
-    
-    // Loop through all selected specialties and create a submission for each
-    for (const spec of selectedSpecialties) {
-      const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
-      if (!info) continue;
+    try {
+      // Loop through all selected specialties and create a submission for each
+      for (const spec of selectedSpecialties) {
+        const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+        if (!info) continue;
 
-      const rsbk = parseFloat(sessionStorage.getItem(`${spec}_rsbkScore`) || "0");
-      const audit = parseFloat(sessionStorage.getItem(`${spec}_clinicalAuditScore`) || "0");
-      const report = parseFloat(sessionStorage.getItem(`${spec}_patientReportScore`) || "0");
-      const final = Number(((rsbk * 0.15) + (audit * 0.60) + (report * 0.25)).toFixed(2));
+        const rsbk = getStoredScore(spec, "rsbk");
+        const audit = getStoredScore(spec, "clinicalAudit");
+        const report = getStoredScore(spec, "patientReport");
+        const final = Number(((rsbk * 0.15) + (audit * 0.60) + (report * 0.25)).toFixed(2));
 
       // Get real raw data from draft
       const specProgress = draft?.progress[spec];
@@ -206,7 +253,7 @@ export function SiapPersiResultPage() {
         }
       } catch {}
 
-      addSubmission({
+        await addSubmission({
         hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
         hospitalCode: hCode || "RS001",
         picName: hospitalAuth.picName || "Unknown PIC",
@@ -231,7 +278,7 @@ export function SiapPersiResultPage() {
           prmPatients: prmDetails,
           rawProgress: specProgress,
         },
-      });
+        });
 
       // Cleanup specialty-specific scores
       sessionStorage.removeItem(`${spec}_rsbkScore`);
@@ -240,22 +287,26 @@ export function SiapPersiResultPage() {
       sessionStorage.removeItem(`${spec}_auditPatients`);
       sessionStorage.removeItem(`${spec}_patientReportScore`);
       sessionStorage.removeItem(`${spec}_prmSummary`);
-    }
-    
-    // Save submitted specialties before cleanup so SubmissionSuccessPage can display them
-    sessionStorage.setItem("lastSubmittedSpecialties", JSON.stringify(selectedSpecialties));
+      }
 
-    // Cleanup draft
-    if (draftId) {
-      draftManager.deleteDraft(draftId);
-      draftManager.clearCurrentDraftId();
+      // Save submitted specialties before cleanup so SubmissionSuccessPage can display them
+      sessionStorage.setItem("lastSubmittedSpecialties", JSON.stringify(selectedSpecialties));
+
+      // Cleanup draft only after the server accepts the submission.
+      if (draftId) {
+        draftManager.deleteDraft(draftId);
+        draftManager.clearCurrentDraftId();
+      }
+
+      // General cleanup
+      sessionStorage.removeItem("currentSpecialty");
+      sessionStorage.removeItem("selectedSpecialties");
+
+      navigate("/siap-persi/submission-success");
+    } catch (err: any) {
+      alert(`Submission gagal dikirim ke server: ${err?.message || "Unknown error"}`);
+      setIsSubmitting(false);
     }
-    
-    // General cleanup
-    sessionStorage.removeItem("currentSpecialty");
-    sessionStorage.removeItem("selectedSpecialties");
-    
-    navigate("/siap-persi/submission-success");
   };
 
   return (
@@ -507,9 +558,10 @@ export function SiapPersiResultPage() {
           ) : (
             <Button
               onClick={handleSubmit}
+              disabled={isSubmitting}
               className="flex-1 h-12 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold"
             >
-              Submit Semua untuk Review ({selectedSpecialties.length} Pelayanan)
+              {isSubmitting ? "Mengirim ke server..." : `Submit Semua untuk Review (${selectedSpecialties.length} Pelayanan)`}
             </Button>
           )}
         </div>
