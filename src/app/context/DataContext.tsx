@@ -589,7 +589,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const updateSubmissionStatus = useCallback(async (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any) => {
+  const updateSubmissionStatus = useCallback(async (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any, revisionNotes?: any) => {
     let updatedDetailsJson: any = null;
     
     setSubmissions(prev => prev.map(s => {
@@ -598,7 +598,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const newDetails = { 
           ...(s.details || {}), 
           reviewerNotes: notes !== undefined ? notes : s.details?.reviewerNotes,
-          revisionTargets: revisionTargets || s.details?.revisionTargets
+          revisionTargets: revisionTargets || s.details?.revisionTargets,
+          revisionNotes: revisionNotes || s.details?.revisionNotes,
+          revisionRequestedAt: status === "Revision Required" ? new Date().toISOString() : s.details?.revisionRequestedAt,
         };
         updatedDetailsJson = newDetails;
         

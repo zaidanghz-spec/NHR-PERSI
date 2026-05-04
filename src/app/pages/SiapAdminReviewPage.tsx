@@ -62,6 +62,7 @@ export function SiapAdminReviewPage() {
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "">("");
   const [revisionTargets, setRevisionTargets] = useState({ rsbk: false, clinicalAudit: false, patientReport: false });
+  const [revisionNotes, setRevisionNotes] = useState({ rsbk: "", clinicalAudit: "", patientReport: "" });
   const [customSurveyDocs, setCustomSurveyDocs] = useState<CustomSurveyDoc[]>([]);
   const [customSurveyScores, setCustomSurveyScores] = useState<Record<string, { prem: string; prom: string }>>({});
   const [activeTab, setActiveTab] = useState<"summary" | "rsbk" | "audit" | "prm">("summary");
@@ -409,7 +410,19 @@ export function SiapAdminReviewPage() {
         submissionId: submissionData.id,
       });
     } else if (action === "reject") {
-      updateSubmissionStatus(submissionData.id, "Revision Required", comment, revisionTargets);
+      const selectedTargets = Object.entries(revisionTargets).filter(([, value]) => value);
+      if (selectedTargets.length === 0) {
+        alert("Pilih minimal satu bagian yang perlu direvisi.");
+        return;
+      }
+
+      const missingNote = selectedTargets.find(([key]) => !((revisionNotes as any)[key] || "").trim());
+      if (missingNote) {
+        alert("Isi catatan spesifik untuk setiap bagian yang dipilih revisi.");
+        return;
+      }
+
+      updateSubmissionStatus(submissionData.id, "Revision Required", comment, revisionTargets, revisionNotes);
     }
     setShowApprovalDialog(false);
     setTimeout(() => navigate("/siap-persi/admin/dashboard"), 500);
@@ -1313,7 +1326,7 @@ export function SiapAdminReviewPage() {
         {/* Approval Dialog */}
         {showApprovalDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-6 z-50">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+            <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[86vh] overflow-y-auto">
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
                 {action === "approve" ? "Approve Submission?" : "Request Revision?"}
               </h3>
@@ -1328,19 +1341,29 @@ export function SiapAdminReviewPage() {
                   <h4 className="font-semibold text-gray-900 mb-3 text-sm">Pilih Bagian yang Perlu Direvisi:</h4>
                   <div className="space-y-2">
                     {[
-                      { key: "rsbk", label: "Hospital Structure" },
-                      { key: "clinicalAudit", label: "Clinical Audit" },
-                      { key: "patientReport", label: "Patient Report" },
+                      { key: "rsbk", label: "Hospital Structure", placeholder: "Contoh: jumlah SDM/alat tertentu belum sesuai bukti, mohon koreksi data dan lampiran." },
+                      { key: "clinicalAudit", label: "Clinical Audit", placeholder: "Contoh: pasien kode P-098 belum lengkap outcome, atau jawaban indikator X perlu diperbaiki." },
+                      { key: "patientReport", label: "Patient Report", placeholder: "Contoh: nilai PREM/PROM PDF belum dapat diverifikasi, atau data pasien PRM kurang." },
                     ].map(item => (
-                      <label key={item.key} className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={(revisionTargets as any)[item.key]}
-                          onChange={e => setRevisionTargets(prev => ({ ...prev, [item.key]: e.target.checked }))}
-                          className="w-4 h-4 rounded border-gray-300 text-[#0F4C81] focus:ring-[#0F4C81]"
-                        />
-                        <span className="text-sm font-medium text-gray-700">{item.label}</span>
-                      </label>
+                      <div key={item.key} className="rounded-lg border border-gray-200 bg-white p-3">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={(revisionTargets as any)[item.key]}
+                            onChange={e => setRevisionTargets(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                            className="w-4 h-4 rounded border-gray-300 text-[#0F4C81] focus:ring-[#0F4C81]"
+                          />
+                          <span className="text-sm font-bold text-gray-800">{item.label}</span>
+                        </label>
+                        {(revisionTargets as any)[item.key] && (
+                          <Textarea
+                            value={(revisionNotes as any)[item.key]}
+                            onChange={(e) => setRevisionNotes(prev => ({ ...prev, [item.key]: e.target.value }))}
+                            placeholder={item.placeholder}
+                            className="mt-3 min-h-24 text-sm"
+                          />
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
