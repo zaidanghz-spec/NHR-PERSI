@@ -7,8 +7,9 @@ import {
   X,
   ChevronDown,
   LogOut,
-  Settings,
   Shield,
+  LayoutDashboard,
+  ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
 import { useData } from "../context/DataContext";
@@ -20,6 +21,8 @@ export function Root() {
   const { isAdmin, adminLogout, currentHospital, hospitalLogout } = useData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/siap-persi/admin");
+  const isAdminLoginRoute = location.pathname === "/admin/login";
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
@@ -34,10 +37,8 @@ export function Root() {
     { label: "Metodologi", to: "/methodology" },
   ];
 
-  const isLoggedIn = isAdmin || currentHospital;
-  const userName = isAdmin
-    ? "Admin PERSI"
-    : currentHospital?.hospitalName || "";
+  const isLoggedIn = Boolean(currentHospital);
+  const userName = currentHospital?.hospitalName || "";
 
   const handleLogout = () => {
     if (isAdmin) adminLogout();
@@ -45,6 +46,116 @@ export function Root() {
     setUserMenuOpen(false);
     navigate("/");
   };
+
+  const adminShellLogout = () => {
+    adminLogout();
+    navigate("/admin/login");
+  };
+
+  if (isAdminRoute) {
+    if (isAdminLoginRoute) {
+      return (
+        <div className="min-h-screen bg-slate-950">
+          {outlet}
+        </div>
+      );
+    }
+
+    const adminLinks = [
+      { label: "Control Center", to: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Review NHR", to: "/siap-persi/admin/dashboard", icon: Shield },
+      { label: "Public Site", to: "/", icon: ExternalLink },
+    ];
+
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col">
+          <div className="px-6 py-6 border-b border-white/10">
+            <Link to="/siap-persi/admin/dashboard" className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-white/10 rounded-xl flex items-center justify-center">
+                <Shield className="w-6 h-6 text-teal-300" />
+              </div>
+              <div>
+                <div className="font-black leading-tight">NHR PERSI</div>
+                <div className="text-xs text-slate-400">Admin Workspace</div>
+              </div>
+            </Link>
+          </div>
+
+          <nav className="flex-1 px-4 py-5 space-y-1">
+            {adminLinks.map(link => {
+              const Icon = link.icon;
+              const active = link.to === "/"
+                ? location.pathname === "/"
+                : location.pathname.startsWith(link.to);
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${
+                    active ? "bg-white text-slate-950" : "text-slate-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="p-4 border-t border-white/10">
+            <button
+              onClick={adminShellLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-200 hover:bg-red-500/10 hover:text-red-100 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout Admin
+            </button>
+          </div>
+        </aside>
+
+        <div className="lg:pl-72 min-h-screen flex flex-col">
+          <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+            <div className="h-16 px-6 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-teal-600">Admin Workspace</p>
+                <p className="font-black text-slate-900">PERSI Internal Review</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/"
+                  className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Lihat Public Site
+                </Link>
+                <button
+                  onClick={adminShellLogout}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-950 text-white text-sm font-bold hover:bg-slate-800"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <AnimatePresence mode="wait">
+            <motion.main
+              key={location.pathname}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="flex-1"
+            >
+              {outlet}
+            </motion.main>
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -128,29 +239,9 @@ export function Root() {
                             {userName}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {isAdmin ? "Administrator" : "Rumah Sakit"}
+                            Rumah Sakit
                           </p>
                         </div>
-                        {isAdmin && (
-                          <Link
-                            to="/admin/dashboard"
-                            onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <Settings className="w-4 h-4" />
-                            Admin Dashboard
-                          </Link>
-                        )}
-                        {isAdmin && (
-                          <Link
-                            to="/siap-persi/admin/dashboard"
-                            onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            <Shield className="w-4 h-4" />
-                            NHR PERSI Review
-                          </Link>
-                        )}
                         <button
                           onClick={handleLogout}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full"
@@ -298,18 +389,18 @@ export function Root() {
                 </li>
                 <li>
                   <Link
-                    to="/hospital-login"
-                    className="hover:text-white transition-colors"
-                  >
-                    Portal Rumah Sakit
-                  </Link>
-                </li>
-                <li>
-                  <Link
                     to="/admin/login"
                     className="hover:text-white transition-colors"
                   >
                     Login Admin
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/hospital-login"
+                    className="hover:text-white transition-colors"
+                  >
+                    Portal Rumah Sakit
                   </Link>
                 </li>
               </ul>
