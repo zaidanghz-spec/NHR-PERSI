@@ -24,6 +24,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useData } from "../context/DataContext";
 import type { HospitalAccount } from "../context/DataContext";
+import { getHospitalSuratTugas } from "../utils/api";
 
 type Tab = "overview" | "accounts" | "news" | "events";
 
@@ -270,6 +271,8 @@ function AccountsTab({
   const { activateHospital, rejectHospital } = useData();
   const [viewPdfUrl, setViewPdfUrl] = useState<string | null>(null);
   const [viewPdfName, setViewPdfName] = useState("");
+  const [pdfLoadingEmail, setPdfLoadingEmail] = useState("");
+  const [pdfError, setPdfError] = useState("");
 
   const pendingCount = accounts.filter(a => a.status === "pending_activation").length;
   const activatedCount = accounts.filter(a => a.status === "activated").length;
@@ -280,6 +283,27 @@ function AccountsTab({
     if (status === "activated") return { text: "Aktif", cls: "bg-green-100 text-green-700", icon: <CheckCircle2 className="w-3 h-3" /> };
     if (status === "rejected") return { text: "Ditolak", cls: "bg-red-100 text-red-700", icon: <XCircle className="w-3 h-3" /> };
     return { text: status, cls: "bg-gray-100 text-gray-700", icon: null };
+  };
+
+  const handleViewSuratTugas = async (acc: HospitalAccount) => {
+    setPdfError("");
+    setViewPdfName(acc.suratTugasFileName || "");
+
+    if (acc.suratTugasData) {
+      setViewPdfUrl(acc.suratTugasData);
+      return;
+    }
+
+    setPdfLoadingEmail(acc.email);
+    const pdfData = await getHospitalSuratTugas(acc.email);
+    setPdfLoadingEmail("");
+
+    if (pdfData) {
+      setViewPdfUrl(pdfData);
+      return;
+    }
+
+    setPdfError(`Surat tugas untuk ${acc.hospitalName} belum tersimpan di server atau gagal diambil.`);
   };
 
   return (
@@ -338,14 +362,16 @@ function AccountsTab({
                   <td className="px-5 py-3">
                     {acc.suratTugasFileName ? (
                       <button
-                        onClick={() => {
-                          setViewPdfUrl(acc.suratTugasData || null);
-                          setViewPdfName(acc.suratTugasFileName || "");
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs font-[600] text-[#1E3A8A] hover:underline"
+                        onClick={() => handleViewSuratTugas(acc)}
+                        disabled={pdfLoadingEmail === acc.email}
+                        className="inline-flex items-center gap-1.5 text-xs font-[600] text-[#1E3A8A] hover:underline disabled:opacity-60"
                       >
-                        <FileText className="w-3.5 h-3.5" />
-                        Lihat PDF
+                        {pdfLoadingEmail === acc.email ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5" />
+                        )}
+                        {pdfLoadingEmail === acc.email ? "Memuat..." : "Lihat PDF"}
                       </button>
                     ) : (
                       <span className="text-xs text-gray-400 italic">Tidak ada</span>
@@ -402,6 +428,12 @@ function AccountsTab({
           </div>
         )}
       </div>
+
+      {pdfError && (
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-[600] text-red-700">
+          {pdfError}
+        </div>
+      )}
 
       {/* PDF Viewer Modal */}
       {viewPdfUrl && (

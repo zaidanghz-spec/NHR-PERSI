@@ -583,12 +583,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const newId = `SUB-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}`;
     const fullSub = { ...sub, id: newId };
     
-    setSubmissions(prev => [fullSub, ...prev]);
+    setSubmissions(prev => {
+      const updated = [fullSub, ...prev];
+      safeLocalStorageSet("persi_submissions", JSON.stringify(updated));
+      return updated;
+    });
     
     try {
       await addSubmissionToDb(fullSub);
     } catch (err) {
       console.error("Cloud push failed:", err);
+      throw err;
     }
   }, []);
 

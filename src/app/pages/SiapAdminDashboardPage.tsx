@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   FileText,
@@ -20,7 +20,13 @@ export function SiapAdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
-  const { isAdmin, submissions, unpublishRanking, updateSubmissionStatus } = useData();
+  const { isAdmin, submissions, unpublishRanking, updateSubmissionStatus, syncWithCloud } = useData();
+
+  useEffect(() => {
+    if (isAdmin) {
+      syncWithCloud().catch(console.error);
+    }
+  }, [isAdmin, syncWithCloud]);
 
   const handleUnpublish = (id: string) => {
     if (window.confirm("Apakah Anda yakin ingin menarik submission ini dari Ranking publik?")) {

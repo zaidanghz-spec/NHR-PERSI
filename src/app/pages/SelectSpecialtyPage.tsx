@@ -8,8 +8,8 @@ import { useData } from "../context/DataContext";
 
 export function SelectSpecialtyPage() {
   const navigate = useNavigate();
-  const { submissions, currentHospital } = useData();
-  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string } | null>(null);
+  const { submissions, currentHospital, syncWithCloud } = useData();
+  const [authData, setAuthData] = useState<{ hospitalName: string; picName: string; email?: string; hospitalCode?: string } | null>(null);
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<DraftData[]>([]);
   const [showNewAssessment, setShowNewAssessment] = useState(false);
@@ -37,24 +37,46 @@ export function SelectSpecialtyPage() {
     draftManager.syncWithCloud().then(() => {
       loadLocalDrafts();
     });
+    syncWithCloud().catch(console.error);
 
     // Load previously selected specialties if any
     const saved = sessionStorage.getItem("selectedSpecialties");
     if (saved) {
       setSelectedSpecialties(JSON.parse(saved));
     }
-  }, [navigate]);
+  }, [navigate, syncWithCloud]);
 
-  const submittedSpecialties = submissions
-    .filter(s => 
-      s.hospitalName === (authData?.hospitalName || currentHospital?.hospitalName) && 
-      (s.status === "Pending" || s.status === "Approved")
-    )
+  const normalize = (value?: string) => (value || "").trim().toLowerCase();
+  const deriveHospitalCode = (email?: string) =>
+    email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
+  const authHospitalName = authData?.hospitalName || currentHospital?.hospitalName || "";
+  const authHospitalCode = authData?.hospitalCode || deriveHospitalCode(authData?.email || currentHospital?.email);
+  const hospitalSubmissions = submissions.filter((submission: any) => {
+    const submissionHospitalCode =
+      submission.hospitalCode ||
+      submission.details?.hospitalCode ||
+      submission.details?.hospital?.hospitalCode ||
+      "";
+    return (
+      normalize(submission.hospitalName) === normalize(authHospitalName) ||
+      Boolean(authHospitalCode && submissionHospitalCode && authHospitalCode === submissionHospitalCode)
+    );
+  });
+  const getSpecialtySubmission = (specialtyName: string) =>
+    hospitalSubmissions.find(s => s.specialty === specialtyName);
+  const lockedStatuses = ["Pending", "Approved"];
+  const submittedSpecialties = hospitalSubmissions
+    .filter(s => lockedStatuses.includes(s.status))
     .map(s => s.specialty);
 
   const toggleSpecialty = (id: string) => {
     // Prevent toggling locked/submitted specialties
     const spec = specialties.find(s => s.id === id);
+    const submission = spec ? getSpecialtySubmission(spec.name) : null;
+    if (submission?.status === "Revision Required") {
+      navigate("/hospital/hasil-penilaian");
+      return;
+    }
     if (spec && submittedSpecialties.includes(spec.name)) {
       return;
     }
@@ -93,6 +115,15 @@ export function SelectSpecialtyPage() {
 
   const handleStartSingleAssessment = (specId: string) => {
     if (!authData) return;
+    const spec = specialties.find(s => s.id === specId);
+    const submission = spec ? getSpecialtySubmission(spec.name) : null;
+    if (submission?.status === "Revision Required") {
+      navigate("/hospital/hasil-penilaian");
+      return;
+    }
+    if (submission && lockedStatuses.includes(submission.status)) {
+      return;
+    }
 
     // Ensure the specialty is selected
     let specs = [...selectedSpecialties];
@@ -369,6 +400,7 @@ export function SelectSpecialtyPage() {
                   specialty={specialty}
                   isSelected={selectedSpecialties.includes(specialty.id)}
                   isLocked={submittedSpecialties.includes(specialty.name)}
+                  submissionStatus={getSpecialtySubmission(specialty.name)?.status}
                   onToggle={() => toggleSpecialty(specialty.id)}
                   onStartSingleAssessment={() => handleStartSingleAssessment(specialty.id)}
                 />
@@ -397,6 +429,7 @@ function SpecialtyCard({
   onToggle,
   onStartSingleAssessment,
   isLocked,
+  submissionStatus,
 }: {
   specialty: {
     id: string;
@@ -418,7 +451,20 @@ function SpecialtyCard({
   onToggle: () => void;
   onStartSingleAssessment: () => void;
   isLocked?: boolean;
+  submissionStatus?: string;
 }) {
+  const isRevision = submissionStatus === "Revision Required";
+  const statusText =
+    submissionStatus === "Pending"
+      ? "Menunggu Review"
+      : submissionStatus === "Approved"
+      ? "Sudah Publish"
+      : isRevision
+      ? "Perlu Revisi"
+      : isSelected
+      ? "Terpilih"
+      : "Belum Dipilih";
+
   return (
     <button
       onClick={onToggle}
@@ -426,6 +472,8 @@ function SpecialtyCard({
       className={`group bg-white rounded-3xl border-2 overflow-hidden transition-all duration-300 text-left w-full relative flex flex-col h-full shadow-sm hover:shadow-2xl ${
         isLocked 
           ? "opacity-75 grayscale-[0.5] cursor-not-allowed border-gray-200"
+          : isRevision
+          ? "border-red-300 ring-4 ring-red-50 hover:border-red-400"
           : isSelected
           ? `${specialty.borderColor} shadow-blue-100 ring-4 ring-offset-2 ring-blue-50 -translate-y-2`
           : "border-gray-100 hover:border-gray-200"
@@ -437,12 +485,14 @@ function SpecialtyCard({
           className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 transform ${
             isLocked
               ? "bg-green-500 text-white shadow-lg"
+              : isRevision
+              ? "bg-red-500 text-white shadow-lg"
               : isSelected
               ? `bg-white text-[#0F4C81] scale-110 shadow-lg`
               : "bg-white/30 backdrop-blur-md border border-white/40 text-transparent scale-100"
           }`}
         >
-          {isLocked ? (
+          {isLocked || isRevision ? (
             <CheckCircle2 className="w-6 h-6 opacity-100" />
           ) : (
             <CheckCircle2 className={`w-6 h-6 ${isSelected ? "opacity-100" : "opacity-0"}`} />
@@ -499,14 +549,14 @@ function SpecialtyCard({
           {/* Footer Interaction */}
           <div className="pt-6 border-t border-gray-100 flex items-center justify-between">
             <span className={`text-xs font-bold uppercase tracking-widest ${
-              isLocked ? "text-green-600" : isSelected ? specialty.textColor : "text-gray-400 group-hover:text-gray-600"
+              isLocked ? "text-green-600" : isRevision ? "text-red-600" : isSelected ? specialty.textColor : "text-gray-400 group-hover:text-gray-600"
             } transition-colors`}>
-              {isLocked ? "Assessment Terkirim" : isSelected ? "Terpilih" : "Belum Dipilih"}
+              {statusText}
             </span>
             <div className={`p-2 rounded-xl transition-all ${
-              isLocked ? "bg-green-50" : isSelected ? specialty.bgLight : "bg-gray-50 group-hover:bg-gray-100"
+              isLocked ? "bg-green-50" : isRevision ? "bg-red-50" : isSelected ? specialty.bgLight : "bg-gray-50 group-hover:bg-gray-100"
             }`}>
-               <ChevronRight className={`w-5 h-5 ${isLocked ? "text-green-600" : isSelected ? specialty.textColor : "text-gray-400"}`} />
+               <ChevronRight className={`w-5 h-5 ${isLocked ? "text-green-600" : isRevision ? "text-red-600" : isSelected ? specialty.textColor : "text-gray-400"}`} />
             </div>
           </div>
         </div>

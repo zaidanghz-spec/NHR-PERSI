@@ -196,7 +196,7 @@ async function initTursoTables() {
     )
   `);
 
-  const tablesToMigrate = ["surveys", "patients", "drafts", "submissions"];
+  const tablesToMigrate = ["surveys", "patients", "drafts", "submissions", "hospital_accounts"];
   for (const table of tablesToMigrate) {
     const info = await client.execute(`PRAGMA table_info(${table})`);
     const existingColumns = info.rows.map((r: any) => r.name);
@@ -256,6 +256,14 @@ async function initTursoTables() {
       if (!existingColumns.includes("scores")) await client.execute("ALTER TABLE submissions ADD COLUMN scores TEXT DEFAULT '{}'");
       if (!existingColumns.includes("status")) await client.execute("ALTER TABLE submissions ADD COLUMN status TEXT DEFAULT 'Pending'");
       if (!existingColumns.includes("created_at")) await client.execute("ALTER TABLE submissions ADD COLUMN created_at TEXT DEFAULT ''");
+    }
+
+    if (table === "hospital_accounts") {
+      if (!existingColumns.includes("surat_tugas_filename")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN surat_tugas_filename TEXT DEFAULT ''");
+      if (!existingColumns.includes("surat_tugas_data")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN surat_tugas_data TEXT DEFAULT ''");
+      if (!existingColumns.includes("province")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN province TEXT DEFAULT ''");
+      if (!existingColumns.includes("city")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN city TEXT DEFAULT ''");
+      if (!existingColumns.includes("registered_at")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN registered_at TEXT DEFAULT ''");
     }
   }
 
@@ -324,7 +332,7 @@ async function addSubmission({ submission }: any) {
     hospitalName: submission.hospitalName,
   };
   await db().execute({
-    sql: `INSERT INTO submissions (id, hospital_name, hospital_code, specialty, pic_name, submitted_date, status, scores, details)
+    sql: `INSERT OR REPLACE INTO submissions (id, hospital_name, hospital_code, specialty, pic_name, submitted_date, status, scores, details)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       submission.id,
