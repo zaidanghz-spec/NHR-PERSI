@@ -122,6 +122,7 @@ async function initTursoTables() {
     CREATE TABLE IF NOT EXISTS submissions (
       id TEXT PRIMARY KEY,
       hospital_name TEXT NOT NULL,
+      hospital_code TEXT DEFAULT '',
       specialty TEXT NOT NULL,
       pic_name TEXT,
       submitted_date TEXT,
@@ -195,7 +196,7 @@ async function initTursoTables() {
     )
   `);
 
-  const tablesToMigrate = ["surveys", "patients", "drafts"];
+  const tablesToMigrate = ["surveys", "patients", "drafts", "submissions"];
   for (const table of tablesToMigrate) {
     const info = await client.execute(`PRAGMA table_info(${table})`);
     const existingColumns = info.rows.map((r: any) => r.name);
@@ -245,6 +246,16 @@ async function initTursoTables() {
       if (!existingColumns.some((c: string) => ["updated_at", "updatedAt"].includes(c))) {
         await client.execute("ALTER TABLE drafts ADD COLUMN updated_at TEXT DEFAULT ''");
       }
+    }
+
+    if (table === "submissions") {
+      if (!existingColumns.includes("hospital_code")) {
+        await client.execute("ALTER TABLE submissions ADD COLUMN hospital_code TEXT DEFAULT ''");
+      }
+      if (!existingColumns.includes("details")) await client.execute("ALTER TABLE submissions ADD COLUMN details TEXT DEFAULT '{}'");
+      if (!existingColumns.includes("scores")) await client.execute("ALTER TABLE submissions ADD COLUMN scores TEXT DEFAULT '{}'");
+      if (!existingColumns.includes("status")) await client.execute("ALTER TABLE submissions ADD COLUMN status TEXT DEFAULT 'Pending'");
+      if (!existingColumns.includes("created_at")) await client.execute("ALTER TABLE submissions ADD COLUMN created_at TEXT DEFAULT ''");
     }
   }
 
@@ -306,18 +317,25 @@ async function updateAccountStatus({ email, status }: any) {
 
 async function addSubmission({ submission }: any) {
   await initTursoTables();
+  const hospitalCode = submission.hospitalCode || submission.details?.hospitalCode || "";
+  const details = {
+    ...(submission.details || {}),
+    hospitalCode,
+    hospitalName: submission.hospitalName,
+  };
   await db().execute({
-    sql: `INSERT INTO submissions (id, hospital_name, specialty, pic_name, submitted_date, status, scores, details)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO submissions (id, hospital_name, hospital_code, specialty, pic_name, submitted_date, status, scores, details)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       submission.id,
       submission.hospitalName,
+      hospitalCode,
       submission.specialty,
       submission.picName,
       submission.submittedDate,
       submission.status,
       JSON.stringify(submission.scores),
-      JSON.stringify(submission.details || {}),
+      JSON.stringify(details),
     ],
   });
 }
@@ -325,16 +343,21 @@ async function addSubmission({ submission }: any) {
 async function getAllSubmissions() {
   await initTursoTables();
   const rs = await db().execute("SELECT * FROM submissions ORDER BY created_at DESC");
-  return rs.rows.map((r: any) => ({
-    id: r.id,
-    hospitalName: r.hospital_name,
-    specialty: r.specialty,
-    picName: r.pic_name,
-    submittedDate: r.submitted_date,
-    status: r.status,
-    scores: parseJson(r.scores, {}),
-    details: parseJson(r.details, {}),
-  }));
+  return rs.rows.map((r: any) => {
+    const details = parseJson(r.details, {});
+    return {
+      id: r.id,
+      hospitalName: r.hospital_name || details.hospitalName || "",
+      hospitalCode: r.hospital_code || r.hospitalCode || details.hospitalCode || "",
+      specialty: r.specialty,
+      picName: r.pic_name,
+      submittedDate: r.submitted_date,
+      status: r.status,
+      scores: parseJson(r.scores, {}),
+      details,
+      reviewerNotes: details.reviewerNotes || "",
+    };
+  });
 }
 
 async function updateSubmissionStatus({ id, status }: any) {
