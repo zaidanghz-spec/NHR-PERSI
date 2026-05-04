@@ -54,6 +54,7 @@ export function ClinicalAuditPage() {
 
   // formData key: `d{diseaseIndex}-{patientNum}-{questionId}` — per-disease, per-patient
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [patientMeta, setPatientMeta] = useState<Record<string, { initials: string; code: string }>>({});
   const [currentPatient, setCurrentPatient] = useState(1);
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
 
@@ -69,6 +70,7 @@ export function ClinicalAuditPage() {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
         if (serverDraft && serverDraft.formData) {
           setFormData(serverDraft.formData);
+          if (serverDraft.patientMeta) setPatientMeta(serverDraft.patientMeta);
           if (serverDraft.currentPatient) setCurrentPatient(serverDraft.currentPatient);
           if (typeof serverDraft.activeDiseaseIndex === "number") setActiveDiseaseIndex(serverDraft.activeDiseaseIndex);
           return;
@@ -79,6 +81,7 @@ export function ClinicalAuditPage() {
         if (saved) {
           const draft = JSON.parse(saved);
           if (draft.formData) setFormData(draft.formData);
+          if (draft.patientMeta) setPatientMeta(draft.patientMeta);
           if (draft.currentPatient) setCurrentPatient(draft.currentPatient);
           if (typeof draft.activeDiseaseIndex === "number") setActiveDiseaseIndex(draft.activeDiseaseIndex);
         }
@@ -98,6 +101,8 @@ export function ClinicalAuditPage() {
   // Key builder: disease-specific patient key
   const makeKey = (diseaseIdx: number, patientNum: number, questionId: string) =>
     `d${diseaseIdx}-${patientNum}-${questionId}`;
+  const makePatientKey = (diseaseIdx: number, patientNum: number) =>
+    `d${diseaseIdx}-${patientNum}`;
 
   // Get answer for current disease/patient
 
@@ -112,12 +117,28 @@ export function ClinicalAuditPage() {
     return formData[makeKey(activeDiseaseIndex, patientNum, questionId)] || "";
   };
 
+  const getPatientMeta = (diseaseIdx: number, patientNum: number) =>
+    patientMeta[makePatientKey(diseaseIdx, patientNum)] || { initials: "", code: "" };
+
+  const handlePatientMetaChange = (field: "initials" | "code", value: string) => {
+    const key = makePatientKey(activeDiseaseIndex, currentPatient);
+    setPatientMeta(prev => ({
+      ...prev,
+      [key]: {
+        ...getPatientMeta(activeDiseaseIndex, currentPatient),
+        [field]: field === "initials" ? value.toUpperCase() : value.toUpperCase(),
+      },
+    }));
+  };
+
   const currentQuestions = activeDisease.questions;
 
   // Is a patient complete FOR the current active disease?
   const isPatientComplete = (diseaseIdx: number, patientNum: number): boolean => {
     const qs = diseases[diseaseIdx].questions;
-    return qs.every(q => !!formData[makeKey(diseaseIdx, patientNum, q.id)]);
+    const meta = getPatientMeta(diseaseIdx, patientNum);
+    return Boolean(meta.initials.trim() && meta.code.trim()) &&
+      qs.every(q => !!formData[makeKey(diseaseIdx, patientNum, q.id)]);
   };
 
   // Score for a single patient in a given disease (weighted by category)
@@ -217,10 +238,54 @@ export function ClinicalAuditPage() {
     }));
   };
 
+  const buildAuditPatients = () => {
+    const auditPatients: any[] = [];
+    diseases.forEach((d, dIdx) => {
+      for (let p = 1; p <= 30; p++) {
+        const meta = getPatientMeta(dIdx, p);
+        const answeredQuestions = d.questions.filter(q => formData[makeKey(dIdx, p, q.id)]);
+        if (!meta.initials && !meta.code && answeredQuestions.length === 0) continue;
+
+        const diagnosisQs = d.questions.filter(q => q.category.toLowerCase().includes("diagnosa") || q.category.toLowerCase().includes("diagnosis"));
+        const treatmentQs = d.questions.filter(q => q.category.toLowerCase().includes("tatalaksana"));
+        const outcomeQs = d.questions.filter(q => q.category.toLowerCase().includes("outcome"));
+
+        const getCatScore = (qs: any[]) => {
+          if (qs.length === 0) return 100;
+          const answered = qs.filter(q => formData[makeKey(dIdx, p, q.id)]);
+          if (answered.length === 0) return 0;
+          const correct = answered.filter(q => formData[makeKey(dIdx, p, q.id)] !== "tidak-sesuai");
+          return Math.round((correct.length / answered.length) * 100);
+        };
+
+        auditPatients.push({
+          patientIndex: p,
+          initials: meta.initials,
+          code: meta.code,
+          diseaseIndex: dIdx,
+          diseaseName: d.diseaseName,
+          diagnosisScore: getCatScore(diagnosisQs),
+          treatmentScore: getCatScore(treatmentQs),
+          outcomeScore: getCatScore(outcomeQs),
+          score: calculatePatientScore(dIdx, p) || 0,
+          isComplete: isPatientComplete(dIdx, p),
+          answers: d.questions.map(q => ({
+            id: q.id,
+            question: q.question,
+            category: q.category,
+            answer: formData[makeKey(dIdx, p, q.id)] || "",
+          })),
+        });
+      }
+    });
+    return auditPatients;
+  };
+
   const handleSaveDraft = () => {
     if (!specialty) return;
     const draft = {
       formData,
+      patientMeta,
       currentPatient,
       activeDiseaseIndex,
       savedAt: new Date().toISOString(),
@@ -251,6 +316,7 @@ export function ClinicalAuditPage() {
       });
     });
     sessionStorage.setItem(`${specialty}_auditSummary`, JSON.stringify(summary));
+    sessionStorage.setItem(`${specialty}_auditPatients`, JSON.stringify(buildAuditPatients()));
 
     api.saveDraft("clinical-audit", hospitalCode, specialty, draft).catch(err => {
       console.error("Failed to save draft to server:", err);
@@ -278,17 +344,19 @@ export function ClinicalAuditPage() {
     const timer = setTimeout(() => {
       draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
         data: formData,
+        patientMeta,
         score: specialtyScore,
         currentPatient,
       });
     }, 1000); // 1s debounce to prevent flooding
 
     return () => clearTimeout(timer);
-  }, [formData, currentPatient, activeDiseaseIndex, specialty, specialtyScore]);
+  }, [formData, patientMeta, currentPatient, activeDiseaseIndex, specialty, specialtyScore]);
   const activeCategoryScores = calculateActiveDiseaseCategories();
   const activeValidity = getSampleValidityWeight(activeCompletedPatients);
   const currentPatientScoreVal = calculatePatientScore(activeDiseaseIndex, currentPatient);
   const allDiseasesHaveData = diseases.every((_, idx) => getCompletedPatientsCount(idx) >= 1);
+  const currentMeta = getPatientMeta(activeDiseaseIndex, currentPatient);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -458,6 +526,35 @@ export function ClinicalAuditPage() {
               Selanjutnya
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 mb-5 pt-5 border-t border-gray-200">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Inisial Pasien *
+              </label>
+              <input
+                type="text"
+                value={currentMeta.initials}
+                onChange={(e) => handlePatientMetaChange("initials", e.target.value)}
+                placeholder="Contoh: BS"
+                maxLength={8}
+                className="w-full h-11 px-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0F4C81] font-bold uppercase"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Kode Pasien *
+              </label>
+              <input
+                type="text"
+                value={currentMeta.code}
+                onChange={(e) => handlePatientMetaChange("code", e.target.value)}
+                placeholder="Contoh: P-098"
+                maxLength={24}
+                className="w-full h-11 px-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0F4C81] font-mono font-bold uppercase"
+              />
+            </div>
           </div>
 
           {/* Quick Patient Navigation */}

@@ -141,6 +141,41 @@ export function SiapAdminReviewPage() {
   };
 
   const gradeInfo = getTier(effectiveFinal);
+  const clampPercent = (value: any) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+  const getPrmPatientKey = (patient: any) => `${patient.diseaseKey || patient.specialty || "prm"}:${patient.rm}`;
+  const auditPatientsForReview = ((submissionData as any).details?.auditPatients || []) as any[];
+  const prmPatientsForReview = ((submissionData as any).details?.prmPatients || []) as any[];
+  const selectedAuditDetail = selectedAuditPatient !== null ? auditPatientsForReview[selectedAuditPatient] : null;
+  const selectedPrmDetail = selectedPrmPatient
+    ? prmPatientsForReview.find((patient: any) => getPrmPatientKey(patient) === selectedPrmPatient || patient.rm === selectedPrmPatient)
+    : null;
+
+  const getPrmQuestionGroups = (patient: any) => {
+    const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
+    const disease = specData.diseases?.[patient?.diseaseIndex || 0];
+    return {
+      premQuestions: disease?.premQuestions || specData.premQuestions || [],
+      promQuestions: disease?.promQuestions || specData.promQuestions || [],
+    };
+  };
+
+  const getAuditAnswerLabel = (answer: string) => {
+    if (answer === "sesuai") return "Sesuai";
+    if (answer === "tidak-sesuai-pengecualian") return "Tidak sesuai dengan perkecualian klinis";
+    if (answer === "tidak-sesuai") return "Tidak sesuai";
+    return "Belum diisi";
+  };
+
+  const getRatingAnswerLabel = (answer: string) => {
+    const labels: Record<string, string> = {
+      "5": "Sangat Setuju",
+      "4": "Setuju",
+      "3": "Netral",
+      "2": "Tidak Setuju",
+      "1": "Sangat Tidak Setuju",
+    };
+    return labels[answer] || "Belum diisi";
+  };
 
   const handleSaveScoreOverride = () => {
     if (!adminScores) return;
@@ -629,12 +664,13 @@ export function SiapAdminReviewPage() {
                     <table className="w-full text-sm">
                       <thead className="bg-[#0F4C81] text-white">
                         <tr>
-                          <th className="py-4 px-4 text-left font-bold uppercase tracking-widest text-[10px]">No. Pasien</th>
+                          <th className="py-4 px-4 text-left font-bold uppercase tracking-widest text-[10px]">Pasien</th>
                           <th className="py-4 px-4 text-left font-bold uppercase tracking-widest text-[10px]">Penyakit</th>
                           <th className="py-4 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Diagnosis</th>
                           <th className="py-4 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Tatalaksana</th>
                           <th className="py-4 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Outcome</th>
                           <th className="py-4 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Status</th>
+                          <th className="py-4 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Detail</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -642,8 +678,12 @@ export function SiapAdminReviewPage() {
                           <tr 
                             key={idx} 
                             className="border-b border-gray-50 hover:bg-blue-50 cursor-pointer transition-colors"
+                            onClick={() => setSelectedAuditPatient(idx)}
                           >
-                            <td className="py-4 px-4 font-bold text-gray-700">Pasien {p.patientIndex}</td>
+                            <td className="py-4 px-4">
+                              <div className="font-black text-gray-800">{p.initials || `Pasien ${p.patientIndex}`}</div>
+                              <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Kode: {p.code || "-"}</div>
+                            </td>
                             <td className="py-4 px-4 text-gray-600">{p.diseaseName}</td>
                             <td className="py-4 px-4 text-center">
                               <span className={`font-bold ${p.diagnosisScore >= 80 ? "text-green-600" : p.diagnosisScore >= 50 ? "text-amber-600" : "text-red-500"}`}>
@@ -666,6 +706,19 @@ export function SiapAdminReviewPage() {
                               ) : (
                                 <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-widest rounded-full">Parsial</span>
                               )}
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-[10px] font-black uppercase tracking-widest"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedAuditPatient(idx);
+                                }}
+                              >
+                                Lihat
+                              </Button>
                             </td>
                           </tr>
                         ))}
@@ -815,60 +868,69 @@ export function SiapAdminReviewPage() {
 
                 return (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {prmPatients.map((p: any, idx: number) => (
-                      <div 
-                        key={idx}
-                        className="group bg-gray-50 hover:bg-white p-5 rounded-2xl border-2 border-transparent hover:border-blue-200 hover:shadow-xl transition-all duration-300"
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black text-xl shadow-inner group-hover:scale-110 transition-transform">
-                            {p.name?.substring(0, 2).toUpperCase() || "PX"}
-                          </div>
-                          <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${p.hasResponse ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
-                            {p.hasResponse ? "Survey Selesai" : "Terdaftar"}
-                          </span>
-                        </div>
-                        <h4 className="font-extrabold text-gray-900 mb-1 truncate">{p.name}</h4>
-                        <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-4">Kode: {p.rm}</p>
-                        
-                        {p.hasResponse ? (
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center text-[10px]">
-                              <span className="text-gray-500 font-bold uppercase tracking-tight">PREM (Experience)</span>
-                              <span className="text-blue-600 font-black">{Math.round((p.premScore / 5) * 100)}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                              <div className="bg-blue-500 h-full transition-all duration-1000" style={{ width: `${(p.premScore / 5) * 100}%` }} />
-                            </div>
-                            
-                            <div className="flex justify-between items-center text-[10px] mt-3">
-                              <span className="text-gray-500 font-bold uppercase tracking-tight">PROM (Outcome)</span>
-                              <span className="text-emerald-600 font-black">{Math.round((p.promScore / 5) * 100)}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                              <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${(p.promScore / 5) * 100}%` }} />
-                            </div>
-                            
-                            <p className="text-[9px] text-gray-400 mt-4 flex items-center gap-1 font-bold">
-                              <Clock className="w-3 h-3" />
-                              SUBMITTED: {p.submittedAt ? new Date(p.submittedAt).toLocaleDateString("id-ID") : "—"}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="h-24 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl">
-                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Belum ada respon</span>
-                          </div>
-                        )}
-                        
-                        <Button
-                          variant="outline"
-                          className="w-full mt-5 border-gray-200 text-gray-600 group-hover:bg-[#0F4C81] group-hover:text-white group-hover:border-transparent transition-all h-9 text-xs font-bold uppercase tracking-widest rounded-xl"
-                          onClick={() => setSelectedPrmPatient(p.rm)}
+                    {prmPatients.map((p: any, idx: number) => {
+                      const premScore = clampPercent(p.premScore);
+                      const promScore = clampPercent(p.promScore);
+
+                      return (
+                        <div
+                          key={idx}
+                          className="group bg-gray-50 hover:bg-white p-5 rounded-2xl border-2 border-transparent hover:border-blue-200 hover:shadow-xl transition-all duration-300"
                         >
-                          Lihat Detail Pasien
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black text-xl shadow-inner group-hover:scale-110 transition-transform">
+                              {p.name?.substring(0, 2).toUpperCase() || "PX"}
+                            </div>
+                            <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${p.hasResponse ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
+                              {p.hasResponse ? "Survey Selesai" : "Terdaftar"}
+                            </span>
+                          </div>
+                          <h4 className="font-extrabold text-gray-900 mb-1 truncate">{p.name}</h4>
+                          <p className="text-xs font-black text-blue-600 uppercase tracking-widest">Kode: {p.rm}</p>
+                          {p.diseaseName && (
+                            <p className="text-[10px] text-gray-500 font-bold mt-1 mb-4 truncate">{p.diseaseName}</p>
+                          )}
+
+                          {p.hasResponse ? (
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-gray-500 font-bold uppercase tracking-tight">PREM (Experience)</span>
+                                <span className="text-blue-600 font-black">{premScore}%</span>
+                              </div>
+                              <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-blue-500 h-full transition-all duration-1000" style={{ width: `${premScore}%` }} />
+                              </div>
+
+                              <div className="flex justify-between items-center text-[10px] mt-3">
+                                <span className="text-gray-500 font-bold uppercase tracking-tight">PROM (Outcome)</span>
+                                <span className="text-emerald-600 font-black">{promScore}%</span>
+                              </div>
+                              <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${promScore}%` }} />
+                              </div>
+
+                              <p className="text-[9px] text-gray-400 mt-4 flex items-center gap-1 font-bold">
+                                <Clock className="w-3 h-3" />
+                                SUBMITTED: {p.submittedAt ? new Date(p.submittedAt).toLocaleDateString("id-ID") : "—"}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="h-24 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl">
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Belum ada respon</span>
+                            </div>
+                          )}
+
+                          <Button
+                            variant="outline"
+                            className="w-full mt-5 border-gray-200 text-gray-600 group-hover:bg-[#0F4C81] group-hover:text-white group-hover:border-transparent transition-all h-9 text-xs font-bold uppercase tracking-widest rounded-xl"
+                            onClick={() => setSelectedPrmPatient(getPrmPatientKey(p))}
+                            disabled={!p.hasResponse}
+                          >
+                            Lihat Detail Pasien
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -921,6 +983,138 @@ export function SiapAdminReviewPage() {
             </>
           )}
         </div>
+
+        {/* Clinical Audit Patient Detail */}
+        {selectedAuditDetail && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-6 z-50">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[86vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-2">Clinical Audit</p>
+                  <h3 className="text-2xl font-black text-gray-900">{selectedAuditDetail.initials || `Pasien ${selectedAuditDetail.patientIndex}`}</h3>
+                  <p className="text-sm text-gray-500 font-semibold mt-1">
+                    Kode: {selectedAuditDetail.code || "-"} • {selectedAuditDetail.diseaseName || "-"}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setSelectedAuditPatient(null)} className="rounded-full h-10 w-10 p-0">
+                  <XCircle className="w-5 h-5" />
+                </Button>
+              </div>
+
+              <div className="p-6 overflow-y-auto">
+                <div className="grid sm:grid-cols-4 gap-3 mb-6">
+                  {[
+                    { label: "Diagnosis", value: selectedAuditDetail.diagnosisScore },
+                    { label: "Tatalaksana", value: selectedAuditDetail.treatmentScore },
+                    { label: "Outcome", value: selectedAuditDetail.outcomeScore },
+                    { label: "Total", value: selectedAuditDetail.score },
+                  ].map(item => (
+                    <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{item.label}</p>
+                      <p className="text-2xl font-black text-gray-900">{clampPercent(item.value)}%</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-3">
+                  {(selectedAuditDetail.answers || []).map((answer: any, idx: number) => (
+                    <div key={`${answer.id}-${idx}`} className="rounded-xl border border-gray-100 p-4">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">{answer.category}</p>
+                          <p className="text-sm font-bold text-gray-800 leading-relaxed">{answer.question}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${
+                          answer.answer === "tidak-sesuai"
+                            ? "bg-red-100 text-red-700"
+                            : answer.answer
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {getAuditAnswerLabel(answer.answer)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PRM Patient Detail */}
+        {selectedPrmDetail && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-6 z-50">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[86vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">Patient Reported Measures</p>
+                  <h3 className="text-2xl font-black text-gray-900">{selectedPrmDetail.name || "Pasien"}</h3>
+                  <p className="text-sm text-gray-500 font-semibold mt-1">
+                    Kode: {selectedPrmDetail.rm || "-"} • {selectedPrmDetail.diseaseName || "-"}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setSelectedPrmPatient(null)} className="rounded-full h-10 w-10 p-0">
+                  <XCircle className="w-5 h-5" />
+                </Button>
+              </div>
+
+              <div className="p-6 overflow-y-auto">
+                <div className="grid sm:grid-cols-3 gap-3 mb-6">
+                  {[
+                    { label: "PREM", value: selectedPrmDetail.premScore, color: "text-blue-700" },
+                    { label: "PROM", value: selectedPrmDetail.promScore, color: "text-emerald-700" },
+                    { label: "Overall", value: selectedPrmDetail.overallScore, color: "text-gray-900" },
+                  ].map(item => (
+                    <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{item.label}</p>
+                      <p className={`text-2xl font-black ${item.color}`}>{clampPercent(item.value)}%</p>
+                    </div>
+                  ))}
+                </div>
+
+                {(() => {
+                  const { premQuestions, promQuestions } = getPrmQuestionGroups(selectedPrmDetail);
+                  const rows = [
+                    ...premQuestions.map((q: any) => ({ ...q, group: "PREM" })),
+                    ...promQuestions.map((q: any) => ({ ...q, group: "PROM" })),
+                  ];
+
+                  if (!selectedPrmDetail.answers || Object.keys(selectedPrmDetail.answers).length === 0) {
+                    return (
+                      <div className="bg-amber-50 rounded-xl p-6 border border-amber-200 text-center">
+                        <p className="text-amber-800 font-bold">Detail jawaban tidak tersedia untuk submission lama.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {rows.map((question: any, idx: number) => {
+                        const value = selectedPrmDetail.answers?.[question.id] || "";
+                        return (
+                          <div key={`${question.id}-${idx}`} className="rounded-xl border border-gray-100 p-4">
+                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                                  {question.group}{question.subCategory ? ` • ${question.subCategory}` : ""}
+                                </p>
+                                <p className="text-sm font-bold text-gray-800 leading-relaxed">{question.question}</p>
+                              </div>
+                              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap bg-blue-100 text-blue-700">
+                                {getRatingAnswerLabel(value)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Approval Dialog */}
         {showApprovalDialog && (
