@@ -11,8 +11,17 @@ import {
   ClipboardCheck,
   FileText,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useData } from "../context/DataContext";
+
+const SIDEBAR_WIDTH_KEY = "persi_workspace_sidebar_width";
+const DEFAULT_SIDEBAR_WIDTH = 240;
+const MIN_SIDEBAR_WIDTH = 208;
+const MAX_SIDEBAR_WIDTH = 340;
+
+function clampSidebarWidth(width: number) {
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
+}
 
 export function Root() {
   const location = useLocation();
@@ -20,6 +29,12 @@ export function Root() {
   const outlet = useOutlet();
   const { isAdmin, adminLogout, currentHospital, hospitalLogout } = useData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_SIDEBAR_WIDTH;
+    const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    return Number.isFinite(stored) && stored > 0 ? clampSidebarWidth(stored) : DEFAULT_SIDEBAR_WIDTH;
+  });
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/siap-persi/admin");
   const isAdminLoginRoute = location.pathname === "/admin/login";
   const isHospitalPortalRoute =
@@ -40,6 +55,52 @@ export function Root() {
     { label: "Events", to: "/events" },
     { label: "Metodologi", to: "/methodology" },
   ];
+
+  useEffect(() => {
+    if (!isSidebarResizing) return;
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const nextWidth = clampSidebarWidth(event.clientX);
+      setSidebarWidth(nextWidth);
+      window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(nextWidth));
+    };
+
+    const handlePointerUp = () => {
+      setIsSidebarResizing(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isSidebarResizing]);
+
+  const workspaceSidebarStyle: CSSProperties = { width: `${sidebarWidth}px` };
+  const workspaceContentStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
+  const sidebarResizeHandle = (
+    <button
+      type="button"
+      aria-label="Atur lebar sidebar"
+      title="Tarik untuk mengatur lebar sidebar"
+      onPointerDown={(event) => {
+        event.preventDefault();
+        setIsSidebarResizing(true);
+      }}
+      className={`absolute inset-y-0 right-0 w-2 cursor-col-resize transition-colors ${
+        isSidebarResizing ? "bg-teal-300/50" : "bg-transparent hover:bg-teal-300/30"
+      }`}
+    />
+  );
 
   const adminShellLogout = () => {
     adminLogout();
@@ -82,7 +143,10 @@ export function Root() {
 
     return (
       <div className="min-h-screen bg-slate-100 text-slate-900">
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col">
+        <aside
+          className="fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col"
+          style={workspaceSidebarStyle}
+        >
           <div className="px-6 py-6 border-b border-white/10">
             <Link to="/siap-persi/admin/dashboard" className="flex items-center gap-3">
               <div className="w-11 h-11 bg-white/10 rounded-xl flex items-center justify-center">
@@ -125,9 +189,10 @@ export function Root() {
               Logout Admin
             </button>
           </div>
+          {sidebarResizeHandle}
         </aside>
 
-        <div className="lg:pl-72 min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col lg:pl-[var(--sidebar-width)]" style={workspaceContentStyle}>
           <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
             <div className="h-16 px-6 flex items-center justify-between">
               <div>
@@ -188,7 +253,10 @@ export function Root() {
 
     return (
       <div className="min-h-screen bg-slate-100 text-slate-900">
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col">
+        <aside
+          className="fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col"
+          style={workspaceSidebarStyle}
+        >
           <div className="px-6 py-6 border-b border-white/10">
             <Link to="/submit" className="flex items-center gap-3">
               <div className="w-11 h-11 bg-white/10 rounded-xl flex items-center justify-center">
@@ -235,9 +303,10 @@ export function Root() {
               Logout RS
             </button>
           </div>
+          {sidebarResizeHandle}
         </aside>
 
-        <div className="lg:pl-72 min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col lg:pl-[var(--sidebar-width)]" style={workspaceContentStyle}>
           <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
             <div className="h-16 px-6 flex items-center justify-between">
               <div>
