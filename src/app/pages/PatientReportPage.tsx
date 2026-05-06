@@ -667,80 +667,6 @@ export function PatientReportPage() {
           )}
         </div>
 
-        {/* ========== CUSTOM SURVEY UPLOAD SECTION ========== */}
-        <div className="bg-white rounded-2xl border-2 border-[#14B8A6]/30 p-6 md:p-8 mb-6">
-          <div className="flex items-start gap-4 mb-4">
-            <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0">
-              <FileUp className="w-5 h-5 text-teal-600" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-1">
-                Upload Hasil Survei Internal (Opsional)
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Jika rumah sakit Anda sudah memiliki hasil laporan PDF survei PREM/PROM internal khusus <strong>{activeDisease?.diseaseName}</strong>, Anda dapat mengunggahnya secara mandiri (Maks 2MB).
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-teal-50/50 border border-teal-100 rounded-xl p-5">
-            {customSurveyUploaded ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-teal-200">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 shadow-sm bg-teal-100 rounded-lg">
-                      <FileText className="w-5 h-5 text-teal-700" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">{customSurveyFileName}</h4>
-                      <p className="text-xs text-green-600 font-medium tracking-wide">✓ Tersimpan — {customSurveyPatientCount} pasien — {activeDisease?.diseaseName}</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={handleRemoveFile}
-                    variant="outline"
-                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors"
-                    size="sm"
-                  >
-                    <Trash2 className="w-4 h-4 mr-1.5" />
-                    Hapus File
-                  </Button>
-                </div>
-
-                {/* Info: waiting for admin scoring */}
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Clock className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-amber-800 text-sm">Menunggu Penilaian Admin PERSI</p>
-                    <p className="text-amber-700 text-xs mt-1">
-                      Dokumen survei Anda telah diunggah. Tim reviewer PERSI akan meninjau PDF dan memberikan skor PREM &amp; PROM secara manual.
-                      Pastikan dokumen sudah lengkap sebelum melakukan submit.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-teal-300 rounded-xl p-8 bg-white transition-colors hover:bg-teal-50/60">
-                <UploadCloud className="w-10 h-10 text-teal-500 mb-3" />
-                <p className="font-semibold text-gray-700 mb-1">Pilih file PDF laporan survei Anda</p>
-                <p className="text-xs text-gray-500 mb-4 font-mono">Format: .pdf (Maksimal 2MB)</p>
-                <label className="cursor-pointer inline-flex items-center justify-center px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm">
-                  <FileUp className="w-4 h-4 mr-2" />
-                  Browse File PDF
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* ========== PATIENT REGISTRATION SECTION ========== */}
         {!isQRLocked ? (
           <div className="bg-white rounded-2xl border-2 border-[#0F4C81] p-6 md:p-8 mb-6">
@@ -949,6 +875,79 @@ export function PatientReportPage() {
             </div>
           </div>
         )}
+
+        {/* ========== CUSTOM SURVEY UPLOAD SECTION ========== */}
+        <div className="bg-white rounded-2xl border-2 border-[#14B8A6]/30 p-6 md:p-8 mb-6">
+          <div className="flex items-start gap-4 mb-4">
+            <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <FileUp className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-1">
+                Upload Hasil Survei Internal (Opsional)
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Jika rumah sakit Anda sudah memiliki hasil laporan PDF survei PREM/PROM internal khusus <strong>{activeDisease?.diseaseName}</strong>, Anda dapat mengunggahnya setelah atau tanpa generate QR. Maksimal 2MB.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-teal-50/50 border border-teal-100 rounded-xl p-5">
+            {customSurveyUploaded ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-white p-4 rounded-lg border border-teal-200">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 shadow-sm bg-teal-100 rounded-lg">
+                      <FileText className="w-5 h-5 text-teal-700" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm">{customSurveyFileName}</h4>
+                      <p className="text-xs text-green-600 font-medium tracking-wide">✓ Tersimpan — {customSurveyPatientCount} pasien — {activeDisease?.diseaseName}</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleRemoveFile}
+                    variant="outline"
+                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors"
+                    size="sm"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1.5" />
+                    Hapus File
+                  </Button>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-800 text-sm">Menunggu Penilaian Admin PERSI</p>
+                    <p className="text-amber-700 text-xs mt-1">
+                      Dokumen survei Anda telah diunggah. Tim reviewer PERSI akan meninjau PDF dan memberikan skor PREM &amp; PROM secara manual.
+                      Pastikan dokumen sudah lengkap sebelum melakukan submit.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-teal-300 rounded-xl p-8 bg-white transition-colors hover:bg-teal-50/60">
+                <UploadCloud className="w-10 h-10 text-teal-500 mb-3" />
+                <p className="font-semibold text-gray-700 mb-1">Pilih file PDF laporan survei Anda</p>
+                <p className="text-xs text-gray-500 mb-4 font-mono">Format: .pdf (Maksimal 2MB)</p>
+                <label className="cursor-pointer inline-flex items-center justify-center px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm">
+                  <FileUp className="w-4 h-4 mr-2" />
+                  Browse File PDF
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Response Table (always shown if there are QR code responses) */}
         {surveyResponses.length > 0 && (

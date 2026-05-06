@@ -955,6 +955,7 @@ export function SiapAdminReviewPage() {
                 const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                 const items = specData.rsbkItems.filter(i => i.category === category);
                 const data = (submissionData as any).details?.rsbkData || {};
+                const equivalenceNotes = (submissionData as any).details?.rawProgress?.rsbk?.equivalenceNotes || {};
 
                 return (
                   <div key={category}>
@@ -969,6 +970,7 @@ export function SiapAdminReviewPage() {
                         items.map(item => {
                           const val = data[item.id] || "0";
                           const pts = parseInt(val) * item.pointPerUnit;
+                          const equivalenceNote = equivalenceNotes[item.id];
                           return (
                             <ParameterRow
                               key={item.id}
@@ -976,7 +978,7 @@ export function SiapAdminReviewPage() {
                                 name: item.name,
                                 value: parseInt(val) > 0 ? "1" : "2",
                                 score: pts,
-                                detail: `${val} ${item.inputUnit || "unit"} (${pts} poin)`,
+                                detail: `${val} ${item.inputUnit || "unit"} (${pts} poin)${equivalenceNote ? ` | Catatan ekuivalensi: ${equivalenceNote}` : ""}`,
                               }}
                             />
                           );

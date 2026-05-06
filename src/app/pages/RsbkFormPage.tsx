@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
-import { Users, Building2, Stethoscope, ChevronRight, Save, Target, BedDouble, DoorOpen, CheckCircle2 } from "lucide-react";
+import { Users, Building2, Stethoscope, ChevronRight, Save, BedDouble, DoorOpen, CheckCircle2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData, RsbkItem } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
@@ -12,6 +12,7 @@ export function RsbkFormPage() {
   const specialtyInfo = specialtyAuditData[specialty as keyof typeof specialtyAuditData];
 
   const [formData, setFormData] = useState<Record<string, number | null>>({});
+  const [equivalenceNotes, setEquivalenceNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const draftId = draftManager.getCurrentDraftId();
@@ -19,6 +20,7 @@ export function RsbkFormPage() {
       const draft = draftManager.getDraftById(draftId);
       if (draft && draft.progress[specialty]?.rsbk?.data) {
         const raw = draft.progress[specialty].rsbk.data;
+        const rawNotes = draft.progress[specialty].rsbk.equivalenceNotes || {};
         const converted: Record<string, number | null> = {};
         Object.entries(raw).forEach(([k, v]) => {
           if (v === null || v === undefined || v === "") {
@@ -29,6 +31,7 @@ export function RsbkFormPage() {
           }
         });
         setFormData(converted);
+        setEquivalenceNotes(rawNotes);
       }
     }
   }, [specialty]);
@@ -37,11 +40,14 @@ export function RsbkFormPage() {
     setFormData({ ...formData, [id]: value });
   };
 
+  const handleEquivalenceNoteChange = (id: string, value: string) => {
+    setEquivalenceNotes({ ...equivalenceNotes, [id]: value });
+  };
+
   const rsbkItems = specialtyInfo.rsbkItems;
   const sdmItems = rsbkItems.filter(i => i.category === "sdm");
   const saranaItems = rsbkItems.filter(i => i.category === "sarana");
   const alatItems = rsbkItems.filter(i => i.category === "alat");
-  const sarprasItems = [...saranaItems, ...alatItems];
 
   const groupBySubCategory = (items: RsbkItem[]) => {
     const groups: Record<string, RsbkItem[]> = {};
@@ -79,13 +85,8 @@ export function RsbkFormPage() {
   const sdmPoints = calcPoints(sdmItems);
   const sdmTargetPoints = calcTargetPoints(sdmItems);
 
-  // Bed points & room points (for display)
   const bedItems = saranaItems.filter(i => i.pointPerUnit === 1);
   const roomItems = saranaItems.filter(i => i.pointPerUnit === 5);
-  const bedPoints = calcPoints(bedItems);
-  const bedTargetPoints = calcTargetPoints(bedItems);
-  const roomPoints = calcPoints(roomItems);
-  const roomTargetPoints = calcTargetPoints(roomItems);
 
   const saranaPoints = calcPoints(saranaItems);
   const saranaTargetPoints = calcTargetPoints(saranaItems);
@@ -118,19 +119,21 @@ export function RsbkFormPage() {
     const timer = setTimeout(() => {
       draftManager.updateDraft(draftId, specialty, "rsbk", {
         data: formData,
+        equivalenceNotes,
         score: totalRsbkScore,
         completed: filledItems === totalItems,
       });
     }, 1500); // 1.5s debounce
 
     return () => clearTimeout(timer);
-  }, [formData, specialty, totalRsbkScore, filledItems, totalItems]);
+  }, [formData, equivalenceNotes, specialty, totalRsbkScore, filledItems, totalItems]);
 
   const handleSaveDraft = () => {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId || !specialty) return;
     draftManager.updateDraft(draftId, specialty, "rsbk", {
       data: formData,
+      equivalenceNotes,
       score: totalRsbkScore,
       completed: filledItems === totalItems,
     });
@@ -142,6 +145,7 @@ export function RsbkFormPage() {
     if (!draftId || !specialty) return;
     draftManager.updateDraft(draftId, specialty, "rsbk", {
       data: formData,
+      equivalenceNotes,
       score: totalRsbkScore,
       completed: true,
     });
@@ -174,9 +178,9 @@ export function RsbkFormPage() {
               <p className="text-gray-600">Rumah Sakit Berstandar Kemampuan — Input SDM, Kapasitas Bed, Ruangan & Alat Medis</p>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 px-6 py-4 text-center min-w-[160px]">
-              <p className="text-sm text-gray-600 mb-1">Hospital Structure Score</p>
-              <p className="text-4xl font-bold text-[#0F4C81]">{totalRsbkScore}</p>
-              <p className="text-xs text-gray-500 mt-1">dari 100</p>
+              <p className="text-sm text-gray-600 mb-1">Hospital Structure</p>
+              <p className="text-xl font-bold text-[#0F4C81]">Menunggu Review</p>
+              <p className="text-xs text-gray-500 mt-1">Dinilai oleh reviewer</p>
             </div>
           </div>
         </div>
@@ -196,13 +200,10 @@ export function RsbkFormPage() {
         {/* Info Banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
           <h3 className="font-bold text-gray-900 mb-2">Panduan Pengisian Hospital Structure</h3>
-          <p className="text-sm text-[#0F4C81] font-semibold mb-3">
-            {specialtyInfo.name} — SDM Target: {sdmTargetPoints} poin (maks 50) | Sarana Target: {saranaTargetPoints} poin (maks 25) | Alat Target: {alatTargetPoints} poin (maks 25)
-          </p>
           <div className="space-y-2 text-sm text-gray-700">
-            <p>&bull; Klik tombol <strong>+</strong> untuk mulai mengisi (dimulai dari 0). Setiap dokter = 1 poin, setiap bed = 1 poin, setiap ruangan = <strong>5 poin</strong></p>
-            <p>&bull; <strong>Hospital Structure Score</strong> = Sub-Skor SDM (maks 50) + Sub-Skor Sarana (maks 25) + Sub-Skor Alat (maks 25) = <strong>0–100</strong></p>
-            <p>&bull; Nilai Hospital Structure dikalikan bobot <strong>15%</strong> untuk peringkat nasional</p>
+            <p>&bull; Isi jumlah aktual SDM, sarana, prasarana, dan alat yang tersedia serta berfungsi.</p>
+            <p>&bull; Nilai Hospital Structure tidak ditampilkan otomatis ke RS dan akan ditetapkan setelah review/verifikasi PERSI.</p>
+            <p>&bull; Jika ada alat dengan fungsi setara namun nama/jenis berbeda, isi jumlahnya dan tambahkan catatan ekuivalensi pada item alat terkait.</p>
           </div>
         </div>
 
@@ -236,9 +237,9 @@ export function RsbkFormPage() {
           ))}
         </FormSection>
 
-        {/* Section 2: Sarana & Prasarana (Bed + Ruangan + Alat) */}
+        {/* Section 2: Sarana & Prasarana */}
         <FormSection title="Sarana & Prasarana" icon={<Building2 className="w-6 h-6" />} color="teal"
-          subtitle={`Sarana: ${saranaSubScore}/25 | Alat Medis: ${alatSubScore}/25`}>
+          subtitle="Kapasitas bed dan ruangan pendukung pelayanan">
           
           {/* Kapasitas Bed */}
           {saranaGroups["Kapasitas Bed"] && (
@@ -246,7 +247,7 @@ export function RsbkFormPage() {
               <div className="flex items-center gap-2 mb-3">
                 <BedDouble className="w-5 h-5 text-teal-600" />
                 <h4 className="text-sm font-semibold text-teal-700 bg-teal-50 px-4 py-2 rounded-lg flex-1">
-                  Kapasitas Bed <span className="text-gray-500 font-normal ml-2">(1 bed = 1 poin) — {bedPoints}/{bedTargetPoints} poin</span>
+                  Kapasitas Bed
                 </h4>
               </div>
               <div className="space-y-3">
@@ -263,7 +264,7 @@ export function RsbkFormPage() {
               <div className="flex items-center gap-2 mb-3">
                 <DoorOpen className="w-5 h-5 text-indigo-600" />
                 <h4 className="text-sm font-semibold text-indigo-700 bg-indigo-50 px-4 py-2 rounded-lg flex-1">
-                  Ruangan Khusus <span className="text-gray-500 font-normal ml-2">(1 ruangan = 5 poin) — {roomPoints}/{roomTargetPoints} poin</span>
+                  Ruangan Khusus
                 </h4>
               </div>
               <div className="space-y-3">
@@ -274,150 +275,56 @@ export function RsbkFormPage() {
             </div>
           )}
 
-          {/* Alat Medis */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Stethoscope className="w-5 h-5 text-purple-600" />
-              <h4 className="text-sm font-semibold text-purple-700 bg-purple-50 px-4 py-2 rounded-lg flex-1">
-                Alat Medis <span className="text-gray-500 font-normal ml-2">(1 unit = 1 poin) — {alatPoints}/{alatTargetPoints} poin</span>
-              </h4>
-            </div>
-            <div className="space-y-3">
-              {alatItems.map((item) => (
-                <QuantityInput key={item.id} item={item} value={formData[item.id] ?? null} onChange={handleChange} />
-              ))}
-            </div>
+        </FormSection>
+
+        {/* Section 3: Alat Medis */}
+        <FormSection
+          title="Alat Medis yang Memenuhi Syarat dan Regulasi serta Berfungsi Penuh"
+          icon={<Stethoscope className="w-6 h-6" />}
+          color="purple"
+          subtitle="Isi alat yang tersedia. Catat alat ekuivalen jika fungsi klinisnya setara."
+        >
+          <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 mb-4 text-sm text-purple-900">
+            Jika alat indikator tidak tersedia tetapi rumah sakit memiliki alat lain dengan fungsi klinis setara, tuliskan pada catatan ekuivalensi. Contoh: indikator garpu tala, namun tersedia audiometri yang menjalankan fungsi pemeriksaan pendengaran.
+          </div>
+          <div className="space-y-3">
+            {alatItems.map((item) => (
+              <QuantityInput
+                key={item.id}
+                item={item}
+                value={formData[item.id] ?? null}
+                onChange={handleChange}
+                equivalenceNote={equivalenceNotes[item.id] || ""}
+                onEquivalenceNoteChange={handleEquivalenceNoteChange}
+              />
+            ))}
           </div>
         </FormSection>
 
-        {/* Summary */}
         <div className="bg-white rounded-xl border-2 border-[#0F4C81] p-6 mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Hospital Structure Score</h3>
-          
-
-
-          <div className="overflow-x-auto mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-[#0F4C81]">
-                  <th className="text-left py-3 px-4 font-bold text-[#0F4C81]">Komponen</th>
-                  <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Poin</th>
-                  <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Target</th>
-                  <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Bobot</th>
-                  <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Sub-Skor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* SDM Row */}
-                <tr className="border-b-2 border-blue-100 bg-blue-50/40">
-                  <td className="py-3 px-4 font-bold text-blue-900" colSpan={3}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
-                      SDM — Tenaga Medis
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-center text-gray-500 font-medium">× 50</td>
-                  <td className="py-3 px-4 text-center font-bold text-blue-800 text-xl">{sdmSubScore}</td>
-                </tr>
-                <tr className="border-b border-blue-50 bg-white">
-                   <td className="py-2.5 px-6" colSpan={3}>
-                     <div className="mt-1 w-full bg-blue-100 rounded-full h-1.5">
-                       <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${sdmTargetPoints > 0 ? Math.min((sdmPoints / sdmTargetPoints) * 100, 100) : 0}%` }} />
-                     </div>
-                     <div className="flex justify-between text-[10px] mt-1 text-blue-600 font-medium">
-                       <span>{sdmPoints} Poin</span>
-                       <span>Target {sdmTargetPoints} Poin</span>
-                     </div>
-                   </td>
-                   <td colSpan={2}></td>
-                </tr>
-
-                {/* Sarana Header */}
-                <tr className="border-b border-teal-100 bg-teal-50/40">
-                  <td className="py-3 px-4 font-bold text-teal-900" colSpan={3}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block"></span>
-                      Sarana
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-center text-gray-500 font-medium">× 25</td>
-                  <td className="py-3 px-4 text-center font-bold text-teal-800 text-xl">{saranaSubScore}</td>
-                </tr>
-
-                {/* Sarana: Bed Row */}
-                <tr className="border-b border-gray-100 bg-white">
-                  <td className="py-2.5 px-4 text-gray-700 pl-10">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400 inline-block"></span>
-                      Kapasitas Bed <span className="text-xs font-normal text-gray-400">(1 bed = 1 poin)</span>
-                    </div>
-                    <div className="mt-1 w-full bg-teal-50 rounded-full h-1">
-                      <div className="bg-teal-500 h-1 rounded-full transition-all" style={{ width: `${bedTargetPoints > 0 ? Math.min((bedPoints / bedTargetPoints) * 100, 100) : 0}%` }} />
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-4 text-center font-semibold text-teal-700">{bedPoints}</td>
-                  <td className="py-2.5 px-4 text-center text-gray-500">{bedTargetPoints}</td>
-                  <td colSpan={2}></td>
-                </tr>
-                {/* Sarana: Ruangan */}
-                <tr className="border-b border-gray-100 bg-white">
-                  <td className="py-2.5 px-4 text-gray-700 pl-10">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
-                      Ruangan Khusus <span className="text-xs font-normal text-gray-400">(1 ruangan = 5 poin)</span>
-                    </div>
-                    <div className="mt-1 w-full bg-indigo-50 rounded-full h-1">
-                      <div className="bg-indigo-500 h-1 rounded-full transition-all" style={{ width: `${roomTargetPoints > 0 ? Math.min((roomPoints / roomTargetPoints) * 100, 100) : 0}%` }} />
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-4 text-center font-semibold text-indigo-700">{roomPoints}</td>
-                  <td className="py-2.5 px-4 text-center text-gray-500">{roomTargetPoints}</td>
-                  <td colSpan={2}></td>
-                </tr>
-
-                {/* Alat row */}
-                <tr className="border-b-2 border-purple-100 bg-purple-50/40">
-                  <td className="py-3 px-4 font-bold text-purple-900" colSpan={3}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span>
-                      Alat Medis
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-center text-gray-500 font-medium">× 25</td>
-                  <td className="py-3 px-4 text-center font-bold text-purple-800 text-xl">{alatSubScore}</td>
-                </tr>
-                <tr className="border-b border-purple-50 bg-white">
-                   <td className="py-2.5 px-6" colSpan={3}>
-                     <div className="mt-1 w-full bg-purple-100 rounded-full h-1.5">
-                       <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${alatTargetPoints > 0 ? Math.min((alatPoints / alatTargetPoints) * 100, 100) : 0}%` }} />
-                     </div>
-                     <div className="flex justify-between text-[10px] mt-1 text-purple-600 font-medium">
-                       <span>{alatPoints} Poin</span>
-                       <span>Target {alatTargetPoints} Poin</span>
-                     </div>
-                   </td>
-                   <td colSpan={2}></td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr className="bg-[#0F4C81]/10">
-                  <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={4}>Total Hospital Structure</td>
-                  <td className="py-3 px-4 text-center font-bold text-[#0F4C81] text-2xl">{totalRsbkScore}</td>
-                </tr>
-              </tfoot>
-            </table>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Ringkasan Hospital Structure</h3>
+          <p className="text-sm text-gray-600 mb-5">
+            Data sudah direkap untuk proses review. Skor RSBK tidak ditampilkan otomatis kepada rumah sakit untuk menghindari miskonsepsi penilaian.
+          </p>
+          <div className="grid md:grid-cols-3 gap-3">
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-blue-700 mb-1">SDM</p>
+              <p className="text-2xl font-black text-blue-900">{sdmItems.filter(item => formData[item.id] !== null && formData[item.id] !== undefined).length}</p>
+              <p className="text-xs text-blue-700 mt-1">item terisi</p>
+            </div>
+            <div className="rounded-xl bg-teal-50 border border-teal-100 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-teal-700 mb-1">Sarana & Prasarana</p>
+              <p className="text-2xl font-black text-teal-900">{saranaItems.filter(item => formData[item.id] !== null && formData[item.id] !== undefined).length}</p>
+              <p className="text-xs text-teal-700 mt-1">item terisi</p>
+            </div>
+            <div className="rounded-xl bg-purple-50 border border-purple-100 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-purple-700 mb-1">Alat Medis</p>
+              <p className="text-2xl font-black text-purple-900">{alatItems.filter(item => formData[item.id] !== null && formData[item.id] !== undefined).length}</p>
+              <p className="text-xs text-purple-700 mt-1">item terisi</p>
+            </div>
           </div>
-
-          <div className="bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] rounded-xl p-5 text-white text-center">
-            <p className="text-sm opacity-90 mb-1">Hospital Structure Score</p>
-            <p className="text-4xl font-bold">{totalRsbkScore} <span className="text-lg font-normal opacity-80">/ 100</span></p>
-            <p className="text-sm opacity-80 mt-1">SDM: {sdmSubScore}/50 + Sarana: {saranaSubScore}/25 + Alat: {alatSubScore}/25</p>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 mt-4">
-            <p><strong>Rumus:</strong> Hospital Structure Score = Sub-Skor SDM (maks 50) + Sub-Skor Sarana (maks 25) + Sub-Skor Alat (maks 25) = 0–100</p>
-            <p className="mt-1">Sub-Skor SDM = (Poin SDM / Target SDM) × 50 | Sub-Skor Sarana = (Total Bed + Ruangan×5) / Target × 25 | Sub-Skor Alat = (Total Alat) / Target × 25</p>
-            <p className="mt-1">Nilai akhir Hospital Structure dikalikan bobot <strong>15%</strong> untuk peringkat nasional.</p>
+          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 mt-4">
+            <strong>Status nilai:</strong> Menunggu review dan validasi PERSI.
           </div>
         </div>
 
@@ -470,18 +377,17 @@ function FormSection({ title, icon, color, subtitle, children }: {
   );
 }
 
-function QuantityInput({ item, value, onChange }: {
-  item: RsbkItem; value: number | null; onChange: (id: string, value: number | null) => void;
+function QuantityInput({ item, value, onChange, equivalenceNote, onEquivalenceNoteChange }: {
+  item: RsbkItem;
+  value: number | null;
+  onChange: (id: string, value: number | null) => void;
+  equivalenceNote?: string;
+  onEquivalenceNoteChange?: (id: string, value: string) => void;
 }) {
   const isFilled = value !== null;
   const actualValue = value ?? 0;
-  const isInfoOnly = item.target === 0;
-  
-  const achievement = isFilled && !isInfoOnly ? Math.min(actualValue, item.target) / item.target : 0;
-  const isMetTarget = isInfoOnly ? isFilled && actualValue > 0 : (isFilled && actualValue >= item.target);
   const unit = item.inputUnit || "unit";
-  const pointsEarned = isFilled && !isInfoOnly ? Math.min(actualValue, item.target) * item.pointPerUnit : 0;
-  const targetPoints = item.target * item.pointPerUnit;
+  const canAddEquivalence = item.category === "alat" && onEquivalenceNoteChange;
 
   const handleDecrement = () => {
     if (!isFilled) return;
@@ -500,46 +406,36 @@ function QuantityInput({ item, value, onChange }: {
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-      <div className="flex-1">
-        <label className="font-medium text-gray-900">{item.name}</label>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {!isInfoOnly ? (
-            <>
-              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
-                isMetTarget ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
-              }`}>
-                <Target className="w-3 h-3" />
-                Target: {item.target} {unit}
-              </span>
-              {item.pointPerUnit > 1 && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
-                  ×{item.pointPerUnit} poin
-                </span>
-              )}
-              {isFilled && (
-                <span className={`text-xs font-medium ${isMetTarget ? "text-green-600" : "text-orange-600"}`}>
-                  {pointsEarned}/{targetPoints} poin ({(achievement * 100).toFixed(0)}%)
-                </span>
-              )}
-            </>
-          ) : null}
+    <div className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <label className="font-medium text-gray-900">{item.name}</label>
+          <p className="text-xs text-gray-500 mt-1">Isi jumlah aktual yang tersedia dan berfungsi.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={handleDecrement}
+            className="w-9 h-9 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center font-bold text-gray-700 transition-colors">-</button>
+          <input type="text" value={isFilled ? actualValue : "-"} onChange={handleInputChange}
+            className={`w-20 h-9 text-center border-2 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-[#0F4C81] focus:border-[#0F4C81] ${
+              isFilled ? "border-gray-300 text-gray-900" : "border-gray-300 text-gray-400"
+            }`} />
+          <button type="button" onClick={handleIncrement}
+            className="w-9 h-9 rounded-lg bg-[#0F4C81] hover:bg-[#0d3d66] flex items-center justify-center font-bold text-white transition-colors">+</button>
+          <span className="text-sm text-gray-500 w-16">{unit}</span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={handleDecrement}
-          className="w-9 h-9 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center font-bold text-gray-700 transition-colors">-</button>
-        <input type="text" value={isFilled ? actualValue : "-"} onChange={handleInputChange}
-          className={`w-20 h-9 text-center border-2 rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-[#0F4C81] focus:border-[#0F4C81] ${
-            isFilled ? "border-gray-300 text-gray-900" : "border-gray-300 text-gray-400"
-          }`} />
-        <button type="button" onClick={handleIncrement}
-          className="w-9 h-9 rounded-lg bg-[#0F4C81] hover:bg-[#0d3d66] flex items-center justify-center font-bold text-white transition-colors">+</button>
-        <span className="text-sm text-gray-500 w-16">{unit}</span>
-      </div>
-      {(!isInfoOnly && isMetTarget) && (
-        <div className="bg-green-100 text-green-700 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
-          Target Tercapai <CheckCircle2 className="w-3.5 h-3.5" />
+
+      {canAddEquivalence && (
+        <div className="mt-3 border-t border-gray-200 pt-3">
+          <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+            Catatan alat ekuivalen / fungsi setara untuk reviewer
+          </label>
+          <textarea
+            value={equivalenceNote || ""}
+            onChange={(event) => onEquivalenceNoteChange(item.id, event.target.value)}
+            placeholder="Contoh: Tidak memiliki garpu tala, tetapi tersedia audiometri untuk fungsi pemeriksaan pendengaran."
+            className="w-full min-h-[72px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0F4C81] focus:border-[#0F4C81]"
+          />
         </div>
       )}
     </div>
