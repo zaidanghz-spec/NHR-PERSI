@@ -13,6 +13,7 @@ export interface DraftData {
       rsbk: {
         completed: boolean;
         data: Record<string, string>;
+        equivalenceNotes?: Record<string, string>;
         score?: number;
       };
       clinicalAudit: {
@@ -86,6 +87,7 @@ export const draftManager = {
     data: {
       completed?: boolean;
       data?: Record<string, any>;
+      equivalenceNotes?: Record<string, string>;
       score?: number;
       patientMeta?: Record<string, { initials: string; code: string }>;
       activeDiseaseIndex?: number;

@@ -413,7 +413,7 @@ export function SiapPersiResultPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Rekapitulasi Nilai</h2>
             <div className="bg-[#0F4C81] text-white px-5 py-2 rounded-xl">
-              <span className="text-sm">Total NHR PERSI</span>
+              <span className="text-sm">Total Sementara</span>
               <span className="text-3xl font-bold ml-3">{totalSiapScore}</span>
             </div>
           </div>
@@ -436,9 +436,9 @@ export function SiapPersiResultPage() {
                     <div className="font-medium text-gray-900">Hospital Structure Form</div>
                     <div className="text-xs text-gray-500">Tenaga medis & sarana prasarana</div>
                   </td>
-                  <td className="py-4 px-4 text-center font-bold text-blue-700">{rsbkScore}</td>
+                  <td className="py-4 px-4 text-center font-bold text-blue-700">Review</td>
                   <td className="py-4 px-4 text-center text-gray-600">15%</td>
-                  <td className="py-4 px-4 text-center font-bold text-blue-700">{rsbkWeighted}</td>
+                  <td className="py-4 px-4 text-center font-bold text-blue-700">Menunggu</td>
                   <td className="py-4 px-4 text-center">
                     <span className="inline-flex items-center gap-1 text-green-700 text-xs font-semibold">
                       <CheckCircle2 className="w-4 h-4" /> Selesai
@@ -477,7 +477,7 @@ export function SiapPersiResultPage() {
               <tfoot>
                 <tr className="bg-[#0F4C81]/10">
                   <td className="py-4 px-4 font-bold text-[#0F4C81] text-lg" colSpan={3}>
-                    Total Skor NHR PERSI
+                    Total Skor Sementara
                   </td>
                   <td className="py-4 px-4 text-center font-bold text-[#0F4C81] text-3xl">
                     {totalSiapScore}
@@ -489,7 +489,7 @@ export function SiapPersiResultPage() {
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-            <p><strong>Rumus:</strong> Total = (Hospital Structure x 15%) + (Clinical Audit x 60%) + (Patient Report x 25%)</p>
+            <p><strong>Catatan:</strong> Nilai Hospital Structure menunggu review PERSI. Total sementara memakai data tersimpan untuk kebutuhan submit dan akan difinalkan reviewer.</p>
           </div>
 
 
@@ -510,7 +510,7 @@ export function SiapPersiResultPage() {
               </div>
               <div className="text-right">
                 <span className="text-green-700 font-semibold block">Selesai</span>
-                <span className="text-sm text-gray-500">Skor: {rsbkScore}</span>
+                <span className="text-sm text-gray-500">Nilai: Menunggu review</span>
               </div>
             </div>
 
