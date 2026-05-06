@@ -343,6 +343,17 @@ export function ClinicalAuditPage() {
 
   const handleSubmit = () => {
     handleSaveDraft();
+    const draftId = draftManager.getCurrentDraftId();
+    if (draftId && specialty) {
+      draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
+        data: formData,
+        patientMeta,
+        score: specialtyScore,
+        currentPatient,
+        activeDiseaseIndex,
+        completed: allDiseasesHaveData,
+      });
+    }
     navigate(`/siap-persi/patient-report/${specialty}`);
   };
 
@@ -365,6 +376,7 @@ export function ClinicalAuditPage() {
         score: specialtyScore,
         currentPatient,
         activeDiseaseIndex,
+        completed: allDiseasesHaveData,
       });
     }, 1000); // 1s debounce to prevent flooding
 
@@ -630,7 +642,7 @@ export function ClinicalAuditPage() {
         {/* ===== Audit Questions ===== */}
         <div className="bg-white rounded-xl border border-gray-200 p-8 mb-6">
           <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Indikator Audit — {activeDisease.diseaseName} — Pasien #{currentPatient}
+            Kriteria Audit Klinis — {activeDisease.diseaseName} — Pasien #{currentPatient}
           </h3>
           <div className="space-y-4">
             {currentQuestions.map((question, index) => (

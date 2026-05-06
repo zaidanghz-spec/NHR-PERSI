@@ -218,7 +218,7 @@ export function SelectSpecialtyPage() {
       borderColor: "border-red-500",
       stats: {
         doctors: `${specialtyAuditData.cardiology.rsbkItems.filter(i => i.category === "sdm").length} item SDM`,
-        indicators: `${specialtyAuditData.cardiology.auditQuestions.length} indikator audit`,
+        indicators: `${specialtyAuditData.cardiology.auditQuestions.length} kriteria audit klinis`,
         equipment: `${specialtyAuditData.cardiology.rsbkItems.filter(i => i.category === "alat").length} alat medis`,
       },
     },
@@ -235,7 +235,7 @@ export function SelectSpecialtyPage() {
       borderColor: "border-blue-500",
       stats: {
         doctors: `${specialtyAuditData.neurology.rsbkItems.filter(i => i.category === "sdm").length} item SDM`,
-        indicators: `${specialtyAuditData.neurology.auditQuestions.length} indikator audit`,
+        indicators: `${specialtyAuditData.neurology.auditQuestions.length} kriteria audit klinis`,
         equipment: `${specialtyAuditData.neurology.rsbkItems.filter(i => i.category === "alat").length} alat medis`,
       },
     },
@@ -252,7 +252,7 @@ export function SelectSpecialtyPage() {
       borderColor: "border-purple-500",
       stats: {
         doctors: `${specialtyAuditData.oncology.rsbkItems.filter(i => i.category === "sdm").length} item SDM`,
-        indicators: `${specialtyAuditData.oncology.auditQuestions.length} indikator audit (2 penyakit)`,
+        indicators: `${specialtyAuditData.oncology.auditQuestions.length} kriteria audit klinis (2 penyakit)`,
         equipment: `${specialtyAuditData.oncology.rsbkItems.filter(i => i.category === "alat").length} alat medis`,
       },
     },
@@ -534,7 +534,7 @@ function SpecialtyCard({
             />
             <StatItem 
               icon={<Activity className="w-4 h-4" />} 
-              label="Indikator Audit" 
+              label="Kriteria Audit Klinis"
               value={specialty.stats.indicators} 
               themeColor={specialty.textColor}
             />

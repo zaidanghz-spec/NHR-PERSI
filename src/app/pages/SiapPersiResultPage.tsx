@@ -93,6 +93,77 @@ export function SiapPersiResultPage() {
   const [prmPatientBreakdown, setPrmPatientBreakdown] = useState<PatientCountBreakdown[]>([]);
   const [showBackChoice, setShowBackChoice] = useState(false);
 
+  const getStageStatus = (spec: string | undefined, stage: "rsbk" | "clinicalAudit" | "patientReport") => {
+    if (!spec) return { complete: false, label: "Belum lengkap", detail: "Data belum tersedia" };
+    const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+    const activeDraft = draftId ? draftManager.getDraftById(draftId) : null;
+    const progress = activeDraft?.progress?.[spec];
+
+    if (stage === "rsbk") {
+      const total = info?.rsbkItems.length || 0;
+      const data = progress?.rsbk?.data || {};
+      const filled = info?.rsbkItems.filter(item => data[item.id] !== null && data[item.id] !== undefined && data[item.id] !== "").length || 0;
+      return {
+        complete: total > 0 && filled === total,
+        label: total > 0 && filled === total ? "Lengkap" : "Belum lengkap",
+        detail: `${filled}/${total} item terisi`,
+      };
+    }
+
+    if (stage === "clinicalAudit") {
+      const breakdown = spec === specialty ? auditPatientBreakdown : [];
+      const diseaseCount = info?.diseases.length || 0;
+      const completeFromBreakdown = breakdown.length >= diseaseCount && breakdown.every(item => item.count >= 1);
+      const sessionCount = parseInt(sessionStorage.getItem(`${spec}_auditPatientCount`) || "0", 10);
+      const complete = Boolean(progress?.clinicalAudit?.completed || completeFromBreakdown || (diseaseCount > 0 && sessionCount >= diseaseCount));
+      return {
+        complete,
+        label: complete ? "Lengkap" : "Belum lengkap",
+        detail: spec === specialty ? `${auditPatientCount} rekam medis terisi` : `${sessionCount} rekam medis terisi`,
+      };
+    }
+
+    const breakdown = spec === specialty ? prmPatientBreakdown : [];
+    const diseaseCount = info?.diseases.length || 0;
+    const completeFromBreakdown = breakdown.length >= diseaseCount && breakdown.every(item => item.count >= 1);
+    const sessionCount = parseInt(sessionStorage.getItem(`${spec}_prmPatientCount`) || "0", 10);
+    const complete = Boolean(progress?.patientReport?.completed || completeFromBreakdown || (diseaseCount > 0 && sessionCount >= diseaseCount));
+    return {
+      complete,
+      label: complete ? "Lengkap" : "Belum lengkap",
+      detail: spec === specialty ? `${prmPatientCount} pasien terisi` : `${sessionCount} pasien terisi`,
+    };
+  };
+
+  const currentStageStatuses = {
+    rsbk: getStageStatus(specialty, "rsbk"),
+    clinicalAudit: getStageStatus(specialty, "clinicalAudit"),
+    patientReport: getStageStatus(specialty, "patientReport"),
+  };
+
+  const incompleteStages = selectedSpecialties.flatMap((spec) => {
+    const statusMap = [
+      { label: "Hospital Structure", status: getStageStatus(spec, "rsbk") },
+      { label: "Clinical Audit", status: getStageStatus(spec, "clinicalAudit") },
+      { label: "Patient Report", status: getStageStatus(spec, "patientReport") },
+    ];
+    const specName = specialtyAuditData[spec as keyof typeof specialtyAuditData]?.name || spec;
+    return statusMap
+      .filter(item => !item.status.complete)
+      .map(item => `${specName} - ${item.label} (${item.status.detail})`);
+  });
+
+  const canSubmitAll = incompleteStages.length === 0;
+
+  const StatusBadge = ({ complete }: { complete: boolean }) => (
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
+      complete ? "text-green-700" : "text-amber-700"
+    }`}>
+      {complete ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+      {complete ? "Lengkap" : "Belum Lengkap"}
+    </span>
+  );
+
   const renderPatientCount = (total: string, breakdown: PatientCountBreakdown[], unit: string) => {
     const totalTarget = Math.max(1, breakdown.length) * 30;
     return (
@@ -211,6 +282,10 @@ export function SiapPersiResultPage() {
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (!canSubmitAll) {
+      alert(`Submission belum bisa dikirim. Lengkapi dulu:\n- ${incompleteStages.join("\n- ")}`);
+      return;
+    }
     setIsSubmitting(true);
     const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
     const hCode = hospitalAuth.hospitalCode || hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "RS001";
@@ -440,9 +515,7 @@ export function SiapPersiResultPage() {
                   <td className="py-4 px-4 text-center text-gray-600">15%</td>
                   <td className="py-4 px-4 text-center font-bold text-blue-700">Menunggu</td>
                   <td className="py-4 px-4 text-center">
-                    <span className="inline-flex items-center gap-1 text-green-700 text-xs font-semibold">
-                      <CheckCircle2 className="w-4 h-4" /> Selesai
-                    </span>
+                    <StatusBadge complete={currentStageStatuses.rsbk.complete} />
                   </td>
                 </tr>
                 <tr className="border-b border-gray-200 bg-purple-50/50">
@@ -454,9 +527,7 @@ export function SiapPersiResultPage() {
                   <td className="py-4 px-4 text-center text-gray-600">60%</td>
                   <td className="py-4 px-4 text-center font-bold text-purple-700">{auditWeighted}</td>
                   <td className="py-4 px-4 text-center">
-                    <span className="inline-flex items-center gap-1 text-green-700 text-xs font-semibold">
-                      <CheckCircle2 className="w-4 h-4" /> Selesai
-                    </span>
+                    <StatusBadge complete={currentStageStatuses.clinicalAudit.complete} />
                   </td>
                 </tr>
                 <tr className="border-b border-gray-200 bg-teal-50/50">
@@ -468,9 +539,7 @@ export function SiapPersiResultPage() {
                   <td className="py-4 px-4 text-center text-gray-600">25%</td>
                   <td className="py-4 px-4 text-center font-bold text-teal-700">{prmWeighted}</td>
                   <td className="py-4 px-4 text-center">
-                    <span className="inline-flex items-center gap-1 text-green-700 text-xs font-semibold">
-                      <CheckCircle2 className="w-4 h-4" /> Selesai
-                    </span>
+                    <StatusBadge complete={currentStageStatuses.patientReport.complete} />
                   </td>
                 </tr>
               </tbody>
@@ -500,47 +569,71 @@ export function SiapPersiResultPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Ringkasan Submission</h2>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+            <button
+              type="button"
+              onClick={() => navigate(`/siap-persi/rsbk/${specialty}`)}
+              className={`w-full text-left flex items-center justify-between p-4 rounded-lg border transition-all hover:shadow-md ${
+                currentStageStatuses.rsbk.complete ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+              }`}
+            >
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
+                {currentStageStatuses.rsbk.complete ? <CheckCircle2 className="w-6 h-6 text-green-600" /> : <AlertCircle className="w-6 h-6 text-amber-600" />}
                 <div>
                   <p className="font-semibold text-gray-900">Hospital Structure Form</p>
-                  <p className="text-sm text-gray-600">Tenaga medis & sarana prasarana</p>
+                  <p className="text-sm text-gray-600">{currentStageStatuses.rsbk.detail}</p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-green-700 font-semibold block">Selesai</span>
-                <span className="text-sm text-gray-500">Nilai: Menunggu review</span>
+                <span className={`${currentStageStatuses.rsbk.complete ? "text-green-700" : "text-amber-700"} font-semibold block`}>
+                  {currentStageStatuses.rsbk.complete ? "Lengkap" : "Lanjutkan"}
+                </span>
+                <span className="text-sm text-gray-500">Klik untuk review/isi</span>
               </div>
-            </div>
+            </button>
 
-            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+            <button
+              type="button"
+              onClick={() => navigate(`/siap-persi/clinical-audit/${specialty}`)}
+              className={`w-full text-left flex items-center justify-between p-4 rounded-lg border transition-all hover:shadow-md ${
+                currentStageStatuses.clinicalAudit.complete ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+              }`}
+            >
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
+                {currentStageStatuses.clinicalAudit.complete ? <CheckCircle2 className="w-6 h-6 text-green-600" /> : <AlertCircle className="w-6 h-6 text-amber-600" />}
                 <div>
                   <p className="font-semibold text-gray-900">Clinical Audit</p>
                   {renderPatientCount(auditPatientCount, auditPatientBreakdown, "rekam medis pasien")}
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-green-700 font-semibold block">Selesai</span>
-                <span className="text-sm text-gray-500">Skor: {clinicalAuditScore}</span>
+                <span className={`${currentStageStatuses.clinicalAudit.complete ? "text-green-700" : "text-amber-700"} font-semibold block`}>
+                  {currentStageStatuses.clinicalAudit.complete ? "Lengkap" : "Lanjutkan"}
+                </span>
+                <span className="text-sm text-gray-500">Klik untuk review/isi</span>
               </div>
-            </div>
+            </button>
 
-            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+            <button
+              type="button"
+              onClick={() => navigate(`/siap-persi/patient-report/${specialty}`)}
+              className={`w-full text-left flex items-center justify-between p-4 rounded-lg border transition-all hover:shadow-md ${
+                currentStageStatuses.patientReport.complete ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+              }`}
+            >
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
+                {currentStageStatuses.patientReport.complete ? <CheckCircle2 className="w-6 h-6 text-green-600" /> : <AlertCircle className="w-6 h-6 text-amber-600" />}
                 <div>
                   <p className="font-semibold text-gray-900">Patient Report (PREM & PROM)</p>
                   {renderPatientCount(prmPatientCount, prmPatientBreakdown, "pasien")}
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-green-700 font-semibold block">Selesai</span>
-                <span className="text-sm text-gray-500">Skor: {patientReportScore}</span>
+                <span className={`${currentStageStatuses.patientReport.complete ? "text-green-700" : "text-amber-700"} font-semibold block`}>
+                  {currentStageStatuses.patientReport.complete ? "Lengkap" : "Lanjutkan"}
+                </span>
+                <span className="text-sm text-gray-500">Klik untuk review/isi</span>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -631,10 +724,14 @@ export function SiapPersiResultPage() {
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-1 h-12 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold"
+              disabled={isSubmitting || !canSubmitAll}
+              className="flex-1 h-12 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Mengirim ke server..." : `Submit Semua untuk Review (${selectedSpecialties.length} Pelayanan)`}
+              {isSubmitting
+                ? "Mengirim ke server..."
+                : canSubmitAll
+                ? `Submit Semua untuk Review (${selectedSpecialties.length} Pelayanan)`
+                : `Lengkapi ${incompleteStages.length} bagian sebelum submit`}
             </Button>
           )}
         </div>
