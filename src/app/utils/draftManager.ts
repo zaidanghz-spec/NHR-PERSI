@@ -27,6 +27,7 @@ export interface DraftData {
       patientReport: {
         completed: boolean;
         data: Record<string, any>;
+        score?: number;
         patientCount?: number;
       };
     };

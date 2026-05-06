@@ -343,6 +343,17 @@ export function ClinicalAuditPage() {
 
   const handleSubmit = () => {
     handleSaveDraft();
+    const draftId = draftManager.getCurrentDraftId();
+    if (draftId && specialty) {
+      draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
+        data: formData,
+        patientMeta,
+        score: specialtyScore,
+        currentPatient,
+        activeDiseaseIndex,
+        completed: allDiseasesHaveData,
+      });
+    }
     navigate(`/siap-persi/patient-report/${specialty}`);
   };
 
@@ -365,6 +376,7 @@ export function ClinicalAuditPage() {
         score: specialtyScore,
         currentPatient,
         activeDiseaseIndex,
+        completed: allDiseasesHaveData,
       });
     }, 1000); // 1s debounce to prevent flooding
 

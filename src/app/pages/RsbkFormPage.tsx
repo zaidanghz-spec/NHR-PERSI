@@ -143,11 +143,12 @@ export function RsbkFormPage() {
   const handleSubmit = () => {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId || !specialty) return;
+    if (filledItems < totalItems) return;
     draftManager.updateDraft(draftId, specialty, "rsbk", {
       data: formData,
       equivalenceNotes,
       score: totalRsbkScore,
-      completed: true,
+      completed: filledItems === totalItems,
     });
     sessionStorage.setItem(`${specialty}_rsbkScore`, totalRsbkScore.toString());
     sessionStorage.setItem("currentSpecialty", specialty || "");

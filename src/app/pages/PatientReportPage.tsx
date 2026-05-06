@@ -29,6 +29,7 @@ import type { PatientSurveyResponse } from "./PatientPremPromPage";
 import * as api from "../utils/api";
 import { getHospitalCode } from "../utils/api";
 import { safeLocalStorageSet } from "../utils/storage";
+import { draftManager } from "../utils/draftManager";
 
 interface RegisteredPatient {
   id: string;
@@ -484,6 +485,15 @@ export function PatientReportPage() {
 
     sessionStorage.setItem(`${specialty}_prmSummary`, JSON.stringify(prmSummary));
     sessionStorage.setItem(`${specialty}_patientReportScore`, Math.round(finalScore).toString());
+    const draftId = draftManager.getCurrentDraftId();
+    if (draftId && specialty) {
+      draftManager.updateDraft(draftId, specialty, "patientReport", {
+        data: prmSummary,
+        score: Math.round(finalScore),
+        patientCount: totalPRMPatients,
+        completed: true,
+      });
+    }
     navigate(`/siap-persi/result/${specialty}`);
   };
 
