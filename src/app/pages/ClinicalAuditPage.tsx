@@ -630,7 +630,7 @@ export function ClinicalAuditPage() {
         {/* ===== Audit Questions ===== */}
         <div className="bg-white rounded-xl border border-gray-200 p-8 mb-6">
           <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Indikator Audit — {activeDisease.diseaseName} — Pasien #{currentPatient}
+            Kriteria Audit Klinis — {activeDisease.diseaseName} — Pasien #{currentPatient}
           </h3>
           <div className="space-y-4">
             {currentQuestions.map((question, index) => (
