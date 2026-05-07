@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
-import { Users, Building2, Stethoscope, ChevronRight, Save, BedDouble, DoorOpen, CheckCircle2 } from "lucide-react";
+import { Users, Building2, Stethoscope, ChevronRight, Save, BedDouble, DoorOpen, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData, RsbkItem } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
@@ -100,6 +100,8 @@ export function RsbkFormPage() {
   const totalRsbkScore = Number((sdmSubScore + saranaSubScore + alatSubScore).toFixed(1));
 
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
+  const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -116,6 +118,7 @@ export function RsbkFormPage() {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId) return;
 
+    setAutosaveState("saving");
     const timer = setTimeout(() => {
       draftManager.updateDraft(draftId, specialty, "rsbk", {
         data: formData,
@@ -123,6 +126,8 @@ export function RsbkFormPage() {
         score: totalRsbkScore,
         completed: filledItems === totalItems,
       });
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
     }, 1500); // 1.5s debounce
 
     return () => clearTimeout(timer);
@@ -137,6 +142,8 @@ export function RsbkFormPage() {
       score: totalRsbkScore,
       completed: filledItems === totalItems,
     });
+    setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    setAutosaveState("saved");
     setDraftSavedMsg(true);
   };
 
@@ -190,7 +197,10 @@ export function RsbkFormPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-gray-700">Progress Pengisian</span>
-            <span className="text-sm text-gray-600">{filledItems} / {totalItems} item ({progress.toFixed(0)}%)</span>
+            <div className="flex items-center gap-3">
+              <AutosaveIndicator state={autosaveState} timestamp={lastAutosavedAt} />
+              <span className="text-sm text-gray-600">{filledItems} / {totalItems} item ({progress.toFixed(0)}%)</span>
+            </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div className="bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] h-3 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -357,6 +367,18 @@ export function RsbkFormPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AutosaveIndicator({ state, timestamp }: { state: "idle" | "saving" | "saved"; timestamp: string }) {
+  if (state === "idle") return null;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+      state === "saving" ? "bg-blue-50 text-blue-700" : "bg-green-50 text-green-700"
+    }`}>
+      {state === "saving" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+      {state === "saving" ? "Menyimpan..." : `Tersimpan otomatis${timestamp ? ` ${timestamp}` : ""}`}
+    </span>
   );
 }
 

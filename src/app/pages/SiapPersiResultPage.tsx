@@ -635,6 +635,59 @@ export function SiapPersiResultPage() {
               </div>
             </button>
           </div>
+
+          <div className="mt-8 overflow-x-auto rounded-xl border border-gray-100">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600">
+                <tr>
+                  <th className="px-4 py-3 text-left font-bold">Bagian</th>
+                  <th className="px-4 py-3 text-left font-bold">Detail</th>
+                  <th className="px-4 py-3 text-center font-bold">Progress</th>
+                  <th className="px-4 py-3 text-center font-bold">Status</th>
+                  <th className="px-4 py-3 text-center font-bold">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-gray-100">
+                  <td className="px-4 py-3 font-semibold text-gray-900">Hospital Structure</td>
+                  <td className="px-4 py-3 text-gray-600">Semua item struktur layanan</td>
+                  <td className="px-4 py-3 text-center text-gray-700">{currentStageStatuses.rsbk.detail}</td>
+                  <td className="px-4 py-3 text-center"><StatusBadge complete={currentStageStatuses.rsbk.complete} /></td>
+                  <td className="px-4 py-3 text-center">
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/siap-persi/rsbk/${specialty}`)}>Buka</Button>
+                  </td>
+                </tr>
+                {auditPatientBreakdown.map((item) => {
+                  const complete = item.count >= 1;
+                  return (
+                    <tr key={`audit-${item.diseaseName}`} className="border-t border-gray-100">
+                      <td className="px-4 py-3 font-semibold text-gray-900">Clinical Audit</td>
+                      <td className="px-4 py-3 text-gray-600">{item.diseaseName}</td>
+                      <td className="px-4 py-3 text-center text-gray-700">{item.count}/30 rekam medis ({Math.min(100, Math.round((item.count / 30) * 100))}%)</td>
+                      <td className="px-4 py-3 text-center"><StatusBadge complete={complete} /></td>
+                      <td className="px-4 py-3 text-center">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/siap-persi/clinical-audit/${specialty}`)}>Buka</Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {prmPatientBreakdown.map((item) => {
+                  const complete = item.count >= 1;
+                  return (
+                    <tr key={`prm-${item.diseaseName}`} className="border-t border-gray-100">
+                      <td className="px-4 py-3 font-semibold text-gray-900">PRM/PREMPROM</td>
+                      <td className="px-4 py-3 text-gray-600">{item.diseaseName}</td>
+                      <td className="px-4 py-3 text-center text-gray-700">{item.count}/30 pasien ({Math.min(100, Math.round((item.count / 30) * 100))}%)</td>
+                      <td className="px-4 py-3 text-center"><StatusBadge complete={complete} /></td>
+                      <td className="px-4 py-3 text-center">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/siap-persi/patient-report/${specialty}`)}>Buka</Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Next Specialty Banner */}

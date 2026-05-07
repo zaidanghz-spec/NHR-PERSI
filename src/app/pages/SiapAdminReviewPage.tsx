@@ -68,6 +68,9 @@ export function SiapAdminReviewPage() {
   const [activeTab, setActiveTab] = useState<"summary" | "rsbk" | "audit" | "prm">("summary");
   const [selectedAuditPatient, setSelectedAuditPatient] = useState<number | null>(null);
   const [selectedPrmPatient, setSelectedPrmPatient] = useState<string | null>(null);
+  const [prmDiseaseFilter, setPrmDiseaseFilter] = useState("all");
+  const [prmStatusFilter, setPrmStatusFilter] = useState("all");
+  const [prmHospitalFilter, setPrmHospitalFilter] = useState("");
 
   // Admin editable scores
   const [editingScores, setEditingScores] = useState(false);
@@ -75,7 +78,7 @@ export function SiapAdminReviewPage() {
   const [adminScoreNotes, setAdminScoreNotes] = useState<Record<string, string>>({});
   const [scoreSaved, setScoreSaved] = useState(false);
 
-  const { isAdmin, submissions, updateSubmissionStatus, publishRanking, hospitalAccounts } = useData();
+  const { isAdmin, submissions, updateSubmissionStatus, publishRanking, unpublishRanking, hospitalAccounts } = useData();
   const actualSubmission = submissions.find(s => s.id === id);
 
   const getSpecialtyKey = (name: string) =>
@@ -377,6 +380,52 @@ export function SiapAdminReviewPage() {
       diseaseWeight,
       contribution: Number((scoreAfterValidity * diseaseWeight).toFixed(1)),
     };
+  });
+
+  const prmUnifiedRows = [
+    ...prmPatientsForReview.map((patient: any) => ({
+      id: `qr-${getPrmPatientKey(patient)}`,
+      source: "QR / Non-PDF",
+      hospitalName: submissionData.hospitalName,
+      diseaseName: patient.diseaseName || reviewSpecData.diseases?.[patient.diseaseIndex || 0]?.diseaseName || "-",
+      patientLabel: patient.name || "Pasien",
+      patientCount: 1,
+      prem: patient.hasResponse ? clampPercent(patient.premScore) : null,
+      prom: patient.hasResponse ? clampPercent(patient.promScore) : null,
+      overall: patient.hasResponse ? clampPercent(patient.overallScore) : null,
+      status: patient.hasResponse ? "Valid" : "Belum Ada Respon",
+      patient,
+      doc: null as CustomSurveyDoc | null,
+    })),
+    ...filteredDocs.map((doc, index) => {
+      const docKey = getCustomSurveyDocKey(doc);
+      const premRaw = customSurveyScores[docKey]?.prem ?? doc.adminPremScore;
+      const promRaw = customSurveyScores[docKey]?.prom ?? doc.adminPromScore;
+      const hasScores = premRaw !== "" && premRaw !== null && premRaw !== undefined && promRaw !== "" && promRaw !== null && promRaw !== undefined;
+      const prem = hasScores ? Math.max(0, Math.min(100, Number(premRaw) || 0)) : null;
+      const prom = hasScores ? Math.max(0, Math.min(100, Number(promRaw) || 0)) : null;
+      return {
+        id: `pdf-${getCustomSurveyDocKey(doc)}-${index}`,
+        source: "PDF Internal",
+        hospitalName: doc.hospitalName || submissionData.hospitalName,
+        diseaseName: doc.diseaseName || "-",
+        patientLabel: doc.fileName,
+        patientCount: doc.patientCount || 0,
+        prem,
+        prom,
+        overall: hasScores && prem !== null && prom !== null ? Number((prem * 0.6 + prom * 0.4).toFixed(1)) : null,
+        status: hasScores ? "Valid" : "Perlu Nilai Admin",
+        patient: null,
+        doc,
+      };
+    }),
+  ];
+
+  const filteredPrmUnifiedRows = prmUnifiedRows.filter(row => {
+    const matchDisease = prmDiseaseFilter === "all" || row.diseaseName === prmDiseaseFilter;
+    const matchStatus = prmStatusFilter === "all" || row.status === prmStatusFilter;
+    const matchHospital = !prmHospitalFilter.trim() || row.hospitalName.toLowerCase().includes(prmHospitalFilter.trim().toLowerCase());
+    return matchDisease && matchStatus && matchHospital;
   });
 
   const getPrmQuestionGroups = (patient: any) => {
@@ -940,6 +989,52 @@ export function SiapAdminReviewPage() {
                 Rumus: poin aktual dibatasi sampai target, lalu dinormalisasi ke skor maksimal subkomponen. SDM maks 50, Sarana maks 25, Alat maks 25.
               </p>
             </div>
+
+            <div className="bg-white border-2 border-blue-200 rounded-2xl p-5 mb-8">
+              <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+                <div className="flex-1">
+                  <h4 className="font-black text-gray-900 mb-1">Validasi Manual RSBK oleh Admin</h4>
+                  <p className="text-sm text-gray-500">
+                    RS tidak melihat skor otomatis ini. Reviewer dapat menerima skor otomatis atau menetapkan skor validasi setelah memeriksa bukti dan catatan ekuivalensi.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
+                  <div className="rounded-xl bg-blue-50 border border-blue-100 p-3 text-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-1">Skor Otomatis</p>
+                    <p className="text-3xl font-black text-blue-900">{(submissionData.scores as any).rsbk || 0}</p>
+                  </div>
+                  <label className="rounded-xl bg-gray-50 border border-gray-200 p-3 text-center">
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Skor Validasi</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={adminScores?.rsbk ?? 0}
+                      onChange={(event) => {
+                        const value = Math.max(0, Math.min(100, parseFloat(event.target.value) || 0));
+                        setAdminScores(prev => prev ? { ...prev, rsbk: value } : prev);
+                      }}
+                      className="w-full bg-transparent text-center text-3xl font-black text-gray-900 focus:outline-none"
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+                <input
+                  type="text"
+                  placeholder="Catatan validasi RSBK, misal bukti alat ekuivalen diterima atau item perlu verifikasi ulang."
+                  value={adminScoreNotes.rsbk || ""}
+                  onChange={(event) => setAdminScoreNotes(prev => ({ ...prev, rsbk: event.target.value }))}
+                  className="h-11 rounded-xl border border-gray-200 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <Button onClick={handleSaveScoreOverride} className="h-11 bg-blue-700 hover:bg-blue-800 font-bold">
+                  <Save className="w-4 h-4 mr-2" />
+                  Simpan Validasi RSBK
+                </Button>
+              </div>
+            </div>
+
             <div className="space-y-8">
               {["sdm", "sarana", "alat"].map((category) => {
                 const labels: Record<string, string> = {
@@ -1014,7 +1109,8 @@ export function SiapAdminReviewPage() {
               return (
                 <div className="space-y-6">
                   <div className="bg-purple-50 border border-purple-100 rounded-2xl p-5">
-                    <h4 className="font-black text-purple-900 mb-4">Rumus Skor Clinical Audit per Penyakit</h4>
+                    <h4 className="font-black text-purple-900 mb-1">Clinical Audit per Disease</h4>
+                    <p className="text-xs text-purple-700 mb-4">Rekap skor dan validitas sampel per penyakit sebelum masuk kontribusi total audit klinis.</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm bg-white rounded-xl overflow-hidden">
                         <thead className="bg-purple-900 text-white">
@@ -1056,7 +1152,9 @@ export function SiapAdminReviewPage() {
                     </p>
                   </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+                  <div>
+                    <h4 className="font-black text-gray-900 mb-3">Clinical Audit per Patient</h4>
+                    <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
                     <table className="w-full text-sm">
                       <thead className="bg-[#0F4C81] text-white">
                         <tr>
@@ -1120,6 +1218,7 @@ export function SiapAdminReviewPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
 
                   <div className="mt-8 p-6 bg-gray-50 rounded-2xl border border-gray-100">
@@ -1190,6 +1289,109 @@ export function SiapAdminReviewPage() {
               </p>
             </div>
 
+            <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Tabel Terpadu PREMPROM</h3>
+                  <p className="text-gray-500 text-sm font-medium">
+                    Semua sumber PRM digabung di satu tabel: pasien QR/non-PDF dan dokumen PDF internal, dengan mapping penyakit yang eksplisit.
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
+                  <select
+                    value={prmDiseaseFilter}
+                    onChange={(event) => setPrmDiseaseFilter(event.target.value)}
+                    className="h-10 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                  >
+                    <option value="all">Semua penyakit</option>
+                    {reviewSpecData.diseases.map(disease => (
+                      <option key={disease.diseaseName} value={disease.diseaseName}>{disease.diseaseName}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={prmStatusFilter}
+                    onChange={(event) => setPrmStatusFilter(event.target.value)}
+                    className="h-10 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                  >
+                    <option value="all">Semua status</option>
+                    <option value="Valid">Valid</option>
+                    <option value="Perlu Nilai Admin">Perlu Nilai Admin</option>
+                    <option value="Belum Ada Respon">Belum Ada Respon</option>
+                  </select>
+                  <input
+                    value={prmHospitalFilter}
+                    onChange={(event) => setPrmHospitalFilter(event.target.value)}
+                    placeholder="Filter RS"
+                    className="h-10 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-teal-700 text-white">
+                    <tr>
+                      <th className="py-3 px-4 text-left font-bold uppercase tracking-widest text-[10px]">Sumber</th>
+                      <th className="py-3 px-4 text-left font-bold uppercase tracking-widest text-[10px]">Rumah Sakit</th>
+                      <th className="py-3 px-4 text-left font-bold uppercase tracking-widest text-[10px]">Penyakit</th>
+                      <th className="py-3 px-4 text-left font-bold uppercase tracking-widest text-[10px]">Pasien/Dokumen</th>
+                      <th className="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Jumlah</th>
+                      <th className="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">PREM</th>
+                      <th className="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">PROM</th>
+                      <th className="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">PRM</th>
+                      <th className="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Status</th>
+                      <th className="py-3 px-4 text-center font-bold uppercase tracking-widest text-[10px]">Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPrmUnifiedRows.length === 0 ? (
+                      <tr>
+                        <td className="py-8 px-4 text-center text-gray-500 font-semibold" colSpan={10}>Tidak ada data sesuai filter.</td>
+                      </tr>
+                    ) : filteredPrmUnifiedRows.map(row => (
+                      <tr key={row.id} className="border-b border-gray-100 hover:bg-teal-50/40">
+                        <td className="py-3 px-4 font-bold text-gray-900">{row.source}</td>
+                        <td className="py-3 px-4 text-gray-600">{row.hospitalName}</td>
+                        <td className="py-3 px-4">
+                          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-700">{row.diseaseName}</span>
+                        </td>
+                        <td className="py-3 px-4 max-w-[240px] truncate text-gray-700">{row.patientLabel}</td>
+                        <td className="py-3 px-4 text-center font-semibold">{row.patientCount}</td>
+                        <td className="py-3 px-4 text-center font-semibold">{row.prem ?? "—"}</td>
+                        <td className="py-3 px-4 text-center font-semibold">{row.prom ?? "—"}</td>
+                        <td className="py-3 px-4 text-center font-black text-teal-700">{row.overall ?? "—"}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                            row.status === "Valid" ? "bg-green-100 text-green-700" :
+                            row.status === "Perlu Nilai Admin" ? "bg-amber-100 text-amber-700" :
+                            "bg-gray-100 text-gray-600"
+                          }`}>
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {row.patient ? (
+                            <Button variant="outline" size="sm" onClick={() => setSelectedPrmPatient(getPrmPatientKey(row.patient))}>
+                              Lihat
+                            </Button>
+                          ) : row.doc ? (
+                            <a
+                              href={row.doc.base64}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex h-9 items-center rounded-md border border-gray-200 px-3 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                            >
+                              PDF
+                            </a>
+                          ) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* Custom Survey PDFs — with admin scoring */}
             {filteredDocs.length > 0 && (
               <div className="bg-white rounded-xl border-2 border-amber-200 p-8">
@@ -1217,7 +1419,11 @@ export function SiapAdminReviewPage() {
                     const prem = Number(scoreInput.prem || 0);
                     const prom = Number(scoreInput.prom || 0);
                     const rawPrm = Number((prem * 0.6 + prom * 0.4).toFixed(1));
-                    const validity = getSampleValidityWeight(doc.patientCount || 0);
+                    const qrCountForDisease = prmPatientsForReview.filter((patient: any) =>
+                      patient.hasResponse && (patient.diseaseName === doc.diseaseName)
+                    ).length;
+                    const combinedCount = qrCountForDisease + (doc.patientCount || 0);
+                    const validity = getSampleValidityWeight(combinedCount);
                     const adjusted = Number((rawPrm * validity).toFixed(1));
 
                     return (
@@ -1311,8 +1517,12 @@ export function SiapAdminReviewPage() {
                               <span className="font-black text-gray-900">{rawPrm}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-500">Validitas sampel</span>
+                              <span className="text-gray-500">Validitas sampel gabungan</span>
                               <span className="font-black text-amber-700">{Math.round(validity * 100)}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Total QR + PDF</span>
+                              <span className="font-black text-gray-900">{combinedCount} pasien</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-500">Skor setelah validitas</span>
@@ -1354,108 +1564,8 @@ export function SiapAdminReviewPage() {
                </div>
              )}
 
-            {/* PREM & PROM from QR surveys */}
-            <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
-              <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Pasien Patient Reported Measures (PRM)</h3>
-              <p className="text-gray-500 text-sm mb-8 font-medium">Laporan feedback kuesioner pengalaman dan hasil klinis per pasien individual.</p>
-
-              {(() => {
-                const prmPatients = (submissionData as any).details?.prmPatients || [];
-                
-                if (prmPatients.length === 0) {
-                  return (
-                    <div className="bg-amber-50 rounded-xl p-8 border border-amber-200 text-center">
-                      <p className="text-amber-800 font-medium font-bold">Data survei PRM via QR tidak ditemukan di database cloud.</p>
-                      <p className="text-amber-600 text-sm mt-1 italic">Kemungkinan rumah sakit hanya menggunakan upload dokumen PDF mandiri.</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {prmPatients.map((p: any, idx: number) => {
-                      const premScore = clampPercent(p.premScore);
-                      const promScore = clampPercent(p.promScore);
-
-                      return (
-                        <div
-                          key={idx}
-                          className="group bg-gray-50 hover:bg-white p-5 rounded-2xl border-2 border-transparent hover:border-blue-200 hover:shadow-xl transition-all duration-300"
-                        >
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black text-xl shadow-inner group-hover:scale-110 transition-transform">
-                              {p.name?.substring(0, 2).toUpperCase() || "PX"}
-                            </div>
-                            <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${p.hasResponse ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
-                              {p.hasResponse ? "Survey Selesai" : "Terdaftar"}
-                            </span>
-                          </div>
-                          <h4 className="font-extrabold text-gray-900 mb-1 truncate">{p.name}</h4>
-                          <p className="text-xs font-black text-blue-600 uppercase tracking-widest">Kode: {p.rm}</p>
-                          {p.diseaseName && (
-                            <p className="text-[10px] text-gray-500 font-bold mt-1 mb-4 truncate">{p.diseaseName}</p>
-                          )}
-
-                          {p.hasResponse ? (
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center text-[10px]">
-                                <span className="text-gray-500 font-bold uppercase tracking-tight">PREM (Experience)</span>
-                                <span className="text-blue-600 font-black">{premScore}%</span>
-                              </div>
-                              <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                <div className="bg-blue-500 h-full transition-all duration-1000" style={{ width: `${premScore}%` }} />
-                              </div>
-
-                              <div className="flex justify-between items-center text-[10px] mt-3">
-                                <span className="text-gray-500 font-bold uppercase tracking-tight">PROM (Outcome)</span>
-                                <span className="text-emerald-600 font-black">{promScore}%</span>
-                              </div>
-                              <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${promScore}%` }} />
-                              </div>
-
-                              <p className="text-[9px] text-gray-400 mt-4 flex items-center gap-1 font-bold">
-                                <Clock className="w-3 h-3" />
-                                SUBMITTED: {p.submittedAt ? new Date(p.submittedAt).toLocaleDateString("id-ID") : "—"}
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="h-24 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl">
-                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Belum ada respon</span>
-                            </div>
-                          )}
-
-                          <Button
-                            variant="outline"
-                            className="w-full mt-5 border-gray-200 text-gray-600 group-hover:bg-[#0F4C81] group-hover:text-white group-hover:border-transparent transition-all h-9 text-xs font-bold uppercase tracking-widest rounded-xl"
-                            onClick={() => setSelectedPrmPatient(getPrmPatientKey(p))}
-                            disabled={!p.hasResponse}
-                          >
-                            Lihat Detail Pasien
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
           </div>
         )}
-
-        {/* ===== Admin Review Comment ===== */}
-        <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Admin Review & Comments</h3>
-          <Textarea
-            placeholder="Masukkan catatan review atau komentar untuk rumah sakit..."
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="min-h-32 mb-4"
-          />
-          <p className="text-sm text-gray-600">
-            Catatan ini akan dikirimkan ke rumah sakit bersama dengan keputusan approval.
-          </p>
-        </div>
 
         {/* Action Buttons */}
         <div className="flex gap-4">
@@ -1636,6 +1746,16 @@ export function SiapAdminReviewPage() {
                   ? `Assessment ini akan dipublikasikan dengan skor final ${effectiveFinal} (${gradeInfo.grade} — ${gradeInfo.name}).`
                   : "Rumah sakit akan diminta untuk melakukan revisi berdasarkan catatan yang Anda berikan."}
               </p>
+
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-gray-800 mb-2">Catatan Umum Reviewer</label>
+                <Textarea
+                  placeholder="Opsional: catatan umum untuk rumah sakit."
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  className="min-h-24 text-sm"
+                />
+              </div>
 
               {action === "reject" && (
                 <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
