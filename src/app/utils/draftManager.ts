@@ -36,6 +36,15 @@ export interface DraftData {
 
 const DRAFTS_KEY = "siap_persi_drafts";
 
+export function stripLegacyToolVariationFields<T extends Record<string, any>>(data: T = {} as T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(([key]) => {
+      const normalized = key.toLowerCase();
+      return !normalized.includes("variasi") && !normalized.includes("variation");
+    })
+  ) as T;
+}
+
 export const draftManager = {
   // Get all drafts
   getAllDrafts(): DraftData[] {
@@ -113,9 +122,12 @@ export const draftManager = {
     }
 
     // Update the specific stage
+    const normalizedData = stage === "rsbk" && data.data
+      ? { ...data, data: stripLegacyToolVariationFields(data.data) }
+      : data;
     draft.progress[specialty][stage] = {
       ...draft.progress[specialty][stage],
-      ...data,
+      ...normalizedData,
     };
 
     draft.updatedAt = new Date().toISOString();

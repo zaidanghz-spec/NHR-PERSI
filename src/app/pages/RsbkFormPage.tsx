@@ -4,7 +4,7 @@ import { Users, Building2, Stethoscope, ChevronRight, Save, BedDouble, DoorOpen,
 import { Button } from "../components/ui/button";
 import { specialtyAuditData, RsbkItem } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
-import { draftManager } from "../utils/draftManager";
+import { draftManager, stripLegacyToolVariationFields } from "../utils/draftManager";
 
 export function RsbkFormPage() {
   const { specialty } = useParams<{ specialty: string }>();
@@ -19,7 +19,7 @@ export function RsbkFormPage() {
     if (draftId && specialty) {
       const draft = draftManager.getDraftById(draftId);
       if (draft && draft.progress[specialty]?.rsbk?.data) {
-        const raw = draft.progress[specialty].rsbk.data;
+        const raw = stripLegacyToolVariationFields(draft.progress[specialty].rsbk.data);
         const rawNotes = draft.progress[specialty].rsbk.equivalenceNotes || {};
         const converted: Record<string, number | null> = {};
         Object.entries(raw).forEach(([k, v]) => {
@@ -136,8 +136,9 @@ export function RsbkFormPage() {
   const handleSaveDraft = () => {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId || !specialty) return;
+    const cleanFormData = stripLegacyToolVariationFields(formData);
     draftManager.updateDraft(draftId, specialty, "rsbk", {
-      data: formData,
+      data: cleanFormData,
       equivalenceNotes,
       score: totalRsbkScore,
       completed: filledItems === totalItems,
@@ -151,8 +152,9 @@ export function RsbkFormPage() {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId || !specialty) return;
     if (filledItems < totalItems) return;
+    const cleanFormData = stripLegacyToolVariationFields(formData);
     draftManager.updateDraft(draftId, specialty, "rsbk", {
-      data: formData,
+      data: cleanFormData,
       equivalenceNotes,
       score: totalRsbkScore,
       completed: filledItems === totalItems,
