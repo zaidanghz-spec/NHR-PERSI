@@ -619,6 +619,66 @@ function DraftCard({
     }).format(date);
   };
 
+  const getStatusInfo = (filled: number, total: number) => {
+    if (total > 0 && filled >= total) return { label: "Complete", className: "bg-green-100 text-green-700" };
+    if (filled > 0) return { label: "In Progress", className: "bg-amber-100 text-amber-700" };
+    return { label: "Not Started", className: "bg-gray-100 text-gray-600" };
+  };
+
+  const getClinicalCompleted = (spec: string, diseaseIndex: number) => {
+    const specData = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+    const stage = draft.progress[spec]?.clinicalAudit;
+    const data = stage?.data || {};
+    const patientMeta = stage?.patientMeta || {};
+    const makeKey = (patientNum: number, questionId: string) => `d${diseaseIndex}-${patientNum}-${questionId}`;
+    const makePatientKey = (patientNum: number) => `d${diseaseIndex}-${patientNum}`;
+    let count = 0;
+    for (let patient = 1; patient <= 30; patient++) {
+      const meta = patientMeta[makePatientKey(patient)] || { initials: "", code: "" };
+      const complete = Boolean(meta.initials?.trim() && meta.code?.trim()) &&
+        specData.diseases[diseaseIndex].questions.every(question => data[makeKey(patient, question.id)]);
+      if (complete) count++;
+    }
+    return count;
+  };
+
+  const getPrmCompleted = (spec: string, diseaseIndex: number) => {
+    const data = draft.progress[spec]?.patientReport?.data || {};
+    const diseaseKey = `${spec}-d${diseaseIndex}`;
+    const count = Number(
+      data[`${diseaseKey}_patientCount`] ||
+      (Number(data[`${diseaseKey}_qrPatientCount`] || 0) + Number(data[`${diseaseKey}_pdfPatientCount`] || 0)) ||
+      0
+    );
+    return Number.isFinite(count) ? count : 0;
+  };
+
+  const renderProgressRow = (label: string, filled: number, total: number, tone: "blue" | "purple" | "teal") => {
+    const pct = total > 0 ? Math.min(100, Math.round((filled / total) * 100)) : 0;
+    const status = getStatusInfo(filled, total);
+    const colors = {
+      blue: "bg-blue-500",
+      purple: "bg-purple-500",
+      teal: "bg-teal-500",
+    };
+    return (
+      <div key={label} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 truncate">{label}</p>
+            <p className="text-xs text-gray-500">{filled}/{total} terisi ({pct}%)</p>
+          </div>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${status.className}`}>
+            {status.label}
+          </span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+          <div className={`h-full rounded-full ${colors[tone]}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="group bg-white rounded-[2rem] border-2 border-gray-100 hover:border-[#0F4C81] hover:shadow-2xl transition-all duration-500 overflow-hidden">
       <div className="p-8">
@@ -699,6 +759,46 @@ function DraftCard({
               </p>
             </div>
           )}
+        </div>
+
+        <div className="mb-8 space-y-4">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Detail Progress Assessment</p>
+          {draft.selectedSpecialties.map((spec) => {
+            const specData = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+            const rsbkData = draft.progress[spec]?.rsbk?.data || {};
+            const rsbkTotal = specData.rsbkItems.length;
+            const rsbkFilled = specData.rsbkItems.filter(item =>
+              rsbkData[item.id] !== null && rsbkData[item.id] !== undefined && rsbkData[item.id] !== ""
+            ).length;
+
+            return (
+              <div key={spec} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="text-[#0F4C81]">{specialtyIcons[spec]}</div>
+                  <h4 className="font-black text-gray-900">{specialtyNames[spec]}</h4>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {renderProgressRow("Hospital Structure", rsbkFilled, rsbkTotal, "blue")}
+                  <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-3 lg:col-span-1">
+                    <p className="mb-2 text-xs font-black uppercase tracking-widest text-purple-700">Clinical Audit per Penyakit</p>
+                    <div className="space-y-2">
+                      {specData.diseases.map((disease, index) =>
+                        renderProgressRow(disease.diseaseName, getClinicalCompleted(spec, index), 30, "purple")
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-3 lg:col-span-1">
+                    <p className="mb-2 text-xs font-black uppercase tracking-widest text-teal-700">PRM/PREMPROM per Penyakit</p>
+                    <div className="space-y-2">
+                      {specData.diseases.map((disease, index) =>
+                        renderProgressRow(disease.diseaseName, getPrmCompleted(spec, index), 30, "teal")
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <Button

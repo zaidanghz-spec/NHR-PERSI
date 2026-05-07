@@ -66,6 +66,8 @@ export function PatientReportPage() {
   const [newPatientRM, setNewPatientRM] = useState("");
   const [registerError, setRegisterError] = useState("");
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
+  const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
   const [loading, setLoading] = useState(true);
   // Custom hospital survey upload
   const [customSurveyFile, setCustomSurveyFile] = useState<File | null>(null);
@@ -144,13 +146,17 @@ export function PatientReportPage() {
       };
       
       try {
+        setAutosaveState("saving");
         await api.saveCustomSurveyMetadata(hospitalCode, diseaseSpecialtyKey, doc);
         setCustomSurveyFileName(file.name);
         setCustomSurveyPatientCount(doc.patientCount);
         setCustomSurveyUploaded(true);
+        setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+        setAutosaveState("saved");
         alert(`Dokumen survei PREM/PROM untuk ${activeDisease?.diseaseName} berhasil diunggah! Tim admin PERSI akan meninjau dan memberikan penilaian.`);
       } catch (err: any) {
         console.error("Upload error:", err);
+        setAutosaveState("idle");
         alert(`Gagal mengunggah status ke server: ${err.message || "silakan coba PDF yang lebih kecil."}`);
       }
     };
@@ -164,12 +170,16 @@ export function PatientReportPage() {
     }
 
     try {
+      setAutosaveState("saving");
       await api.deleteCustomSurveyMetadata(hospitalCode, diseaseSpecialtyKey);
       setCustomSurveyFileName("");
       setCustomSurveyPatientCount(0);
       setCustomSurveyUploaded(false);
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
     } catch (err) {
       console.error("Failed to remove file:", err);
+      setAutosaveState("idle");
     }
   };
 
@@ -321,12 +331,15 @@ export function PatientReportPage() {
     };
 
     try {
+      setAutosaveState("saving");
       const result = await api.registerPatient(hospitalCode, diseaseSpecialtyKey, newPatient);
       if (!result.success && result.error) {
+        setAutosaveState("idle");
         setRegisterError(result.error);
         return;
       }
       if (result.duplicate) {
+        setAutosaveState("idle");
         setRegisterError("Nomor rekam medis sudah terdaftar.");
         return;
       }
@@ -338,7 +351,10 @@ export function PatientReportPage() {
       setDiseaseCompletion(prev => ({ ...prev, [activeDiseaseIndex]: (prev[activeDiseaseIndex] || 0) + 1 }));
       
       await loadRegisteredPatients();
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
     } catch (err: any) {
+      setAutosaveState("idle");
       setRegisterError(err.message || "Gagal mendaftarkan pasien.");
     }
   };
@@ -351,10 +367,14 @@ export function PatientReportPage() {
     }
 
     try {
+      setAutosaveState("saving");
       await api.removePatient(hospitalCode, diseaseSpecialtyKey, id);
       await loadRegisteredPatients();
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
     } catch (err) {
       console.error("Failed to remove patient:", err);
+      setAutosaveState("idle");
     }
   };
 
@@ -380,12 +400,16 @@ export function PatientReportPage() {
   const handleSaveDraft = async () => {
     if (!hasHospitalAuth || !hospitalCode || !specialty) return;
     try {
+      setAutosaveState("saving");
       await api.saveDraft("patient-report", hospitalCode, specialty, {
         registeredPatients,
       });
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
       setDraftSavedMsg(true);
     } catch (err) {
       console.error("Failed to save draft:", err);
+      setAutosaveState("idle");
     }
   };
 
@@ -473,12 +497,15 @@ export function PatientReportPage() {
     }
 
     let totalPRMPatients = 0;
+    let allDiseasesHavePRM = diseases.length > 0;
     try {
       for (let i = 0; i < diseases.length; i++) {
         const dKey = `${specialty}-d${i}`;
         const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
         const customData = await api.getCustomSurveyMetadata(hospitalCode, dKey);
-        totalPRMPatients += diseaseSurveys.length + (customData ? (customData.patientCount || 0) : 0);
+        const diseaseCount = diseaseSurveys.length + (customData ? (customData.patientCount || 0) : 0);
+        totalPRMPatients += diseaseCount;
+        if (diseaseCount < 1) allDiseasesHavePRM = false;
       }
     } catch {}
     sessionStorage.setItem(`${specialty}_prmPatientCount`, totalPRMPatients.toString());
@@ -491,7 +518,7 @@ export function PatientReportPage() {
         data: prmSummary,
         score: Math.round(finalScore),
         patientCount: totalPRMPatients,
-        completed: true,
+        completed: allDiseasesHavePRM,
       });
     }
     navigate(`/siap-persi/result/${specialty}`);
@@ -547,6 +574,9 @@ export function PatientReportPage() {
           <p className="text-gray-600">
             Daftarkan pasien per penyakit, generate QR code personal, dan kumpulkan data PREM & PROM hingga mencapai target {targetPatientCount} pasien per penyakit - {specData?.name}
           </p>
+          <div className="mt-3">
+            <AutosaveIndicator state={autosaveState} timestamp={lastAutosavedAt} />
+          </div>
         </div>
 
         {/* Disease Tabs */}
@@ -1234,6 +1264,18 @@ export function PatientReportPage() {
         />
       )}
     </div>
+  );
+}
+
+function AutosaveIndicator({ state, timestamp }: { state: "idle" | "saving" | "saved"; timestamp: string }) {
+  if (state === "idle") return null;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+      state === "saving" ? "bg-blue-50 text-blue-700" : "bg-green-50 text-green-700"
+    }`}>
+      {state === "saving" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+      {state === "saving" ? "Menyimpan..." : `Tersimpan otomatis${timestamp ? ` ${timestamp}` : ""}`}
+    </span>
   );
 }
 

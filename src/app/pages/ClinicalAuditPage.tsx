@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"; // fix-v3-final
 import { useParams, Link, useNavigate } from "react-router";
-import { ChevronRight, Save, AlertCircle, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { ChevronRight, Save, AlertCircle, ChevronLeft, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
@@ -57,6 +57,8 @@ export function ClinicalAuditPage() {
   const [patientMeta, setPatientMeta] = useState<Record<string, { initials: string; code: string }>>({});
   const [currentPatient, setCurrentPatient] = useState(1);
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
+  const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
 
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
   const hospitalName = authData.hospitalName || "Unknown Hospital";
@@ -338,6 +340,8 @@ export function ClinicalAuditPage() {
     api.saveDraft("clinical-audit", hospitalCode, specialty, draft).catch(err => {
       console.error("Failed to save draft to server:", err);
     });
+    setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    setAutosaveState("saved");
     setDraftSavedMsg(true);
   };
 
@@ -361,6 +365,7 @@ export function ClinicalAuditPage() {
   const activeProgress = (activeCompletedPatients / 30) * 100;
   const activeDiseaseScore = calculateDiseaseScore(activeDiseaseIndex);
   const specialtyScore = calculateSpecialtyAuditScore();
+  const allDiseasesHaveData = diseases.every((_, idx) => getCompletedPatientsCount(idx) >= 1);
 
   // Advanced Auto-save: Persists state to local and cloud on every change via draftManager
   useEffect(() => {
@@ -369,6 +374,7 @@ export function ClinicalAuditPage() {
     const draftId = draftManager.getCurrentDraftId();
     if (!draftId) return;
 
+    setAutosaveState("saving");
     const timer = setTimeout(() => {
       draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
         data: formData,
@@ -378,14 +384,15 @@ export function ClinicalAuditPage() {
         activeDiseaseIndex,
         completed: allDiseasesHaveData,
       });
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
     }, 1000); // 1s debounce to prevent flooding
 
     return () => clearTimeout(timer);
-  }, [formData, patientMeta, currentPatient, activeDiseaseIndex, specialty, specialtyScore]);
+  }, [formData, patientMeta, currentPatient, activeDiseaseIndex, specialty, specialtyScore, allDiseasesHaveData]);
   const activeCategoryScores = calculateActiveDiseaseCategories();
   const activeValidity = getSampleValidityWeight(activeCompletedPatients);
   const currentPatientScoreVal = calculatePatientScore(activeDiseaseIndex, currentPatient);
-  const allDiseasesHaveData = diseases.every((_, idx) => getCompletedPatientsCount(idx) >= 1);
   const currentMeta = getPatientMeta(activeDiseaseIndex, currentPatient);
 
   return (
@@ -484,9 +491,12 @@ export function ClinicalAuditPage() {
             <span className="text-sm font-semibold text-gray-700">
               Progress Rekam Medis — <span className="text-[#0F4C81]">{activeDisease.diseaseName}</span>
             </span>
-            <span className="text-sm text-gray-600">
-              {activeCompletedPatients} / 30 rekam medis ({activeProgress.toFixed(0)}%)
-            </span>
+            <div className="flex items-center gap-3">
+              <AutosaveIndicator state={autosaveState} timestamp={lastAutosavedAt} />
+              <span className="text-sm text-gray-600">
+                {activeCompletedPatients} / 30 rekam medis ({activeProgress.toFixed(0)}%)
+              </span>
+            </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
             <div
@@ -807,6 +817,18 @@ export function ClinicalAuditPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AutosaveIndicator({ state, timestamp }: { state: "idle" | "saving" | "saved"; timestamp: string }) {
+  if (state === "idle") return null;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+      state === "saving" ? "bg-blue-50 text-blue-700" : "bg-green-50 text-green-700"
+    }`}>
+      {state === "saving" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+      {state === "saving" ? "Menyimpan..." : `Tersimpan otomatis${timestamp ? ` ${timestamp}` : ""}`}
+    </span>
   );
 }
 

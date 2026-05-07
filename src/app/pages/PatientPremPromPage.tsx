@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { Heart, MessageSquare, CheckCircle2, Building2, Shield, Star } from "lucide-react";
+import { Heart, MessageSquare, CheckCircle2, Building2, Shield, Star, Clock, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { submitSurvey } from "../utils/api";
@@ -69,6 +69,8 @@ export function PatientPremPromPage() {
 
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
   const selectedSpecialty = urlSpecialty || "";
 
   // Get specialty-specific questions from the disease
@@ -86,6 +88,26 @@ export function PatientPremPromPage() {
 
   // Use disease-specific specialty key for API
   const diseaseSpecialtyKey = `${selectedSpecialty}-d${qDisease}`;
+  const surveyDraftKey = `patient-survey-draft-${hospitalCode || ""}-${diseaseSpecialtyKey}-${qRm || ""}`;
+
+  useEffect(() => {
+    if (!hospitalCode || !selectedSpecialty || !qRm) return;
+    try {
+      const saved = localStorage.getItem(surveyDraftKey);
+      if (saved) setFormData(JSON.parse(saved));
+    } catch {}
+  }, [hospitalCode, qRm, selectedSpecialty, surveyDraftKey]);
+
+  useEffect(() => {
+    if (!hospitalCode || !selectedSpecialty || !qRm || isSubmitted || Object.keys(formData).length === 0) return;
+    setAutosaveState("saving");
+    const timer = setTimeout(() => {
+      localStorage.setItem(surveyDraftKey, JSON.stringify(formData));
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [formData, hospitalCode, isSubmitted, qRm, selectedSpecialty, surveyDraftKey]);
 
   const handleChange = (id: string, value: string) => {
     setFormData({ ...formData, [id]: value });
@@ -139,6 +161,7 @@ export function PatientPremPromPage() {
       console.error("Failed to submit survey to server:", err);
     });
 
+    localStorage.removeItem(surveyDraftKey);
     setIsSubmitted(true);
   };
 
@@ -221,6 +244,9 @@ export function PatientPremPromPage() {
               Survei ini mengevaluasi pengalaman dan hasil perawatan Anda.
               Jawaban bersifat <strong>rahasia</strong> dan akan membantu meningkatkan kualitas pelayanan.
             </p>
+            <div className="mt-3">
+              <AutosaveIndicator state={autosaveState} timestamp={lastAutosavedAt} />
+            </div>
           </div>
         </div>
 
@@ -347,6 +373,18 @@ export function PatientPremPromPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AutosaveIndicator({ state, timestamp }: { state: "idle" | "saving" | "saved"; timestamp: string }) {
+  if (state === "idle") return null;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+      state === "saving" ? "bg-blue-50 text-blue-700" : "bg-green-50 text-green-700"
+    }`}>
+      {state === "saving" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+      {state === "saving" ? "Menyimpan..." : `Tersimpan otomatis${timestamp ? ` ${timestamp}` : ""}`}
+    </span>
   );
 }
 
