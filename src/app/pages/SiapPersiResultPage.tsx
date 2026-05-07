@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import { useData } from "../context/DataContext";
-import { draftManager } from "../utils/draftManager";
+import { draftManager, stripLegacyToolVariationFields } from "../utils/draftManager";
 import * as api from "../utils/api";
 
 type PatientCountBreakdown = {
@@ -419,7 +419,7 @@ export function SiapPersiResultPage() {
           hospitalCode: hCode || "RS001",
           hospitalName: hospitalAuth.hospitalName || "Unknown Hospital",
           specialties: [{ specialty: info.name, disease: info.disease }],
-          rsbkData: specProgress?.rsbk.data || {},
+          rsbkData: stripLegacyToolVariationFields(specProgress?.rsbk.data || {}),
           auditData: auditSummary,
           prmData: prmSummary,
           auditPatients: auditDetails,
