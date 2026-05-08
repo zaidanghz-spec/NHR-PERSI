@@ -12,15 +12,14 @@ export function RsbkFormPage() {
   const specialtyInfo = specialtyAuditData[specialty as keyof typeof specialtyAuditData];
 
   const [formData, setFormData] = useState<Record<string, number | null>>({});
-  const [equivalenceNotes, setEquivalenceNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    setFormData({});
     const draftId = draftManager.getCurrentDraftId();
     if (draftId && specialty) {
       const draft = draftManager.getDraftById(draftId);
       if (draft && draft.progress[specialty]?.rsbk?.data) {
         const raw = stripLegacyToolVariationFields(draft.progress[specialty].rsbk.data);
-        const rawNotes = draft.progress[specialty].rsbk.equivalenceNotes || {};
         const converted: Record<string, number | null> = {};
         Object.entries(raw).forEach(([k, v]) => {
           if (v === null || v === undefined || v === "") {
@@ -31,17 +30,12 @@ export function RsbkFormPage() {
           }
         });
         setFormData(converted);
-        setEquivalenceNotes(rawNotes);
       }
     }
   }, [specialty]);
 
   const handleChange = (id: string, value: number | null) => {
     setFormData({ ...formData, [id]: value });
-  };
-
-  const handleEquivalenceNoteChange = (id: string, value: string) => {
-    setEquivalenceNotes({ ...equivalenceNotes, [id]: value });
   };
 
   const rsbkItems = specialtyInfo.rsbkItems;
@@ -120,9 +114,9 @@ export function RsbkFormPage() {
 
     setAutosaveState("saving");
     const timer = setTimeout(() => {
+      if (draftManager.getCurrentDraftId() !== draftId) return;
       draftManager.updateDraft(draftId, specialty, "rsbk", {
         data: formData,
-        equivalenceNotes,
         score: totalRsbkScore,
         completed: filledItems === totalItems,
       });
@@ -131,7 +125,7 @@ export function RsbkFormPage() {
     }, 1500); // 1.5s debounce
 
     return () => clearTimeout(timer);
-  }, [formData, equivalenceNotes, specialty, totalRsbkScore, filledItems, totalItems]);
+  }, [formData, specialty, totalRsbkScore, filledItems, totalItems]);
 
   const handleSaveDraft = () => {
     const draftId = draftManager.getCurrentDraftId();
@@ -139,7 +133,6 @@ export function RsbkFormPage() {
     const cleanFormData = stripLegacyToolVariationFields(formData);
     draftManager.updateDraft(draftId, specialty, "rsbk", {
       data: cleanFormData,
-      equivalenceNotes,
       score: totalRsbkScore,
       completed: filledItems === totalItems,
     });
@@ -155,7 +148,6 @@ export function RsbkFormPage() {
     const cleanFormData = stripLegacyToolVariationFields(formData);
     draftManager.updateDraft(draftId, specialty, "rsbk", {
       data: cleanFormData,
-      equivalenceNotes,
       score: totalRsbkScore,
       completed: filledItems === totalItems,
     });
@@ -216,7 +208,7 @@ export function RsbkFormPage() {
           <div className="space-y-2 text-sm text-gray-700">
             <p>&bull; Isi jumlah aktual SDM, sarana, prasarana, dan alat yang tersedia serta berfungsi.</p>
             <p>&bull; Nilai Hospital Structure tidak ditampilkan otomatis ke RS dan akan ditetapkan setelah review/verifikasi PERSI.</p>
-            <p>&bull; Jika ada alat dengan fungsi setara namun nama/jenis berbeda, isi jumlahnya dan tambahkan catatan ekuivalensi pada item alat terkait.</p>
+            <p>&bull; Sistem menggunakan data alat apa adanya berdasarkan jumlah aktual yang tersedia dan berfungsi.</p>
           </div>
         </div>
 
@@ -295,11 +287,8 @@ export function RsbkFormPage() {
           title="Alat Medis yang Memenuhi Syarat dan Regulasi serta Berfungsi Penuh"
           icon={<Stethoscope className="w-6 h-6" />}
           color="purple"
-          subtitle="Isi alat yang tersedia. Catat alat ekuivalen jika fungsi klinisnya setara."
+          subtitle="Isi alat yang tersedia dan berfungsi."
         >
-          <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 mb-4 text-sm text-purple-900">
-            Jika alat indikator tidak tersedia tetapi rumah sakit memiliki alat lain dengan fungsi klinis setara, tuliskan pada catatan ekuivalensi. Contoh: indikator garpu tala, namun tersedia audiometri yang menjalankan fungsi pemeriksaan pendengaran.
-          </div>
           <div className="space-y-3">
             {alatItems.map((item) => (
               <QuantityInput
@@ -307,8 +296,6 @@ export function RsbkFormPage() {
                 item={item}
                 value={formData[item.id] ?? null}
                 onChange={handleChange}
-                equivalenceNote={equivalenceNotes[item.id] || ""}
-                onEquivalenceNoteChange={handleEquivalenceNoteChange}
               />
             ))}
           </div>
@@ -402,17 +389,14 @@ function FormSection({ title, icon, color, subtitle, children }: {
   );
 }
 
-function QuantityInput({ item, value, onChange, equivalenceNote, onEquivalenceNoteChange }: {
+function QuantityInput({ item, value, onChange }: {
   item: RsbkItem;
   value: number | null;
   onChange: (id: string, value: number | null) => void;
-  equivalenceNote?: string;
-  onEquivalenceNoteChange?: (id: string, value: string) => void;
 }) {
   const isFilled = value !== null;
   const actualValue = value ?? 0;
   const unit = item.inputUnit || "unit";
-  const canAddEquivalence = item.category === "alat" && onEquivalenceNoteChange;
 
   const handleDecrement = () => {
     if (!isFilled) return;
@@ -449,20 +433,6 @@ function QuantityInput({ item, value, onChange, equivalenceNote, onEquivalenceNo
           <span className="text-sm text-gray-500 w-16">{unit}</span>
         </div>
       </div>
-
-      {canAddEquivalence && (
-        <div className="mt-3 border-t border-gray-200 pt-3">
-          <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-            Catatan alat ekuivalen / fungsi setara untuk reviewer
-          </label>
-          <textarea
-            value={equivalenceNote || ""}
-            onChange={(event) => onEquivalenceNoteChange(item.id, event.target.value)}
-            placeholder="Contoh: Tidak memiliki garpu tala, tetapi tersedia audiometri untuk fungsi pemeriksaan pendengaran."
-            className="w-full min-h-[72px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0F4C81] focus:border-[#0F4C81]"
-          />
-        </div>
-      )}
     </div>
   );
 }

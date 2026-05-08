@@ -995,7 +995,7 @@ export function SiapAdminReviewPage() {
                 <div className="flex-1">
                   <h4 className="font-black text-gray-900 mb-1">Validasi Manual RSBK oleh Admin</h4>
                   <p className="text-sm text-gray-500">
-                    RS tidak melihat skor otomatis ini. Reviewer dapat menerima skor otomatis atau menetapkan skor validasi setelah memeriksa bukti dan catatan ekuivalensi.
+                    RS tidak melihat skor otomatis ini. Reviewer dapat menerima skor otomatis atau menetapkan skor validasi setelah memeriksa bukti struktur layanan.
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
@@ -1023,7 +1023,7 @@ export function SiapAdminReviewPage() {
               <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
                 <input
                   type="text"
-                  placeholder="Catatan validasi RSBK, misal bukti alat ekuivalen diterima atau item perlu verifikasi ulang."
+                  placeholder="Catatan validasi RSBK, misal bukti jumlah SDM/sarana/alat perlu diverifikasi ulang."
                   value={adminScoreNotes.rsbk || ""}
                   onChange={(event) => setAdminScoreNotes(prev => ({ ...prev, rsbk: event.target.value }))}
                   className="h-11 rounded-xl border border-gray-200 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
@@ -1050,8 +1050,6 @@ export function SiapAdminReviewPage() {
                 const specData = specialtyAuditData[(submissionData as any).specialtyKey] || specialtyAuditData.cardiology;
                 const items = specData.rsbkItems.filter(i => i.category === category);
                 const data = (submissionData as any).details?.rsbkData || {};
-                const equivalenceNotes = (submissionData as any).details?.rawProgress?.rsbk?.equivalenceNotes || {};
-
                 return (
                   <div key={category}>
                     <h4 className={`font-extrabold ${colors[category].split(" ")[0]} mb-5 flex items-center gap-3 text-lg`}>
@@ -1065,7 +1063,6 @@ export function SiapAdminReviewPage() {
                         items.map(item => {
                           const val = data[item.id] || "0";
                           const pts = parseInt(val) * item.pointPerUnit;
-                          const equivalenceNote = equivalenceNotes[item.id];
                           return (
                             <ParameterRow
                               key={item.id}
@@ -1073,7 +1070,7 @@ export function SiapAdminReviewPage() {
                                 name: item.name,
                                 value: parseInt(val) > 0 ? "1" : "2",
                                 score: pts,
-                                detail: `${val} ${item.inputUnit || "unit"} (${pts} poin)${equivalenceNote ? ` | Catatan ekuivalensi: ${equivalenceNote}` : ""}`,
+                                detail: `${val} ${item.inputUnit || "unit"} (${pts} poin)`,
                               }}
                             />
                           );

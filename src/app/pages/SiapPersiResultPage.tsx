@@ -51,6 +51,10 @@ export function SiapPersiResultPage() {
 
   const getStoredScore = (spec: string | undefined, stage: "rsbk" | "clinicalAudit" | "patientReport") => {
     if (!spec) return 0;
+    const draftStage = draft?.progress?.[spec]?.[stage];
+    if (typeof draftStage?.score === "number") return draftStage.score;
+    if (stage === "rsbk" && draftStage?.data) return calculateRsbkScoreFromData(spec, draftStage.data || {});
+
     const sessionKey =
       stage === "rsbk"
         ? `${spec}_rsbkScore`
@@ -59,18 +63,21 @@ export function SiapPersiResultPage() {
         : `${spec}_patientReportScore`;
     const sessionValue = parseFloat(sessionStorage.getItem(sessionKey) || "");
     if (Number.isFinite(sessionValue)) return sessionValue;
-
-    const draftStage = draft?.progress?.[spec]?.[stage];
-    if (typeof draftStage?.score === "number") return draftStage.score;
-    if (stage === "rsbk") return calculateRsbkScoreFromData(spec, draftStage?.data || {});
     return 0;
   };
 
-  // Get selected specialties
-  const selectedSpecialtiesStr = sessionStorage.getItem("selectedSpecialties");
-  const selectedSpecialties: string[] = selectedSpecialtiesStr
-    ? JSON.parse(selectedSpecialtiesStr)
-    : [specialty];
+  // Get selected specialties from the active draft first so old session selections cannot submit the wrong draft.
+  let sessionSelectedSpecialties: string[] = [];
+  try {
+    sessionSelectedSpecialties = JSON.parse(sessionStorage.getItem("selectedSpecialties") || "[]");
+  } catch {
+    sessionSelectedSpecialties = [];
+  }
+  const selectedSpecialties: string[] = draft?.selectedSpecialties?.length
+    ? draft.selectedSpecialties
+    : sessionSelectedSpecialties.length
+    ? sessionSelectedSpecialties
+    : [specialty].filter(Boolean) as string[];
   
   const currentIndex = selectedSpecialties.indexOf(specialty || "");
   const isLastSpecialty = currentIndex === selectedSpecialties.length - 1;
@@ -115,7 +122,10 @@ export function SiapPersiResultPage() {
       const diseaseCount = info?.diseases.length || 0;
       const completeFromBreakdown = breakdown.length >= diseaseCount && breakdown.every(item => item.count >= 1);
       const sessionCount = parseInt(sessionStorage.getItem(`${spec}_auditPatientCount`) || "0", 10);
-      const complete = Boolean(progress?.clinicalAudit?.completed || completeFromBreakdown || (diseaseCount > 0 && sessionCount >= diseaseCount));
+      const hasDraftStage = Boolean(progress?.clinicalAudit);
+      const complete = hasDraftStage
+        ? Boolean(progress?.clinicalAudit?.completed || completeFromBreakdown)
+        : Boolean(completeFromBreakdown || (diseaseCount > 0 && sessionCount >= diseaseCount));
       return {
         complete,
         label: complete ? "Lengkap" : "Belum lengkap",
@@ -127,7 +137,10 @@ export function SiapPersiResultPage() {
     const diseaseCount = info?.diseases.length || 0;
     const completeFromBreakdown = breakdown.length >= diseaseCount && breakdown.every(item => item.count >= 1);
     const sessionCount = parseInt(sessionStorage.getItem(`${spec}_prmPatientCount`) || "0", 10);
-    const complete = Boolean(progress?.patientReport?.completed || completeFromBreakdown || (diseaseCount > 0 && sessionCount >= diseaseCount));
+    const hasDraftStage = Boolean(progress?.patientReport);
+    const complete = hasDraftStage
+      ? Boolean(progress?.patientReport?.completed || completeFromBreakdown)
+      : Boolean(completeFromBreakdown || (diseaseCount > 0 && sessionCount >= diseaseCount));
     return {
       complete,
       label: complete ? "Lengkap" : "Belum lengkap",
@@ -226,7 +239,7 @@ export function SiapPersiResultPage() {
             }
           : null;
 
-        if (!auditSource) {
+        if (!auditSource && !currentDraft) {
           try {
             const savedDraft = localStorage.getItem(`clinical-audit-draft-${hCode}-${specialty}`);
             if (savedDraft) auditSource = JSON.parse(savedDraft);
@@ -252,7 +265,7 @@ export function SiapPersiResultPage() {
             totalAudit += diseaseCount;
             auditBreakdown.push({ diseaseName: d.diseaseName, count: diseaseCount });
           });
-        } else {
+        } else if (!currentDraft) {
           try {
             const auditPatients = JSON.parse(sessionStorage.getItem(`${specialty}_auditPatients`) || "[]");
             specialtyInfo.diseases.forEach((d, dIdx) => {
@@ -321,56 +334,69 @@ export function SiapPersiResultPage() {
       }
 
       if (auditDetails.length === 0) {
-        const auditDraftKey = `clinical-audit-draft-${hCode}-${spec}`;
-        const auditDraftRaw = localStorage.getItem(auditDraftKey);
-        if (auditDraftRaw) {
-          try {
-            const parsed = JSON.parse(auditDraftRaw);
-            const formData = parsed.formData || {};
-            const patientMeta = parsed.patientMeta || {};
-            const makeKey = (diseaseIdx: number, patientNum: number, questionId: string) =>
-              `d${diseaseIdx}-${patientNum}-${questionId}`;
-            const makePatientKey = (diseaseIdx: number, patientNum: number) =>
-              `d${diseaseIdx}-${patientNum}`;
+        const draftAudit = specProgress?.clinicalAudit;
+        let parsed: any = draftAudit?.data && Object.keys(draftAudit.data).length > 0
+          ? {
+              formData: draftAudit.data,
+              patientMeta: draftAudit.patientMeta || {},
+            }
+          : null;
+        if (!parsed && !draft) {
+          const auditDraftKey = `clinical-audit-draft-${hCode}-${spec}`;
+          const auditDraftRaw = localStorage.getItem(auditDraftKey);
+          if (auditDraftRaw) {
+            try {
+              parsed = JSON.parse(auditDraftRaw);
+            } catch {
+              parsed = null;
+            }
+          }
+        }
+        if (parsed) {
+          const formData = parsed.formData || {};
+          const patientMeta = parsed.patientMeta || {};
+          const makeKey = (diseaseIdx: number, patientNum: number, questionId: string) =>
+            `d${diseaseIdx}-${patientNum}-${questionId}`;
+          const makePatientKey = (diseaseIdx: number, patientNum: number) =>
+            `d${diseaseIdx}-${patientNum}`;
 
-            info.diseases.forEach((d, dIdx) => {
-              for (let p = 1; p <= 30; p++) {
-                const meta = patientMeta[makePatientKey(dIdx, p)] || { initials: "", code: "" };
-                const answeredQuestions = d.questions.filter(q => formData[makeKey(dIdx, p, q.id)]);
-                if (!meta.initials && !meta.code && answeredQuestions.length === 0) continue;
+          info.diseases.forEach((d, dIdx) => {
+            for (let p = 1; p <= 30; p++) {
+              const meta = patientMeta[makePatientKey(dIdx, p)] || { initials: "", code: "" };
+              const answeredQuestions = d.questions.filter(q => formData[makeKey(dIdx, p, q.id)]);
+              if (!meta.initials && !meta.code && answeredQuestions.length === 0) continue;
 
-                const diagnosisQs = d.questions.filter(q => q.category.toLowerCase().includes("diagnosa") || q.category.toLowerCase().includes("diagnosis"));
-                const treatmentQs = d.questions.filter(q => q.category.toLowerCase().includes("tatalaksana"));
-                const outcomeQs = d.questions.filter(q => q.category.toLowerCase().includes("outcome"));
+              const diagnosisQs = d.questions.filter(q => q.category.toLowerCase().includes("diagnosa") || q.category.toLowerCase().includes("diagnosis"));
+              const treatmentQs = d.questions.filter(q => q.category.toLowerCase().includes("tatalaksana"));
+              const outcomeQs = d.questions.filter(q => q.category.toLowerCase().includes("outcome"));
 
-                const getCatScore = (qs: any[]) => {
-                  if (qs.length === 0) return 100;
-                  const answered = qs.filter(q => formData[makeKey(dIdx, p, q.id)]);
-                  if (answered.length === 0) return 0;
-                  const correct = answered.filter(q => formData[makeKey(dIdx, p, q.id)] !== "tidak-sesuai");
-                  return Math.round((correct.length / answered.length) * 100);
-                };
+              const getCatScore = (qs: any[]) => {
+                if (qs.length === 0) return 100;
+                const answered = qs.filter(q => formData[makeKey(dIdx, p, q.id)]);
+                if (answered.length === 0) return 0;
+                const correct = answered.filter(q => formData[makeKey(dIdx, p, q.id)] !== "tidak-sesuai");
+                return Math.round((correct.length / answered.length) * 100);
+              };
 
-                auditDetails.push({
-                  patientIndex: p,
-                  initials: meta.initials,
-                  code: meta.code,
-                  diseaseIndex: dIdx,
-                  diseaseName: d.diseaseName,
-                  diagnosisScore: getCatScore(diagnosisQs),
-                  treatmentScore: getCatScore(treatmentQs),
-                  outcomeScore: getCatScore(outcomeQs),
-                  isComplete: Boolean(meta.initials && meta.code) && d.questions.every(q => formData[makeKey(dIdx, p, q.id)]),
-                  answers: d.questions.map(q => ({
-                    id: q.id,
-                    question: q.question,
-                    category: q.category,
-                    answer: formData[makeKey(dIdx, p, q.id)] || "",
-                  })),
-                });
-              }
-            });
-          } catch {}
+              auditDetails.push({
+                patientIndex: p,
+                initials: meta.initials,
+                code: meta.code,
+                diseaseIndex: dIdx,
+                diseaseName: d.diseaseName,
+                diagnosisScore: getCatScore(diagnosisQs),
+                treatmentScore: getCatScore(treatmentQs),
+                outcomeScore: getCatScore(outcomeQs),
+                isComplete: Boolean(meta.initials && meta.code) && d.questions.every(q => formData[makeKey(dIdx, p, q.id)]),
+                answers: d.questions.map(q => ({
+                  id: q.id,
+                  question: q.question,
+                  category: q.category,
+                  answer: formData[makeKey(dIdx, p, q.id)] || "",
+                })),
+              });
+            }
+          });
         }
       }
 

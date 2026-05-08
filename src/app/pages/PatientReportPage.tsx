@@ -419,7 +419,9 @@ export function PatientReportPage() {
       return;
     }
 
+    const activeDraftId = draftManager.getCurrentDraftId();
     await handleSaveDraft();
+    if (activeDraftId && draftManager.getCurrentDraftId() !== activeDraftId) return;
     
     // Calculate final score across ALL diseases for this specialty
     let finalScore = 0;
@@ -508,12 +510,14 @@ export function PatientReportPage() {
         if (diseaseCount < 1) allDiseasesHavePRM = false;
       }
     } catch {}
+    if (activeDraftId && draftManager.getCurrentDraftId() !== activeDraftId) return;
+
     sessionStorage.setItem(`${specialty}_prmPatientCount`, totalPRMPatients.toString());
 
     sessionStorage.setItem(`${specialty}_prmSummary`, JSON.stringify(prmSummary));
     sessionStorage.setItem(`${specialty}_patientReportScore`, Math.round(finalScore).toString());
     const draftId = draftManager.getCurrentDraftId();
-    if (draftId && specialty) {
+    if (draftId && specialty && (!activeDraftId || draftId === activeDraftId)) {
       draftManager.updateDraft(draftId, specialty, "patientReport", {
         data: prmSummary,
         score: Math.round(finalScore),
