@@ -16,6 +16,7 @@ export function SelectSpecialtyPage() {
 
   // Check authentication on mount
   useEffect(() => {
+    let cancelled = false;
     const auth = sessionStorage.getItem("hospitalAuth");
     if (!auth) {
       navigate("/hospital-login");
@@ -28,6 +29,7 @@ export function SelectSpecialtyPage() {
     const loadLocalDrafts = () => {
       const allDrafts = draftManager.getAllDrafts();
       const hospitalDrafts = allDrafts.filter(d => d.hospitalName === parsedAuth.hospitalName);
+      if (cancelled) return;
       setDrafts(hospitalDrafts);
     };
     
@@ -39,11 +41,21 @@ export function SelectSpecialtyPage() {
     });
     syncWithCloud().catch(console.error);
 
-    // Load previously selected specialties if any
+    // Restore selected specialties only when they still belong to the active draft.
+    // Specialty-only session data was one of the causes of deleted draft state leaking into new drafts.
     const saved = sessionStorage.getItem("selectedSpecialties");
-    if (saved) {
-      setSelectedSpecialties(JSON.parse(saved));
+    const currentDraftId = draftManager.getCurrentDraftId();
+    const currentDraft = currentDraftId ? draftManager.getDraftById(currentDraftId) : null;
+    if (currentDraft && currentDraft.hospitalName === parsedAuth.hospitalName) {
+      setSelectedSpecialties(currentDraft.selectedSpecialties);
+    } else {
+      sessionStorage.removeItem("selectedSpecialties");
+      if (saved) setSelectedSpecialties([]);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate, syncWithCloud]);
 
   const normalize = (value?: string) => (value || "").trim().toLowerCase();
@@ -105,9 +117,7 @@ export function SelectSpecialtyPage() {
       selectedSpecialties
     );
 
-    // Save to session
-    sessionStorage.setItem("selectedSpecialties", JSON.stringify(selectedSpecialties));
-    draftManager.setCurrentDraftId(draft.draftId);
+    draftManager.beginDraftSession(draft);
     
     // Navigate to first specialty's Hospital Structure
     navigate(`/siap-persi/rsbk/${selectedSpecialties[0]}`);
@@ -153,7 +163,7 @@ export function SelectSpecialtyPage() {
           localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
         }
       }
-      sessionStorage.setItem("selectedSpecialties", JSON.stringify(existingDraft.selectedSpecialties));
+      draftManager.beginDraftSession(existingDraft);
     } else {
       // Create new draft
       const draft = draftManager.createDraft(
@@ -161,17 +171,14 @@ export function SelectSpecialtyPage() {
         authData.picName,
         specs
       );
-      sessionStorage.setItem("selectedSpecialties", JSON.stringify(specs));
-      draftManager.setCurrentDraftId(draft.draftId);
+      draftManager.beginDraftSession(draft);
     }
 
     navigate(`/siap-persi/rsbk/${specId}`);
   };
 
   const handleResumeDraft = (draft: DraftData) => {
-    // Set draft as current
-    draftManager.setCurrentDraftId(draft.draftId);
-    sessionStorage.setItem("selectedSpecialties", JSON.stringify(draft.selectedSpecialties));
+    draftManager.beginDraftSession(draft);
 
     // Find next incomplete stage
     const nextStage = draftManager.getNextStage(draft);
@@ -195,8 +202,12 @@ export function SelectSpecialtyPage() {
   const handleDeleteDraft = (draftId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm("Apakah Anda yakin ingin menghapus draft ini?")) {
+      const wasCurrentDraft = draftManager.getCurrentDraftId() === draftId;
       draftManager.deleteDraft(draftId);
-      setDrafts(drafts.filter(d => d.draftId !== draftId));
+      setDrafts(prev => prev.filter(d => d.draftId !== draftId));
+      if (wasCurrentDraft) {
+        setSelectedSpecialties([]);
+      }
     }
   };
 

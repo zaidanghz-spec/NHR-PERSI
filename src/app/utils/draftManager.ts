@@ -13,7 +13,6 @@ export interface DraftData {
       rsbk: {
         completed: boolean;
         data: Record<string, string>;
-        equivalenceNotes?: Record<string, string>;
         score?: number;
       };
       clinicalAudit: {
@@ -35,6 +34,17 @@ export interface DraftData {
 }
 
 const DRAFTS_KEY = "siap_persi_drafts";
+const DELETED_DRAFTS_KEY = "siap_persi_deleted_draft_ids";
+const DRAFT_SCOPED_SESSION_SUFFIXES = [
+  "_rsbkScore",
+  "_clinicalAuditScore",
+  "_auditPatientCount",
+  "_auditSummary",
+  "_auditPatients",
+  "_patientReportScore",
+  "_prmPatientCount",
+  "_prmSummary",
+];
 
 export function stripLegacyToolVariationFields<T extends Record<string, any>>(data: T = {} as T): T {
   return Object.fromEntries(
@@ -49,7 +59,55 @@ export const draftManager = {
   // Get all drafts
   getAllDrafts(): DraftData[] {
     const draftsStr = localStorage.getItem(DRAFTS_KEY);
-    return draftsStr ? JSON.parse(draftsStr) : [];
+    const drafts = draftsStr ? JSON.parse(draftsStr) : [];
+    const deletedIds = this.getDeletedDraftIds();
+    return drafts.filter((draft: DraftData) => !deletedIds.includes(draft.draftId));
+  },
+
+  getDeletedDraftIds(): string[] {
+    try {
+      return JSON.parse(localStorage.getItem(DELETED_DRAFTS_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  },
+
+  rememberDeletedDraft(draftId: string): void {
+    const deletedIds = this.getDeletedDraftIds();
+    if (!deletedIds.includes(draftId)) {
+      safeLocalStorageSet(DELETED_DRAFTS_KEY, JSON.stringify([...deletedIds, draftId]));
+    }
+  },
+
+  clearDraftRuntimeState(draft?: DraftData | null): void {
+    const specialties = new Set<string>(draft?.selectedSpecialties || []);
+    try {
+      const selected = JSON.parse(sessionStorage.getItem("selectedSpecialties") || "[]");
+      if (Array.isArray(selected)) selected.forEach((spec) => specialties.add(spec));
+    } catch {}
+
+    specialties.forEach((spec) => {
+      DRAFT_SCOPED_SESSION_SUFFIXES.forEach((suffix) => sessionStorage.removeItem(`${spec}${suffix}`));
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key?.startsWith("clinical-audit-draft-") && key.endsWith(`-${spec}`)) {
+          localStorage.removeItem(key);
+        }
+      }
+    });
+
+    sessionStorage.removeItem("currentDraftId");
+    sessionStorage.removeItem("selectedSpecialties");
+    sessionStorage.removeItem("currentSpecialty");
+    sessionStorage.removeItem("activeRevisionContext");
+  },
+
+  beginDraftSession(draft: DraftData): void {
+    // Root cause guard: old specialty-scoped session/local caches were shared across drafts.
+    // Resetting them before binding the new draft prevents stale autosave/result data from hydrating into it.
+    this.clearDraftRuntimeState(draft);
+    this.setCurrentDraftId(draft.draftId);
+    sessionStorage.setItem("selectedSpecialties", JSON.stringify(draft.selectedSpecialties));
   },
 
   // Get draft by ID
@@ -97,7 +155,6 @@ export const draftManager = {
     data: {
       completed?: boolean;
       data?: Record<string, any>;
-      equivalenceNotes?: Record<string, string>;
       score?: number;
       patientMeta?: Record<string, { initials: string; code: string }>;
       activeDiseaseIndex?: number;
@@ -141,9 +198,15 @@ export const draftManager = {
 
   // Delete draft
   deleteDraft(draftId: string): void {
+    const draft = this.getDraftById(draftId);
+    this.rememberDeletedDraft(draftId);
     const drafts = this.getAllDrafts();
     const filtered = drafts.filter((d) => d.draftId !== draftId);
     safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(filtered));
+
+    if (this.getCurrentDraftId() === draftId) {
+      this.clearDraftRuntimeState(draft);
+    }
 
     // Async delete from cloud
     deleteCloudDraft(draftId).catch(err => console.error("Cloud draft deletion failed:", err));
@@ -220,13 +283,18 @@ export const draftManager = {
   async syncWithCloud(): Promise<void> {
     try {
       const cloudDrafts = await getAllHospitalDrafts();
+      const deletedIds = this.getDeletedDraftIds();
       if (cloudDrafts.length > 0) {
         const localDrafts = this.getAllDrafts();
         
-        // Merge strategy: Cloud overrides if cloud is newer or local is missing
+        // Deleted cloud drafts can resolve after a local delete. Tombstones prevent them from being merged back.
         const mergedDrafts = [...localDrafts];
         
         cloudDrafts.forEach(cd => {
+          if (deletedIds.includes(cd.draftId)) {
+            deleteCloudDraft(cd.draftId).catch(err => console.error("Cloud tombstone cleanup failed:", err));
+            return;
+          }
           const index = mergedDrafts.findIndex(ld => ld.draftId === cd.draftId);
           if (index === -1) {
             mergedDrafts.push(cd);

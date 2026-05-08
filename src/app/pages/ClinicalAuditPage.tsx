@@ -67,15 +67,29 @@ export function ClinicalAuditPage() {
   // Load draft on mount
   useEffect(() => {
     if (!specialty) return;
+    let cancelled = false;
+    const capturedDraftId = draftManager.getCurrentDraftId();
+    setFormData({});
+    setPatientMeta({});
+    setCurrentPatient(1);
+    setActiveDiseaseIndex(0);
+    const isStillActiveDraft = () =>
+      Boolean(!cancelled && capturedDraftId && draftManager.getCurrentDraftId() === capturedDraftId);
+    const hydrateClinicalDraft = (draft: any) => {
+      if (!isStillActiveDraft() || draft?.draftId !== capturedDraftId) return false;
+      if (draft.formData) setFormData(draft.formData);
+      if (draft.patientMeta) setPatientMeta(draft.patientMeta);
+      if (draft.currentPatient) setCurrentPatient(draft.currentPatient);
+      if (typeof draft.activeDiseaseIndex === "number") setActiveDiseaseIndex(draft.activeDiseaseIndex);
+      return true;
+    };
     async function loadDraft() {
-      const currentDraftId = draftManager.getCurrentDraftId();
+      const currentDraftId = capturedDraftId;
       const currentDraft = currentDraftId ? draftManager.getDraftById(currentDraftId) : null;
       const currentClinical = currentDraft?.progress?.[specialty!]?.clinicalAudit;
-      const activeRevisionContext = sessionStorage.getItem("activeRevisionContext");
-      const allowUnscopedDraft = !currentDraftId || Boolean(activeRevisionContext);
-      const canUseSavedDraft = (draft: any) => allowUnscopedDraft || draft?.draftId === currentDraftId;
 
       if (currentClinical?.data && Object.keys(currentClinical.data).length > 0) {
+        if (!isStillActiveDraft()) return;
         setFormData(currentClinical.data);
         if (currentClinical.patientMeta) setPatientMeta(currentClinical.patientMeta);
         if (currentClinical.currentPatient) setCurrentPatient(currentClinical.currentPatient);
@@ -85,11 +99,7 @@ export function ClinicalAuditPage() {
 
       try {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
-        if (serverDraft && serverDraft.formData && canUseSavedDraft(serverDraft)) {
-          setFormData(serverDraft.formData);
-          if (serverDraft.patientMeta) setPatientMeta(serverDraft.patientMeta);
-          if (serverDraft.currentPatient) setCurrentPatient(serverDraft.currentPatient);
-          if (typeof serverDraft.activeDiseaseIndex === "number") setActiveDiseaseIndex(serverDraft.activeDiseaseIndex);
+        if (serverDraft && serverDraft.formData && hydrateClinicalDraft(serverDraft)) {
           return;
         }
       } catch { /* fallback */ }
@@ -97,15 +107,14 @@ export function ClinicalAuditPage() {
         const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
         if (saved) {
           const draft = JSON.parse(saved);
-          if (!canUseSavedDraft(draft)) return;
-          if (draft.formData) setFormData(draft.formData);
-          if (draft.patientMeta) setPatientMeta(draft.patientMeta);
-          if (draft.currentPatient) setCurrentPatient(draft.currentPatient);
-          if (typeof draft.activeDiseaseIndex === "number") setActiveDiseaseIndex(draft.activeDiseaseIndex);
+          hydrateClinicalDraft(draft);
         }
       } catch { /* ignore */ }
     }
     loadDraft();
+    return () => {
+      cancelled = true;
+    };
   }, [specialty, hospitalCode]);
 
   useEffect(() => {
@@ -301,8 +310,10 @@ export function ClinicalAuditPage() {
 
   const handleSaveDraft = () => {
     if (!specialty) return;
+    const activeDraftId = draftManager.getCurrentDraftId();
+    if (!activeDraftId) return;
     const draft = {
-      draftId: draftManager.getCurrentDraftId(),
+      draftId: activeDraftId,
       formData,
       patientMeta,
       currentPatient,
@@ -338,6 +349,7 @@ export function ClinicalAuditPage() {
     sessionStorage.setItem(`${specialty}_auditPatients`, JSON.stringify(buildAuditPatients()));
 
     api.saveDraft("clinical-audit", hospitalCode, specialty, draft).catch(err => {
+      if (draftManager.getCurrentDraftId() !== activeDraftId) return;
       console.error("Failed to save draft to server:", err);
     });
     setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
@@ -376,6 +388,7 @@ export function ClinicalAuditPage() {
 
     setAutosaveState("saving");
     const timer = setTimeout(() => {
+      if (draftManager.getCurrentDraftId() !== draftId) return;
       draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
         data: formData,
         patientMeta,
