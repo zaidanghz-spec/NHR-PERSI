@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import {
   MessageSquare,
@@ -75,6 +75,8 @@ export function PatientReportPage() {
   const [customSurveyFileName, setCustomSurveyFileName] = useState<string>("");
   const [customSurveyPatientCount, setCustomSurveyPatientCount] = useState<number>(0);
   const [diseaseCompletion, setDiseaseCompletion] = useState<Record<number, number>>({});
+  const refreshInFlightRef = useRef(false);
+  const lastFullProgressRefreshRef = useRef(0);
   // NOTE: PREM/PROM scores for PDF uploads are set ONLY by admin, not by the hospital
 
   useEffect(() => {
@@ -245,25 +247,46 @@ export function PatientReportPage() {
     setDiseaseCompletion(progress);
   }, [hasHospitalAuth, hospitalCode, specialty, diseases.length, specData]);
 
-  // Initial load and on disease tab change
-  useEffect(() => {
-    async function init() {
-      setLoading(true);
-      await Promise.all([loadRegisteredPatients(), loadResponses(), checkAllDiseasesProgress()]);
-      setLoading(false);
+  const refreshPatientReportData = useCallback(async (options: { fullProgress?: boolean } = {}) => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+    try {
+      await Promise.all([loadRegisteredPatients(), loadResponses()]);
+
+      const shouldRefreshAllDiseases =
+        options.fullProgress || Date.now() - lastFullProgressRefreshRef.current > 60_000;
+      if (shouldRefreshAllDiseases) {
+        await checkAllDiseasesProgress();
+        lastFullProgressRefreshRef.current = Date.now();
+      }
+    } finally {
+      refreshInFlightRef.current = false;
     }
-    init();
   }, [loadRegisteredPatients, loadResponses, checkAllDiseasesProgress]);
 
-  // Auto-refresh every 5 seconds (slightly slower for all-check)
+  // Initial load and on disease tab change
+  useEffect(() => {
+    let cancelled = false;
+    async function init() {
+      setLoading(true);
+      await refreshPatientReportData({ fullProgress: true });
+      if (!cancelled) setLoading(false);
+    }
+    init();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshPatientReportData]);
+
+  // Auto-refresh is intentionally conservative because every PRM page can fan out into multiple Turso calls.
+  // Skip hidden tabs and overlapping requests so national simulation traffic does not pile up serverless invocations.
   useEffect(() => {
     const interval = setInterval(() => {
-      loadResponses();
-      loadRegisteredPatients();
-      checkAllDiseasesProgress();
-    }, 5000);
+      if (document.visibilityState === "hidden") return;
+      refreshPatientReportData();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [loadRegisteredPatients, loadResponses, checkAllDiseasesProgress]);
+  }, [refreshPatientReportData]);
 
   // Mark registered patients that already have surveys
   const patientsWithStatus = registeredPatients.map(p => {

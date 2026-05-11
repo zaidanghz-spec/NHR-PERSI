@@ -1,7 +1,31 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 export const PREFIX = "/api";
 
-async function rpc<T>(operation: string, payload: Record<string, any> = {}): Promise<T> {
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function rpc<T>(
+  operation: string,
+  payload: Record<string, any> = {},
+  options: { retries?: number } = {}
+): Promise<T> {
+  const maxAttempts = Math.max(1, (options.retries || 0) + 1);
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await rpcOnce<T>(operation, payload);
+    } catch (err: any) {
+      lastError = err;
+      const isTransient = /\((429|500|502|503|504)\)|FUNCTION_INVOCATION_FAILED|network|fetch/i.test(err?.message || "");
+      if (!isTransient || attempt >= maxAttempts) break;
+      await sleep(350 * attempt);
+    }
+  }
+
+  throw lastError || new Error(`${operation} failed`);
+}
+
+async function rpcOnce<T>(operation: string, payload: Record<string, any> = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${PREFIX}/rpc/${operation}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -142,7 +166,7 @@ export async function submitSurvey(
 
 export async function getSurveys(hospitalCode: string, specialty: string): Promise<any[]> {
   try {
-    return await rpc<any[]>("getSurveys", { hospitalCode, specialty });
+    return await rpc<any[]>("getSurveys", { hospitalCode, specialty }, { retries: 2 });
   } catch (err) {
     console.error("Get Surveys Error:", err);
     return [];
@@ -177,7 +201,7 @@ export async function registerPatient(
 
 export async function getPatients(hospitalCode: string, specialty: string): Promise<any[]> {
   try {
-    return await rpc<any[]>("getPatients", { hospitalCode, specialty });
+    return await rpc<any[]>("getPatients", { hospitalCode, specialty }, { retries: 2 });
   } catch (err) {
     console.error("Get Patients Error:", err);
     return [];
@@ -216,7 +240,7 @@ export async function saveCustomSurveyMetadata(hospitalCode: string, specialtyKe
 
 export async function getCustomSurveyMetadata(hospitalCode: string, specialtyKey: string): Promise<any | null> {
   try {
-    return await rpc<any | null>("getCustomSurveyMetadata", { hospitalCode, specialtyKey });
+    return await rpc<any | null>("getCustomSurveyMetadata", { hospitalCode, specialtyKey }, { retries: 2 });
   } catch (err) {
     console.error("Get Custom Survey Error:", err);
     return null;
