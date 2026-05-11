@@ -103,6 +103,33 @@ const LEGACY_DEFAULT_NEWS_TITLES = new Set([
 const removeLegacyDefaultNews = (items: NewsItem[] = []) =>
   items.filter((item) => !LEGACY_DEFAULT_NEWS_TITLES.has(item.title));
 
+const normalizeAccountStatus = (status: string = ""): HospitalAccount["status"] => {
+  const normalized = status.trim().toLowerCase();
+  if (["activated", "active", "aktif"].includes(normalized)) return "activated";
+  if (["rejected", "ditolak"].includes(normalized)) return "rejected";
+  return "pending_activation";
+};
+
+const normalizeAccount = (account: HospitalAccount): HospitalAccount => ({
+  ...account,
+  status: normalizeAccountStatus(account.status),
+});
+
+const mergeHospitalAccounts = (primary: HospitalAccount[] = [], secondary: HospitalAccount[] = []) => {
+  const merged = new Map<string, HospitalAccount>();
+
+  [...secondary, ...primary].forEach((account) => {
+    const key = account.email.trim().toLowerCase();
+    if (!key) return;
+    const existing = merged.get(key);
+    merged.set(key, normalizeAccount({ ...existing, ...account }));
+  });
+
+  return Array.from(merged.values()).sort((a, b) =>
+    new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime()
+  );
+};
+
 const defaultEvents: EventItem[] = [
   {
     id: "event-1",
@@ -204,7 +231,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return cleaned;
   });
   const [events, setEvents] = useState<EventItem[]>(() => loadFromStorage("persi_events", defaultEvents));
-  const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>(() => loadFromStorage("persi_hospital_accounts", []));
+  const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>(() =>
+    mergeHospitalAccounts(loadFromStorage("persi_hospital_accounts", []), [])
+  );
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("persi_admin") === "true");
   const [currentHospital, setCurrentHospital] = useState<HospitalAccount | null>(() => {
     const stored = sessionStorage.getItem("persi_hospital_session");
@@ -238,8 +267,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const dbAccs = await getAllHospitalAccounts();
         if (dbAccs !== null) {
-          setHospitalAccounts(dbAccs);
-          safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(dbAccs));
+          setHospitalAccounts(prev => {
+            const merged = mergeHospitalAccounts(dbAccs, prev);
+            safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(merged));
+            return merged;
+          });
         }
       } catch (err) {
         console.error("Failed to sync accounts:", err);
@@ -324,11 +356,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       
       if (dbAccs !== null) {
         setHospitalAccounts(prev => {
-          const merged = [...dbAccs];
-          // Keep local accounts that haven't hit the cloud yet
-          prev.forEach(p => {
-            if (!merged.find(m => m.email.toLowerCase() === p.email.toLowerCase())) merged.push(p);
-          });
+          const merged = mergeHospitalAccounts(dbAccs, prev);
           return merged;
         });
       }
