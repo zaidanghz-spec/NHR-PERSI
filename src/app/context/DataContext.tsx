@@ -93,52 +93,42 @@ export interface SubmissionType {
 }
 
 // ============ DEFAULT DATA ============
-const defaultNews: NewsItem[] = [
-  {
-    id: "news-1",
-    title: "PERSI Luncurkan Platform Ranking Rumah Sakit Nasional Berbasis Data",
-    excerpt: "Platform NHR PERSI resmi diluncurkan sebagai standar penilaian kualitas rumah sakit di Indonesia menggunakan metodologi berbasis evidence.",
-    content: "Perhimpunan Rumah Sakit Seluruh Indonesia (PERSI) resmi meluncurkan platform ranking rumah sakit nasional yang menggunakan sistem penilaian NHR PERSI (National Hospital Ranking PERSI). Platform ini dirancang untuk memberikan transparansi kualitas layanan rumah sakit kepada masyarakat Indonesia.\n\nSistem penilaian berbasis tiga pilar utama: RSBK (Rumah Sakit Berstandar Kemampuan), Clinical Audit, dan Patient Report yang mencakup PREM dan PROM. Setiap rumah sakit yang berpartisipasi akan dinilai secara komprehensif oleh tim reviewer PERSI.\n\nDr. Kuntjoro Adi Purjanto, Ketua Umum PERSI, menyatakan bahwa platform ini merupakan langkah maju dalam meningkatkan akuntabilitas dan transparansi layanan kesehatan di Indonesia.",
-    category: "berita",
-    imageUrl: "https://images.unsplash.com/photo-1650946706426-99f46fe7106a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBob3NwaXRhbCUyMGJ1aWxkaW5nJTIwSW5kb25lc2lhfGVufDF8fHx8MTc3MzM2NjU2MHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    author: "Tim Redaksi PERSI",
-    publishedAt: "2026-03-10",
-    featured: true,
-  },
-  {
-    id: "news-2",
-    title: "Kemenkes Dorong Digitalisasi Penilaian Mutu Rumah Sakit di Seluruh Indonesia",
-    excerpt: "Kementerian Kesehatan mendukung inisiatif digitalisasi penilaian mutu melalui platform terintegrasi untuk meningkatkan standar layanan.",
-    content: "Kementerian Kesehatan RI menyambut baik inisiatif PERSI dalam mengembangkan platform digital untuk penilaian mutu rumah sakit. Digitalisasi ini diharapkan dapat mempercepat proses evaluasi dan memberikan data real-time tentang kualitas layanan kesehatan di Indonesia.",
-    category: "regulasi",
-    imageUrl: "https://images.unsplash.com/photo-1758691462848-ba1e929da259?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoZWFsdGhjYXJlJTIwdGVjaG5vbG9neSUyMGRpZ2l0YWwlMjBpbm5vdmF0aW9ufGVufDF8fHx8MTc3MzM2NjU2MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    author: "Tim Redaksi PERSI",
-    publishedAt: "2026-03-08",
-    featured: false,
-  },
-  {
-    id: "news-3",
-    title: "Clinical Audit: Standar Baru Evaluasi Mutu Layanan Spesialistik RS",
-    excerpt: "Metode clinical audit berbasis 30 rekam medis menjadi standar baru dalam menilai kepatuhan protokol klinis rumah sakit di Indonesia.",
-    content: "PERSI memperkenalkan metode clinical audit sebagai komponen utama dalam sistem penilaian NHR PERSI. Metode ini menggunakan sampel 30 rekam medis per pelayanan untuk mengevaluasi kepatuhan rumah sakit terhadap protokol klinis yang telah ditetapkan.",
-    category: "publikasi",
-    imageUrl: "https://images.unsplash.com/photo-1758691462743-f9fc9e430d39?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3NwaXRhbCUyMGRvY3RvcnMlMjBtZWV0aW5nJTIwcHJvZmVzc2lvbmFsfGVufDF8fHx8MTc3MzM2NjU2MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    author: "Dr. Andi Wijaya, MPH",
-    publishedAt: "2026-03-05",
-    featured: false,
-  },
-  {
-    id: "news-4",
-    title: "Implementasi PREM dan PROM Sebagai Indikator Patient-Centered Care",
-    excerpt: "Patient Reported Experience Measures dan Patient Reported Outcome Measures menjadi bagian integral dari penilaian kualitas rumah sakit.",
-    content: "Dalam upaya meningkatkan pendekatan patient-centered care, PERSI mengintegrasikan PREM (Patient Reported Experience Measures) dan PROM (Patient Reported Outcome Measures) sebagai salah satu pilar penilaian dalam NHR PERSI Assessment.",
-    category: "inovasi",
-    imageUrl: "https://images.unsplash.com/photo-1660795308754-4c6422baf2f6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwY29uZmVyZW5jZSUyMHNlbWluYXIlMjBoZWFsdGhjYXJlfGVufDF8fHx8MTc3MzM2NjU2MHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    author: "Tim Riset PERSI",
-    publishedAt: "2026-03-01",
-    featured: false,
-  },
-];
+const LEGACY_DEFAULT_NEWS_TITLES = new Set([
+  "PERSI Luncurkan Platform Ranking Rumah Sakit Nasional Berbasis Data",
+  "Kemenkes Dorong Digitalisasi Penilaian Mutu Rumah Sakit di Seluruh Indonesia",
+  "Clinical Audit: Standar Baru Evaluasi Mutu Layanan Spesialistik RS",
+  "Implementasi PREM dan PROM Sebagai Indikator Patient-Centered Care",
+]);
+
+const removeLegacyDefaultNews = (items: NewsItem[] = []) =>
+  items.filter((item) => !LEGACY_DEFAULT_NEWS_TITLES.has(item.title));
+
+const normalizeAccountStatus = (status: string = ""): HospitalAccount["status"] => {
+  const normalized = status.trim().toLowerCase();
+  if (["activated", "active", "aktif"].includes(normalized)) return "activated";
+  if (["rejected", "ditolak"].includes(normalized)) return "rejected";
+  return "pending_activation";
+};
+
+const normalizeAccount = (account: HospitalAccount): HospitalAccount => ({
+  ...account,
+  status: normalizeAccountStatus(account.status),
+});
+
+const mergeHospitalAccounts = (primary: HospitalAccount[] = [], secondary: HospitalAccount[] = []) => {
+  const merged = new Map<string, HospitalAccount>();
+
+  [...secondary, ...primary].forEach((account) => {
+    const key = account.email.trim().toLowerCase();
+    if (!key) return;
+    const existing = merged.get(key);
+    merged.set(key, normalizeAccount({ ...existing, ...account }));
+  });
+
+  return Array.from(merged.values()).sort((a, b) =>
+    new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime()
+  );
+};
 
 const defaultEvents: EventItem[] = [
   {
@@ -235,9 +225,15 @@ import { safeLocalStorageSet, loadFromStorage } from "../utils/storage";
 const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [news, setNews] = useState<NewsItem[]>(() => loadFromStorage("persi_news", defaultNews));
+  const [news, setNews] = useState<NewsItem[]>(() => {
+    const cleaned = removeLegacyDefaultNews(loadFromStorage("persi_news", []));
+    safeLocalStorageSet("persi_news", JSON.stringify(cleaned));
+    return cleaned;
+  });
   const [events, setEvents] = useState<EventItem[]>(() => loadFromStorage("persi_events", defaultEvents));
-  const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>(() => loadFromStorage("persi_hospital_accounts", []));
+  const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>(() =>
+    mergeHospitalAccounts(loadFromStorage("persi_hospital_accounts", []), [])
+  );
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("persi_admin") === "true");
   const [currentHospital, setCurrentHospital] = useState<HospitalAccount | null>(() => {
     const stored = sessionStorage.getItem("persi_hospital_session");
@@ -271,8 +267,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const dbAccs = await getAllHospitalAccounts();
         if (dbAccs !== null) {
-          setHospitalAccounts(dbAccs);
-          safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(dbAccs));
+          setHospitalAccounts(prev => {
+            const merged = mergeHospitalAccounts(dbAccs, prev);
+            safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(merged));
+            return merged;
+          });
         }
       } catch (err) {
         console.error("Failed to sync accounts:", err);
@@ -298,8 +297,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const dbNews = await getAllNews();
         if (dbNews !== null) {
-          setNews(dbNews);
-          safeLocalStorageSet("persi_news", JSON.stringify(dbNews));
+          const cleanedNews = removeLegacyDefaultNews(dbNews);
+          setNews(cleanedNews);
+          safeLocalStorageSet("persi_news", JSON.stringify(cleanedNews));
         }
         
         const dbEvents = await getAllEvents();
@@ -356,17 +356,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       
       if (dbAccs !== null) {
         setHospitalAccounts(prev => {
-          const merged = [...dbAccs];
-          // Keep local accounts that haven't hit the cloud yet
-          prev.forEach(p => {
-            if (!merged.find(m => m.email.toLowerCase() === p.email.toLowerCase())) merged.push(p);
-          });
+          const merged = mergeHospitalAccounts(dbAccs, prev);
           return merged;
         });
       }
 
       if (dbRankings !== null) { setApprovedRankings(dbRankings); }
-      if (dbNews !== null) { setNews(dbNews); }
+      if (dbNews !== null) { setNews(removeLegacyDefaultNews(dbNews)); }
       if (dbEvents !== null) { setEvents(dbEvents); }
       
       draftManager.syncWithCloud();
