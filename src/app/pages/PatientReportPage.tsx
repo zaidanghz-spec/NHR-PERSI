@@ -251,13 +251,16 @@ export function PatientReportPage() {
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
     try {
-      await Promise.all([loadRegisteredPatients(), loadResponses()]);
+      await Promise.allSettled([loadRegisteredPatients(), loadResponses()]);
 
       const shouldRefreshAllDiseases =
         options.fullProgress || Date.now() - lastFullProgressRefreshRef.current > 60_000;
       if (shouldRefreshAllDiseases) {
-        await checkAllDiseasesProgress();
-        lastFullProgressRefreshRef.current = Date.now();
+        checkAllDiseasesProgress()
+          .then(() => {
+            lastFullProgressRefreshRef.current = Date.now();
+          })
+          .catch((err) => console.error("Failed to refresh PRM disease progress:", err));
       }
     } finally {
       refreshInFlightRef.current = false;

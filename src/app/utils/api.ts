@@ -2,6 +2,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 export const PREFIX = "/api";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const API_REQUEST_TIMEOUT_MS = 15000;
 
 async function rpc<T>(
   operation: string,
@@ -16,7 +17,7 @@ async function rpc<T>(
       return await rpcOnce<T>(operation, payload);
     } catch (err: any) {
       lastError = err;
-      const isTransient = /\((429|500|502|503|504)\)|FUNCTION_INVOCATION_FAILED|network|fetch/i.test(err?.message || "");
+      const isTransient = /\((429|500|502|503|504)\)|FUNCTION_INVOCATION_FAILED|network|fetch|abort|aborted/i.test(err?.message || "");
       if (!isTransient || attempt >= maxAttempts) break;
       await sleep(350 * attempt);
     }
@@ -26,11 +27,14 @@ async function rpc<T>(
 }
 
 async function rpcOnce<T>(operation: string, payload: Record<string, any> = {}): Promise<T> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
   const response = await fetch(`${API_BASE_URL}${PREFIX}/rpc/${operation}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  });
+    signal: controller.signal,
+  }).finally(() => window.clearTimeout(timeout));
 
   const raw = await response.text();
   let body: any = {};
