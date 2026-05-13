@@ -59,6 +59,11 @@ export function PatientReportPage() {
 
   const [surveyResponses, setSurveyResponses] = useState<PatientSurveyResponse[]>([]);
   const [registeredPatients, setRegisteredPatients] = useState<RegisteredPatient[]>([]);
+  const [allDiseaseScores, setAllDiseaseScores] = useState<Record<number, {
+    avgPremScore: number; avgPromScore: number; overallScore: number;
+    qrPatientCount: number; pdfPatientCount: number; patientCount: number;
+    qrValidityWeight: number; adjustedOverallScore: number; diseaseName: string;
+  }>>({});
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [showQRModal, setShowQRModal] = useState<RegisteredPatient | null>(null);
   const [showReviewModal, setShowReviewModal] = useState<PatientSurveyResponse | null>(null);
@@ -247,25 +252,46 @@ export function PatientReportPage() {
     setDiseaseCompletion(progress);
   }, [hasHospitalAuth, hospitalCode, specialty, diseases.length, specData]);
 
+  const loadAllDiseaseScores = useCallback(async () => {
+    if (!hasHospitalAuth || !hospitalCode || !specData) return;
+    const scores: typeof allDiseaseScores = {};
+    for (let i = 0; i < diseases.length; i++) {
+      const dKey = `${specialty}-d${i}`;
+      const surveys = await api.getSurveys(hospitalCode, dKey);
+      const customData = await api.getCustomSurveyMetadata(hospitalCode, dKey);
+      const qrCount = surveys.length;
+      const pdfCount = customData ? (customData.patientCount || 0) : 0;
+      const total = qrCount + pdfCount;
+      const avgPrem = qrCount > 0 ? Math.round(surveys.reduce((s, r) => s + r.premScore, 0) / qrCount) : 0;
+      const avgProm = qrCount > 0 ? Math.round(surveys.reduce((s, r) => s + r.promScore, 0) / qrCount) : 0;
+      const overall = qrCount > 0 ? Math.round(surveys.reduce((s, r) => s + r.overallScore, 0) / qrCount) : 0;
+      const w = getSampleValidityWeight(qrCount);
+      scores[i] = {
+        avgPremScore: avgPrem, avgPromScore: avgProm, overallScore: overall,
+        qrPatientCount: qrCount, pdfPatientCount: pdfCount, patientCount: total,
+        qrValidityWeight: w, adjustedOverallScore: Number((overall * w).toFixed(1)),
+        diseaseName: diseases[i].diseaseName,
+      };
+    }
+    setAllDiseaseScores(scores);
+  }, [hasHospitalAuth, hospitalCode, specialty, diseases, specData]);
+
   const refreshPatientReportData = useCallback(async (options: { fullProgress?: boolean } = {}) => {
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
     try {
-      await Promise.allSettled([loadRegisteredPatients(), loadResponses()]);
+      await Promise.all([loadRegisteredPatients(), loadResponses()]);
 
       const shouldRefreshAllDiseases =
         options.fullProgress || Date.now() - lastFullProgressRefreshRef.current > 60_000;
       if (shouldRefreshAllDiseases) {
-        checkAllDiseasesProgress()
-          .then(() => {
-            lastFullProgressRefreshRef.current = Date.now();
-          })
-          .catch((err) => console.error("Failed to refresh PRM disease progress:", err));
+        await Promise.all([checkAllDiseasesProgress(), loadAllDiseaseScores()]);
+        lastFullProgressRefreshRef.current = Date.now();
       }
     } finally {
       refreshInFlightRef.current = false;
     }
-  }, [loadRegisteredPatients, loadResponses, checkAllDiseasesProgress]);
+  }, [loadRegisteredPatients, loadResponses, checkAllDiseasesProgress, loadAllDiseaseScores]);
 
   // Initial load and on disease tab change
   useEffect(() => {
@@ -549,6 +575,7 @@ export function PatientReportPage() {
         score: Math.round(finalScore),
         patientCount: totalPRMPatients,
         completed: allDiseasesHavePRM,
+        confirmed: true,
       });
     }
     navigate(`/siap-persi/result/${specialty}`);
@@ -593,10 +620,10 @@ export function PatientReportPage() {
         {/* Header */}
         <div className="mb-6">
           <Link
-            to={`/siap-persi/clinical-audit/${specialty}`}
+            to="/siap-persi/select-specialty"
             className="inline-flex items-center text-[#0F4C81] hover:underline mb-4"
           >
-            &larr; Kembali ke Clinical Audit
+            &larr; Kembali ke Pilih Pelayanan
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Patient Reported Measurement
@@ -1152,82 +1179,65 @@ export function PatientReportPage() {
 
         {/* Weighted Score Summary Table */}
         <div className="bg-white rounded-xl border-2 border-[#0F4C81] p-6 mb-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Skor PRM - {activeDisease?.diseaseName} (Berbobot)</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Ringkasan Skor PRM (Berbobot)</h3>
           
-          {customSurveyUploaded && qrPatientCount === 0 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-              <Clock className="w-8 h-8 text-amber-500 mx-auto mb-3" />
-              <p className="font-bold text-amber-800 text-lg mb-1">Menunggu Penilaian Admin</p>
-              <p className="text-amber-700 text-sm">
-                Dokumen survei {activeDisease?.diseaseName} ({customSurveyPatientCount} pasien) telah diunggah.
-                Skor PREM &amp; PROM akan diberikan oleh tim reviewer PERSI setelah meninjau dokumen PDF Anda.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto mb-4">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b-2 border-[#0F4C81]">
-                      <th className="text-left py-3 px-4 font-bold text-[#0F4C81]">Komponen</th>
-                      <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Nilai</th>
-                      <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Bobot</th>
-                      <th className="text-center py-3 px-4 font-bold text-[#0F4C81]">Nilai Berbobot</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-gray-200 bg-blue-50/50">
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-gray-900">PREM (Patient Reported Experience)</div>
-                        <div className="text-xs text-gray-500">Pengalaman pasien terhadap layanan</div>
-                      </td>
-                      <td className="py-3 px-4 text-center font-bold text-blue-700 text-xl">{avgPremScore}</td>
-                      <td className="py-3 px-4 text-center text-gray-600">60%</td>
-                      <td className="py-3 px-4 text-center font-bold text-blue-700">{(avgPremScore * 0.6).toFixed(1)}</td>
-                    </tr>
-                    <tr className="border-b border-gray-200 bg-teal-50/50">
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-gray-900">PROM (Patient Reported Outcome)</div>
-                        <div className="text-xs text-gray-500">Hasil kesehatan menurut pasien</div>
-                      </td>
-                      <td className="py-3 px-4 text-center font-bold text-teal-700 text-xl">{avgPromScore}</td>
-                      <td className="py-3 px-4 text-center text-gray-600">40%</td>
-                      <td className="py-3 px-4 text-center font-bold text-teal-700">{(avgPromScore * 0.4).toFixed(1)}</td>
-                    </tr>
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-[#0F4C81]/10">
-                      <td className="py-3 px-4 font-bold text-[#0F4C81] text-lg" colSpan={3}>Total PRM Sebelum Validitas</td>
-                      <td className="py-3 px-4 text-center font-bold text-[#0F4C81] text-2xl">{overallScore}</td>
-                    </tr>
-                    <tr className="bg-amber-50">
-                      <td className="py-3 px-4 font-bold text-amber-700" colSpan={3}>
-                        Bobot Validitas Sampel ({patientCount} pasien)
-                      </td>
-                      <td className="py-3 px-4 text-center font-bold text-amber-700 text-xl">
-                        {(qrValidityWeight * 100).toFixed(0)}%
-                      </td>
-                    </tr>
-                    <tr className="bg-green-50">
-                      <td className="py-3 px-4 font-black text-green-700 text-lg" colSpan={3}>Skor PRM QR/Non-PDF Sementara Setelah Validitas</td>
-                      <td className="py-3 px-4 text-center font-black text-green-700 text-2xl">{adjustedOverallScore}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                <p><strong>Rumus per penyakit:</strong> ((PREM x 60%) + (PROM x 40%)) x bobot validitas sampel.</p>
-                <p className="mt-1">
-                  Skor PRM akhir menjumlahkan skor tiap penyakit setelah validitas dikalikan bobot penyakitnya masing-masing.
-                </p>
-                {customSurveyUploaded && (
-                  <p className="mt-1 text-amber-700">
-                    Karena ada PDF, skor akhir penyakit ini akan digabung ulang oleh admin setelah nilai PREM/PROM PDF diinput.
-                  </p>
-                )}
-              </div>
-            </>
-          )}
+          <div className="space-y-6">
+            {diseases.map((d, i) => {
+              const scoreData = allDiseaseScores[i];
+              if (!scoreData) return null;
+              const hasPdf = scoreData.pdfPatientCount > 0;
+              return (
+                <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                  <h4 className="text-lg font-bold text-[#0F4C81] mb-4 border-b border-gray-200 pb-2">{d.diseaseName}</h4>
+                  
+                  {hasPdf && scoreData.qrPatientCount === 0 ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                      <Clock className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                      <p className="font-bold text-amber-800 mb-1">Menunggu Penilaian Admin</p>
+                      <p className="text-amber-700 text-sm">
+                        Dokumen survei ({scoreData.pdfPatientCount} pasien) telah diunggah.
+                        Skor PREM &amp; PROM akan diberikan oleh tim reviewer PERSI.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 mb-1">PREM (60%)</p>
+                          <p className="text-xl font-bold text-blue-700">{scoreData.avgPremScore}</p>
+                        </div>
+                        <div className="bg-teal-50/50 border border-teal-100 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 mb-1">PROM (40%)</p>
+                          <p className="text-xl font-bold text-teal-700">{scoreData.avgPromScore}</p>
+                        </div>
+                        <div className="bg-[#0F4C81]/10 border border-[#0F4C81]/20 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 mb-1">Total PRM</p>
+                          <p className="text-xl font-bold text-[#0F4C81]">{scoreData.overallScore}</p>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 mb-1">Bobot Sampel ({scoreData.qrPatientCount} Pasien QR)</p>
+                          <p className="text-xl font-bold text-amber-700">{(scoreData.qrValidityWeight * 100).toFixed(0)}%</p>
+                        </div>
+                      </div>
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex justify-between items-center">
+                        <span className="font-bold text-green-800">Skor PRM Setelah Validitas</span>
+                        <span className="text-2xl font-black text-green-700">{scoreData.adjustedOverallScore}</span>
+                      </div>
+                      {hasPdf && (
+                        <p className="mt-2 text-xs text-amber-700 text-center">
+                          Catatan: Ada {scoreData.pdfPatientCount} pasien PDF yang akan digabung ke skor akhir oleh admin.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="bg-blue-50 rounded-lg p-4 text-sm text-gray-700 mt-6 border border-blue-200">
+            <p><strong>Total Skor PRM Pelayanan:</strong> Penjumlahan skor tiap penyakit yang dikalikan dengan bobot masing-masing penyakit.</p>
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -1259,7 +1269,7 @@ export function PatientReportPage() {
           >
             {Object.values(diseaseCompletion).length < diseases.length || Object.values(diseaseCompletion).some(count => count < 1)
               ? `Mohon isi minimal 1 pasien untuk SETIAP penyakit`
-              : `Lanjut ke Hasil Akhir (Skor: ${adjustedOverallScore})`}
+              : `Lanjut ke Hasil Akhir (Skor Total: ${diseases.reduce((total, d, i) => total + ((allDiseaseScores[i]?.adjustedOverallScore || 0) * (d.weight.match(/(\d+)%/) ? parseInt(d.weight.match(/(\d+)%/)![1]) / 100 : 1 / diseases.length)), 0).toFixed(1)})`}
             <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
         </div>

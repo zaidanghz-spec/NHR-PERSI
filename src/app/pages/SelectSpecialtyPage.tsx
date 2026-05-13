@@ -445,7 +445,7 @@ function SpecialtyCard({
   specialty: {
     id: string;
     name: string;
-    nameId: string;
+    nameEn: string;
     description: string;
     icon: React.ReactNode;
     color: string;
@@ -616,6 +616,12 @@ function DraftCard({
     oncology: "Onkologi",
   };
 
+  const specialtyColors: Record<string, string> = {
+    cardiology: "bg-red-500 border-red-500 text-white",
+    neurology: "bg-blue-500 border-blue-500 text-white",
+    oncology: "bg-purple-500 border-purple-500 text-white",
+  };
+
   const progress = draftManager.calculateDraftProgress(draft);
   const nextStage = draftManager.getNextStage(draft);
 
@@ -677,7 +683,7 @@ function DraftCard({
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="min-w-0">
             <p className="text-sm font-bold text-gray-900 truncate">{label}</p>
-            <p className="text-xs text-gray-500">{filled}/{total} terisi ({pct}%)</p>
+            <p className="text-xs text-gray-500">{filled}/{total} terisi</p>
           </div>
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${status.className}`}>
             {status.label}
@@ -717,28 +723,7 @@ function DraftCard({
           </button>
         </div>
 
-        {/* Progress Bar - Modern Card Style */}
-        <div className="bg-gray-50 rounded-2xl p-6 mb-8 border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Layout className="w-5 h-5 text-[#0F4C81]" />
-              <span className="text-sm font-black text-gray-700 uppercase tracking-tight">Performa Draft</span>
-            </div>
-            <span className="text-2xl font-black text-[#0F4C81]">{progress.percentage}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
-            <div
-              className="absolute top-0 left-0 bg-gradient-to-r from-[#0F4C81] via-[#14B8A6] to-[#0F4C81] bg-[length:200%_auto] h-full rounded-full transition-all duration-1000 animate-gradient"
-              style={{ width: `${progress.percentage}%` }}
-            />
-          </div>
-          <div className="mt-4 flex justify-between items-center text-xs font-bold text-gray-500 uppercase tracking-widest">
-            <span>{progress.completedStages} Tahap Selesai</span>
-            <span>{progress.totalStages} Tahap Total</span>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
+        <div className="mb-8">
           {/* Specialties List */}
           <div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Pelayanan</p>
@@ -746,30 +731,14 @@ function DraftCard({
               {draft.selectedSpecialties.map((spec) => (
                 <div
                   key={spec}
-                  className="flex items-center gap-3 px-4 py-2 bg-white border border-gray-100 shadow-sm rounded-xl text-sm font-bold group-hover:border-blue-100 transition-colors"
+                  className={`flex items-center gap-3 px-4 py-2 border shadow-sm rounded-xl text-sm font-bold transition-colors ${specialtyColors[spec] || "bg-gray-100 border-gray-200 text-gray-700"}`}
                 >
-                  <div className="text-[#0F4C81]">{specialtyIcons[spec]}</div>
-                  <span className="text-gray-700">{specialtyNames[spec]}</span>
+                  <div>{specialtyIcons[spec]}</div>
+                  <span>{specialtyNames[spec]}</span>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Next Steps */}
-          {nextStage && (
-            <div className="bg-[#0F4C81] rounded-2xl p-6 text-white shadow-xl shadow-blue-900/10 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-12 -mt-12 blur-2xl" />
-              <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-2">Langkah Berikutnya</p>
-              <h4 className="text-lg font-bold mb-1">{specialtyNames[nextStage.specialty]}</h4>
-              <p className="text-white/80 text-sm font-medium">
-                {nextStage.stage === "rsbk"
-                  ? "Hospital Structure Form"
-                  : nextStage.stage === "clinicalAudit"
-                  ? "Clinical Audit Assessment"
-                  : "Patient Experience Report"}
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="mb-8 space-y-4">

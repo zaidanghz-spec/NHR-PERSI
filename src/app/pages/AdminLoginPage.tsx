@@ -19,7 +19,7 @@ export function AdminLoginPage() {
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -35,9 +35,18 @@ export function AdminLoginPage() {
       } catch (err) {
         console.error("Admin login failed:", err);
         setError("Login admin gagal. Periksa konfigurasi admin di deployment.");
+    try {
+      const success = await adminLogin(email, password);
+      if (success) {
+        navigate("/admin/dashboard");
+      } else {
+        setError("Username atau password salah.");
       }
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (

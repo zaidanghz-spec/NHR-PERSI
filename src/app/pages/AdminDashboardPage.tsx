@@ -124,29 +124,33 @@ export function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Data Recovery Rescue Banner */}
-        {(hospitalAccounts.length > 10 || submissions.length > 5) && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <h4 className="font-[600] text-amber-900">Data Rescue Mode</h4>
-                <p className="text-sm text-amber-800">
-                  Terdeteksi {hospitalAccounts.length} akun dan {submissions.length} submission di device ini. 
-                  Jika di device lain datanya lebih sedikit, klik tombol di kanan untuk memaksa kirim data lokal ke Cloud.
-                </p>
-              </div>
+        {/* Data Recovery Rescue Banner
+            Shown always (not gated on account/submission count) so admins can push local data
+            to cloud on any device where localStorage has diverged from Turso DB.
+            handleForcePush re-upserts all localStorage accounts/submissions without deleting existing cloud records. */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h4 className="font-[600] text-amber-900">Data Rescue Mode</h4>
+              <p className="text-sm text-amber-800">
+                Terdeteksi {hospitalAccounts.length} akun dan {submissions.length} submission di device ini. 
+                Jika di device lain datanya lebih sedikit, klik tombol di kanan untuk memaksa kirim data lokal ke Cloud.
+              </p>
+              <p className="text-xs text-amber-700 mt-1 font-mono">
+                [Operasional]: Ini akan mengirim ulang data localStorage ke Turso DB tanpa menghapus data cloud yang sudah ada.
+              </p>
             </div>
-            <Button 
-              size="sm" 
-              onClick={handleForcePush}
-              disabled={pushing}
-              className="bg-amber-600 hover:bg-amber-700 text-white whitespace-nowrap"
-            >
-              {pushing ? "Pushing..." : "Push Local Data to Cloud"}
-            </Button>
           </div>
-        )}
+          <Button 
+            size="sm" 
+            onClick={handleForcePush}
+            disabled={pushing}
+            className="bg-amber-600 hover:bg-amber-700 text-white whitespace-nowrap"
+          >
+            {pushing ? "Pushing..." : "Push Local Data to Cloud"}
+          </Button>
+        </div>
 
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-8 overflow-x-auto no-scrollbar">
@@ -288,11 +292,6 @@ function AccountsTab({
   const handleViewSuratTugas = async (acc: HospitalAccount) => {
     setPdfError("");
     setViewPdfName(acc.suratTugasFileName || "");
-
-    if (acc.suratTugasData) {
-      setViewPdfUrl(acc.suratTugasData);
-      return;
-    }
 
     setPdfLoadingEmail(acc.email);
     const pdfData = await getHospitalSuratTugas(acc.email);
@@ -600,6 +599,14 @@ function NewsTab({
             />
           </div>
           <div className="space-y-1.5">
+            <Label className="text-sm font-[600]">Penulis (opsional)</Label>
+            <Input
+              value={form.author}
+              onChange={(e) => setForm({ ...form, author: e.target.value })}
+              placeholder="Tim Redaksi PERSI"
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label className="text-sm font-[600]">Gambar Berita (opsional)</Label>
             <div className="flex flex-col gap-2">
               <Input
@@ -731,8 +738,29 @@ function EventsTab({
     type: "seminar" as const,
     imageUrl: "",
     registrationUrl: "#",
+    links: [] as { label: string; url: string }[],
     featured: false,
   });
+
+  const handleAddLink = () => {
+    setForm(prev => ({ ...prev, links: [...prev.links, { label: "", url: "" }] }));
+  };
+
+  const handleUpdateLink = (index: number, field: "label" | "url", value: string) => {
+    setForm(prev => {
+      const newLinks = [...prev.links];
+      newLinks[index][field] = value;
+      return { ...prev, links: newLinks };
+    });
+  };
+
+  const handleRemoveLink = (index: number) => {
+    setForm(prev => {
+      const newLinks = [...prev.links];
+      newLinks.splice(index, 1);
+      return { ...prev, links: newLinks };
+    });
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -751,6 +779,7 @@ function EventsTab({
       type: "seminar",
       imageUrl: "",
       registrationUrl: "#",
+      links: [],
       featured: false,
     });
     setShowForm(false);
@@ -853,6 +882,41 @@ function EventsTab({
                 placeholder="Jakarta / Online"
                 required
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-[600]">URL Registrasi</Label>
+              <Input
+                value={form.registrationUrl}
+                onChange={(e) => setForm({ ...form, registrationUrl: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="space-y-1.5 md:col-span-3">
+              <div className="flex justify-between items-center">
+                <Label className="text-sm font-[600]">Link Tambahan (Opsional)</Label>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddLink}>
+                  <Plus className="w-4 h-4 mr-1" /> Tambah Link
+                </Button>
+              </div>
+              {form.links.map((link, idx) => (
+                <div key={idx} className="flex gap-2 mb-2">
+                  <Input
+                    placeholder="Label (Contoh: Materi PDF)"
+                    value={link.label}
+                    onChange={(e) => handleUpdateLink(idx, "label", e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="URL (https://...)"
+                    value={link.url}
+                    onChange={(e) => handleUpdateLink(idx, "url", e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button type="button" variant="outline" onClick={() => handleRemoveLink(idx)}>
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              ))}
             </div>
             <div className="space-y-1.5 md:col-span-3">
               <Label className="text-sm font-[600]">Gambar Event (opsional)</Label>

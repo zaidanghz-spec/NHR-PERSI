@@ -227,7 +227,9 @@ export function HospitalReviewResultPage() {
                         <div className="space-y-3">
                           <div className="flex justify-between items-center text-sm">
                             <span className="text-gray-600">Hospital Structure (15%)</span>
-                            <span className="font-bold text-gray-900">{submission.scores?.rsbk || 0}</span>
+                            <span className="font-bold text-gray-900">
+                              {submission.status === "Pending" ? "Menunggu Review" : (submission.scores?.rsbk || 0)}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center text-sm">
                             <span className="text-gray-600">Clinical Audit (60%)</span>

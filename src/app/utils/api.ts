@@ -2,7 +2,14 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 export const PREFIX = "/api";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-const API_REQUEST_TIMEOUT_MS = 15000;
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("hospitalToken") || sessionStorage.getItem("auth_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 async function rpc<T>(
   operation: string,
@@ -17,7 +24,7 @@ async function rpc<T>(
       return await rpcOnce<T>(operation, payload);
     } catch (err: any) {
       lastError = err;
-      const isTransient = /\((429|500|502|503|504)\)|FUNCTION_INVOCATION_FAILED|network|fetch|abort|aborted/i.test(err?.message || "");
+      const isTransient = /\((429|500|502|503|504)\)|FUNCTION_INVOCATION_FAILED|network|fetch/i.test(err?.message || "");
       if (!isTransient || attempt >= maxAttempts) break;
       await sleep(350 * attempt);
     }
@@ -27,26 +34,21 @@ async function rpc<T>(
 }
 
 async function rpcOnce<T>(operation: string, payload: Record<string, any> = {}): Promise<T> {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
   const response = await fetch(`${API_BASE_URL}${PREFIX}/rpc/${operation}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
-    signal: controller.signal,
-  }).finally(() => window.clearTimeout(timeout));
+  });
 
   const raw = await response.text();
   let body: any = {};
-  try {
-    body = raw ? JSON.parse(raw) : {};
-  } catch {
-    body = {};
-  }
+  try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
 
   if (!response.ok) {
     const details = body.error || raw || response.statusText || "Unknown server error";
-    throw new Error(`${operation} failed (${response.status}): ${details}`);
+    const err: any = new Error(`${operation} failed (${response.status}): ${details}`);
+    err.statusCode = response.status;
+    throw err;
   }
 
   return body.result as T;
@@ -62,26 +64,32 @@ export function getHospitalCode(email: string): string {
   return local.substring(0, 12) || "RS001";
 }
 
+export async function loginHospital(
+  email: string,
+  password: string
+): Promise<{ success: boolean; token?: string; account?: any; error?: string }> {
+  return rpc("loginHospital", { email, password });
+}
+
+export async function loginAdmin(
+  username: string,
+  password: string
+): Promise<{ success: boolean; token?: string; error?: string }> {
+  return rpc("loginAdmin", { username, password });
+}
+
 export async function addHospitalAccount(acc: any): Promise<void> {
   await rpc("addHospitalAccount", { acc });
 }
 
 export async function getAllHospitalAccounts(): Promise<any[] | null> {
-  try {
-    return await rpc<any[]>("getAllHospitalAccounts");
-  } catch (err) {
-    console.error("Get Accounts Error:", err);
-    return null;
-  }
+  try { return await rpc<any[]>("getAllHospitalAccounts"); }
+  catch (err) { console.error("Get Accounts Error:", err); return null; }
 }
 
 export async function getHospitalSuratTugas(email: string): Promise<string | null> {
-  try {
-    return await rpc<string | null>("getHospitalSuratTugas", { email });
-  } catch (err) {
-    console.error("Fetch PDF Error:", err);
-    return null;
-  }
+  try { return await rpc<string | null>("getHospitalSuratTugas", { email }); }
+  catch (err) { console.error("Fetch PDF Error:", err); return null; }
 }
 
 export async function updateAccountStatus(email: string, status: string): Promise<void> {
@@ -93,16 +101,34 @@ export async function addSubmission(submission: any): Promise<void> {
 }
 
 export async function getAllSubmissions(): Promise<any[] | null> {
-  try {
-    return await rpc<any[]>("getAllSubmissions");
-  } catch (err) {
-    console.error("Get Submissions Error:", err);
-    return null;
-  }
+  try { return await rpc<any[]>("getAllSubmissions"); }
+  catch (err) { console.error("Get Submissions Error:", err); return null; }
 }
 
-export async function updateSubmissionStatus(id: string, status: string): Promise<void> {
-  await rpc("updateSubmissionStatus", { id, status });
+export async function softDeleteSubmission(id: string): Promise<void> {
+  await rpc("softDeleteSubmission", { id });
+}
+
+export async function restoreSubmission(id: string): Promise<void> {
+  await rpc("restoreSubmission", { id });
+}
+
+export async function getDeletedSubmissions(): Promise<any[] | null> {
+  try { return await rpc<any[]>("getDeletedSubmissions"); }
+  catch (err) { console.error("Get Deleted Submissions Error:", err); return null; }
+}
+
+export async function updateSubmissionStatus(id: string, status: string, updatedAt?: string | null): Promise<void> {
+  await rpc("updateSubmissionStatus", { id, status, updatedAt });
+}
+
+export async function deleteDraft(
+  type: string,
+  hospitalCode: string,
+  specialty: string
+): Promise<void> {
+  try { await rpc("deleteDraft", { type, hospitalCode, specialty }); }
+  catch (err) { console.error("Delete Draft Error:", err); }
 }
 
 export async function updateSubmissionReview(id: string, status: string, details: any): Promise<void> {
@@ -118,16 +144,16 @@ export async function unpublishRankingFromDb(submissionId: string): Promise<void
 }
 
 export async function getAllRankingsFromDb(): Promise<any[] | null> {
-  try {
-    return await rpc<any[]>("getAllRankingsFromDb");
-  } catch (err) {
-    console.error("Get All Rankings Error:", err);
-    return null;
-  }
+  try { return await rpc<any[]>("getAllRankingsFromDb"); }
+  catch (err) { console.error("Get All Rankings Error:", err); return null; }
 }
 
 export async function addNewsToDb(news: any): Promise<void> {
   await rpc("addNewsToDb", { news });
+}
+
+export async function updateNewsInDb(id: string, news: any): Promise<void> {
+  await rpc("updateNewsInDb", { id, news });
 }
 
 export async function deleteNewsFromDb(id: string): Promise<void> {
@@ -135,16 +161,16 @@ export async function deleteNewsFromDb(id: string): Promise<void> {
 }
 
 export async function getAllNews(): Promise<any[] | null> {
-  try {
-    return await rpc<any[]>("getAllNews");
-  } catch (err) {
-    console.error("Get All News Error:", err);
-    return null;
-  }
+  try { return await rpc<any[]>("getAllNews"); }
+  catch (err) { console.error("Get All News Error:", err); return null; }
 }
 
 export async function addEventToDb(event: any): Promise<void> {
   await rpc("addEventToDb", { event });
+}
+
+export async function updateEventInDb(id: string, event: any): Promise<void> {
+  await rpc("updateEventInDb", { id, event });
 }
 
 export async function deleteEventFromDb(id: string): Promise<void> {
@@ -152,12 +178,8 @@ export async function deleteEventFromDb(id: string): Promise<void> {
 }
 
 export async function getAllEvents(): Promise<any[] | null> {
-  try {
-    return await rpc<any[]>("getAllEvents");
-  } catch (err) {
-    console.error("Get All Events Error:", err);
-    return null;
-  }
+  try { return await rpc<any[]>("getAllEvents"); }
+  catch (err) { console.error("Get All Events Error:", err); return null; }
 }
 
 export async function submitSurvey(
@@ -169,21 +191,13 @@ export async function submitSurvey(
 }
 
 export async function getSurveys(hospitalCode: string, specialty: string): Promise<any[]> {
-  try {
-    return await rpc<any[]>("getSurveys", { hospitalCode, specialty }, { retries: 2 });
-  } catch (err) {
-    console.error("Get Surveys Error:", err);
-    return [];
-  }
+  try { return await rpc<any[]>("getSurveys", { hospitalCode, specialty }, { retries: 2 }); }
+  catch (err) { console.error("Get Surveys Error:", err); return []; }
 }
 
 export async function getSurveyByPatient(hospitalCode: string, specialty: string, patientRm: string): Promise<any | null> {
-  try {
-    return await rpc<any | null>("getSurveyByPatient", { hospitalCode, specialty, patientRm });
-  } catch (err) {
-    console.error("Get Survey By Patient Error:", err);
-    return null;
-  }
+  try { return await rpc<any | null>("getSurveyByPatient", { hospitalCode, specialty, patientRm }); }
+  catch (err) { console.error("Get Survey By Patient Error:", err); return null; }
 }
 
 export async function resetSurveys(hospitalCode: string, specialty: string): Promise<void> {
@@ -195,21 +209,16 @@ export async function registerPatient(
   specialty: string,
   patient: any
 ): Promise<{ success: boolean; duplicate?: boolean; patient?: any; error?: string }> {
-  try {
-    return await rpc("registerPatient", { hospitalCode, specialty, patient });
-  } catch (err: any) {
+  try { return await rpc("registerPatient", { hospitalCode, specialty, patient }); }
+  catch (err: any) {
     console.error("Register Patient Error:", err);
     return { success: false, error: err.message || "Koneksi ke server gagal." };
   }
 }
 
 export async function getPatients(hospitalCode: string, specialty: string): Promise<any[]> {
-  try {
-    return await rpc<any[]>("getPatients", { hospitalCode, specialty }, { retries: 2 });
-  } catch (err) {
-    console.error("Get Patients Error:", err);
-    return [];
-  }
+  try { return await rpc<any[]>("getPatients", { hospitalCode, specialty }, { retries: 2 }); }
+  catch (err) { console.error("Get Patients Error:", err); return []; }
 }
 
 const CUSTOM_SURVEY_CHUNK_SIZE = 600_000;
@@ -219,22 +228,10 @@ export async function saveCustomSurveyMetadata(hospitalCode: string, specialtyKe
 
   if (base64.length > CUSTOM_SURVEY_CHUNK_SIZE) {
     const chunks = base64.match(new RegExp(`.{1,${CUSTOM_SURVEY_CHUNK_SIZE}}`, "g")) || [];
-    const metadata = {
-      ...data,
-      base64: "",
-      pdfStoredInChunks: true,
-      pdfChunkCount: chunks.length,
-    };
-
+    const metadata = { ...data, base64: "", pdfStoredInChunks: true, pdfChunkCount: chunks.length };
     await rpc("saveCustomSurveyMetadata", { hospitalCode, specialtyKey, data: metadata });
     for (let index = 0; index < chunks.length; index++) {
-      await rpc("saveCustomSurveyPdfChunk", {
-        hospitalCode,
-        specialtyKey,
-        index,
-        total: chunks.length,
-        chunk: chunks[index],
-      });
+      await rpc("saveCustomSurveyPdfChunk", { hospitalCode, specialtyKey, index, total: chunks.length, chunk: chunks[index] });
     }
     return;
   }
@@ -243,12 +240,8 @@ export async function saveCustomSurveyMetadata(hospitalCode: string, specialtyKe
 }
 
 export async function getCustomSurveyMetadata(hospitalCode: string, specialtyKey: string): Promise<any | null> {
-  try {
-    return await rpc<any | null>("getCustomSurveyMetadata", { hospitalCode, specialtyKey }, { retries: 2 });
-  } catch (err) {
-    console.error("Get Custom Survey Error:", err);
-    return null;
-  }
+  try { return await rpc<any | null>("getCustomSurveyMetadata", { hospitalCode, specialtyKey }, { retries: 2 }); }
+  catch (err) { console.error("Get Custom Survey Error:", err); return null; }
 }
 
 export async function deleteCustomSurveyMetadata(hospitalCode: string, specialtyKey: string): Promise<void> {
@@ -264,12 +257,8 @@ export async function getDraft(
   hospitalCode: string,
   specialty: string
 ): Promise<any | null> {
-  try {
-    return await rpc<any | null>("getDraft", { type, hospitalCode, specialty });
-  } catch (err) {
-    console.error("Get Draft Error:", err);
-    return null;
-  }
+  try { return await rpc<any | null>("getDraft", { type, hospitalCode, specialty }); }
+  catch (err) { console.error("Get Draft Error:", err); return null; }
 }
 
 export async function saveDraft(
@@ -286,12 +275,8 @@ export async function saveHospitalDraft(draft: any): Promise<void> {
 }
 
 export async function getAllHospitalDrafts(): Promise<any[]> {
-  try {
-    return await rpc<any[]>("getAllHospitalDrafts");
-  } catch (err) {
-    console.error("Get All Hospital Drafts Error:", err);
-    return [];
-  }
+  try { return await rpc<any[]>("getAllHospitalDrafts"); }
+  catch (err) { console.error("Get All Hospital Drafts Error:", err); return []; }
 }
 
 export async function deleteHospitalDraft(draftId: string): Promise<void> {

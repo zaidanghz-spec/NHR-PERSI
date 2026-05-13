@@ -6,7 +6,6 @@ import { HospitalLoginPage } from "./pages/HospitalLoginPage";
 import { HospitalSubmissionPage } from "./pages/HospitalSubmissionPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
-import { ReviewSubmissionPage } from "./pages/ReviewSubmissionPage";
 import { SelectSpecialtyPage } from "./pages/SelectSpecialtyPage";
 import { RsbkFormPage } from "./pages/RsbkFormPage";
 import { ClinicalAuditPage } from "./pages/ClinicalAuditPage";
@@ -19,7 +18,6 @@ import { PatientPremPromPage } from "./pages/PatientPremPromPage";
 import { PerformanceSubmissionPage } from "./pages/PerformanceSubmissionPage";
 import { NewsPage, NewsDetailPage } from "./pages/NewsPage";
 import { EventsPage } from "./pages/EventsPage";
-import { HospitalDetailPage } from "./pages/HospitalDetailPage";
 import { HospitalReviewResultPage } from "./pages/HospitalReviewResultPage";
 import { Root } from "./components/Root";
 import { DataProvider } from "./context/DataContext";
@@ -48,7 +46,6 @@ export const router = createBrowserRouter([
         children: [
           { index: true, Component: NewHomePage },
           { path: "rankings", Component: RankingListPage },
-          { path: "rankings/:id", Component: HospitalDetailPage },
           { path: "methodology", Component: MethodologyPage },
 
           // News
@@ -67,7 +64,6 @@ export const router = createBrowserRouter([
           // Admin
           { path: "admin/login", Component: AdminLoginPage },
           { path: "admin/dashboard", Component: AdminDashboardPage },
-          { path: "admin/review/:id", Component: ReviewSubmissionPage },
 
           // NHR PERSI Routes
           { path: "siap-persi/select-specialty", Component: SelectSpecialtyPage },

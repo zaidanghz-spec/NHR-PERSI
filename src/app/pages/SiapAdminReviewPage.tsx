@@ -552,13 +552,21 @@ export function SiapAdminReviewPage() {
     setShowApprovalDialog(true);
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     const finalScoreToUse = effectiveFinal;
     const scoresToUse = effectiveScores;
 
     if (action === "approve") {
-      // Save admin override to submission details before approval
-      updateSubmissionStatus(submissionData.id, "Approved", comment);
+      try {
+        await updateSubmissionStatus(submissionData.id, "Approved", comment);
+      } catch (err: any) {
+        if (err?.statusCode === 409 || /\(409\)/.test(err?.message || "")) {
+          alert("This submission was updated by another session. Please review the latest version.");
+          setShowApprovalDialog(false);
+          navigate("/siap-persi/admin/dashboard");
+          return;
+        }
+      }
 
       const hospitalAccount = hospitalAccounts.find(a => a.hospitalName === submissionData.hospitalName);
       const province = hospitalAccount?.province || "—";
@@ -590,16 +598,33 @@ export function SiapAdminReviewPage() {
         return;
       }
 
-      updateSubmissionStatus(submissionData.id, "Revision Required", comment, revisionTargets, revisionNotes);
+      try {
+        await updateSubmissionStatus(submissionData.id, "Revision Required", comment, revisionTargets, revisionNotes);
+      } catch (err: any) {
+        if (err?.statusCode === 409 || /\(409\)/.test(err?.message || "")) {
+          alert("This submission was updated by another session. Please review the latest version.");
+          setShowApprovalDialog(false);
+          navigate("/siap-persi/admin/dashboard");
+          return;
+        }
+      }
     }
     setShowApprovalDialog(false);
     setTimeout(() => navigate("/siap-persi/admin/dashboard"), 500);
   };
 
-  const handleUnpublish = () => {
+  const handleUnpublish = async () => {
     if (!submissionData) return;
     unpublishRanking(submissionData.id);
-    updateSubmissionStatus(submissionData.id, "Pending", "Ranking ditarik untuk peninjauan ulang oleh Admin Pusat.");
+    try {
+      await updateSubmissionStatus(submissionData.id, "Pending", "Ranking ditarik untuk peninjauan ulang oleh Admin Pusat.");
+    } catch (err: any) {
+      if (err?.statusCode === 409 || /\(409\)/.test(err?.message || "")) {
+        alert("This submission was updated by another session. Please review the latest version.");
+        navigate("/siap-persi/admin/dashboard");
+        return;
+      }
+    }
     setTimeout(() => navigate("/siap-persi/admin/dashboard"), 500);
   };
 

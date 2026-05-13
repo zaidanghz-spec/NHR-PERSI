@@ -1,32 +1,36 @@
 import { createClient } from "@libsql/client";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 let tablesInitialized = false;
 
 function db() {
   const url = process.env.TURSO_DATABASE_URL || "";
   const authToken = process.env.TURSO_AUTH_TOKEN || "";
-
-  if (!url) {
-    throw new Error("TURSO_DATABASE_URL is not configured");
-  }
-
+  if (!url) throw new Error("TURSO_DATABASE_URL is not configured");
   return createClient({ url, authToken });
 }
 
 function randomId() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
 function parseJson(value: unknown, fallback: any) {
   if (typeof value !== "string" || !value) return fallback;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
+  try { return JSON.parse(value); } catch { return fallback; }
+}
+
+function signToken(payload: object): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("JWT_SECRET is not configured");
+  return jwt.sign(payload, secret, { expiresIn: "7d" });
+}
+
+function hospitalCodeFromEmail(email: string): string {
+  if (!email) return "UNKNOWN";
+  const local = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return local.substring(0, 12) || "RS001";
 }
 
 async function getDraftSchema(client: any) {
@@ -36,36 +40,31 @@ async function getDraftSchema(client: any) {
   let idCol = cols.find((c: string) => ["id", "draft_id", "draftId"].includes(c));
   if (!idCol) {
     await client.execute("ALTER TABLE drafts ADD COLUMN id TEXT");
-    cols.push("id");
-    idCol = "id";
+    cols.push("id"); idCol = "id";
   }
 
   let typeCol = cols.find((c: string) => ["type", "draft_type", "draftType"].includes(c));
   if (!typeCol) {
     await client.execute("ALTER TABLE drafts ADD COLUMN type TEXT NOT NULL DEFAULT ''");
-    cols.push("type");
-    typeCol = "type";
+    cols.push("type"); typeCol = "type";
   }
 
   let dataCol = cols.find((c: string) => ["data", "draft_data", "draftData"].includes(c));
   if (!dataCol) {
     await client.execute("ALTER TABLE drafts ADD COLUMN data TEXT DEFAULT '{}'");
-    cols.push("data");
-    dataCol = "data";
+    cols.push("data"); dataCol = "data";
   }
 
   let hCol = cols.find((c: string) => ["hospital_code", "hospitalCode"].includes(c));
   if (!hCol) {
     await client.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
-    cols.push("hospital_code");
-    hCol = "hospital_code";
+    cols.push("hospital_code"); hCol = "hospital_code";
   }
 
   let sCol = cols.find((c: string) => ["specialty", "specialty_name", "specialtyName"].includes(c));
   if (!sCol) {
     await client.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
-    cols.push("specialty");
-    sCol = "specialty";
+    cols.push("specialty"); sCol = "specialty";
   }
 
   let updatedCol = cols.find((c: string) => ["updated_at", "updatedAt"].includes(c));
@@ -80,6 +79,16 @@ async function getDraftSchema(client: any) {
 async function initTursoTables() {
   if (tablesInitialized) return;
   const client = db();
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS admins (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'admin',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
   await client.execute(`
     CREATE TABLE IF NOT EXISTS surveys (
@@ -129,6 +138,7 @@ async function initTursoTables() {
       status TEXT,
       scores TEXT,
       details TEXT,
+      deleted_at DATETIME DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -136,7 +146,8 @@ async function initTursoTables() {
   await client.execute(`
     CREATE TABLE IF NOT EXISTS hospital_accounts (
       email TEXT PRIMARY KEY,
-      password TEXT NOT NULL,
+      password TEXT NOT NULL DEFAULT '',
+      password_hash TEXT,
       hospital_name TEXT NOT NULL,
       pic_name TEXT,
       province TEXT DEFAULT '',
@@ -161,7 +172,8 @@ async function initTursoTables() {
       patient_report_score REAL,
       grade TEXT,
       approved_at TEXT,
-      submission_id TEXT
+      submission_id TEXT,
+      deleted_at DATETIME DEFAULT NULL
     )
   `);
 
@@ -191,12 +203,24 @@ async function initTursoTables() {
       type TEXT,
       image_url TEXT,
       registration_url TEXT,
+      links TEXT DEFAULT '[]',
       featured BOOLEAN,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  const tablesToMigrate = ["surveys", "patients", "drafts", "submissions", "hospital_accounts"];
+  const tablesToMigrate = ["surveys", "patients", "drafts", "submissions", "hospital_accounts", "rankings"];
+
+  // Migrate news table columns (added after initial schema)
+  const newsInfo = await client.execute("PRAGMA table_info(news)");
+  const newsCols = newsInfo.rows.map((r: any) => r.name);
+  if (!newsCols.includes("published_at")) await client.execute("ALTER TABLE news ADD COLUMN published_at TEXT");
+  if (!newsCols.includes("author")) await client.execute("ALTER TABLE news ADD COLUMN author TEXT");
+  if (!newsCols.includes("featured")) await client.execute("ALTER TABLE news ADD COLUMN featured BOOLEAN");
+
+  const eventsInfo = await client.execute("PRAGMA table_info(events)");
+  const eventsCols = eventsInfo.rows.map((r: any) => r.name);
+  if (!eventsCols.includes("links")) await client.execute("ALTER TABLE events ADD COLUMN links TEXT DEFAULT '[]'");
   for (const table of tablesToMigrate) {
     const info = await client.execute(`PRAGMA table_info(${table})`);
     const existingColumns = info.rows.map((r: any) => r.name);
@@ -228,32 +252,18 @@ async function initTursoTables() {
     }
 
     if (table === "drafts") {
-      if (!existingColumns.some((c: string) => ["id", "draft_id", "draftId"].includes(c))) {
-        await client.execute("ALTER TABLE drafts ADD COLUMN id TEXT");
-      }
-      if (!existingColumns.some((c: string) => ["type", "draft_type", "draftType"].includes(c))) {
-        await client.execute("ALTER TABLE drafts ADD COLUMN type TEXT NOT NULL DEFAULT ''");
-      }
-      if (!existingColumns.some((c: string) => ["data", "draft_data", "draftData"].includes(c))) {
-        await client.execute("ALTER TABLE drafts ADD COLUMN data TEXT DEFAULT '{}'");
-      }
-      if (!existingColumns.some((c: string) => ["hospital_code", "hospitalCode"].includes(c))) {
-        await client.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
-      }
-      if (!existingColumns.some((c: string) => ["specialty", "specialty_name", "specialtyName"].includes(c))) {
-        await client.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
-      }
-      if (!existingColumns.some((c: string) => ["updated_at", "updatedAt"].includes(c))) {
-        await client.execute("ALTER TABLE drafts ADD COLUMN updated_at TEXT DEFAULT ''");
-      }
+      if (!existingColumns.some((c: string) => ["id", "draft_id", "draftId"].includes(c))) await client.execute("ALTER TABLE drafts ADD COLUMN id TEXT");
+      if (!existingColumns.some((c: string) => ["type", "draft_type", "draftType"].includes(c))) await client.execute("ALTER TABLE drafts ADD COLUMN type TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.some((c: string) => ["data", "draft_data", "draftData"].includes(c))) await client.execute("ALTER TABLE drafts ADD COLUMN data TEXT DEFAULT '{}'");
+      if (!existingColumns.some((c: string) => ["hospital_code", "hospitalCode"].includes(c))) await client.execute("ALTER TABLE drafts ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.some((c: string) => ["specialty", "specialty_name", "specialtyName"].includes(c))) await client.execute("ALTER TABLE drafts ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.some((c: string) => ["updated_at", "updatedAt"].includes(c))) await client.execute("ALTER TABLE drafts ADD COLUMN updated_at TEXT DEFAULT ''");
     }
 
     if (table === "submissions") {
       if (!existingColumns.includes("id")) await client.execute("ALTER TABLE submissions ADD COLUMN id TEXT");
       if (!existingColumns.includes("hospital_name")) await client.execute("ALTER TABLE submissions ADD COLUMN hospital_name TEXT DEFAULT ''");
-      if (!existingColumns.includes("hospital_code")) {
-        await client.execute("ALTER TABLE submissions ADD COLUMN hospital_code TEXT DEFAULT ''");
-      }
+      if (!existingColumns.includes("hospital_code")) await client.execute("ALTER TABLE submissions ADD COLUMN hospital_code TEXT DEFAULT ''");
       if (!existingColumns.includes("specialty")) await client.execute("ALTER TABLE submissions ADD COLUMN specialty TEXT DEFAULT ''");
       if (!existingColumns.includes("pic_name")) await client.execute("ALTER TABLE submissions ADD COLUMN pic_name TEXT DEFAULT ''");
       if (!existingColumns.includes("submitted_date")) await client.execute("ALTER TABLE submissions ADD COLUMN submitted_date TEXT DEFAULT ''");
@@ -261,15 +271,57 @@ async function initTursoTables() {
       if (!existingColumns.includes("scores")) await client.execute("ALTER TABLE submissions ADD COLUMN scores TEXT DEFAULT '{}'");
       if (!existingColumns.includes("status")) await client.execute("ALTER TABLE submissions ADD COLUMN status TEXT DEFAULT 'Pending'");
       if (!existingColumns.includes("created_at")) await client.execute("ALTER TABLE submissions ADD COLUMN created_at TEXT DEFAULT ''");
+      if (!existingColumns.includes("deleted_at")) await client.execute("ALTER TABLE submissions ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+      if (!existingColumns.includes("updated_at")) await client.execute("ALTER TABLE submissions ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
     }
 
     if (table === "hospital_accounts") {
+      if (!existingColumns.includes("password_hash")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN password_hash TEXT");
       if (!existingColumns.includes("surat_tugas_filename")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN surat_tugas_filename TEXT DEFAULT ''");
       if (!existingColumns.includes("surat_tugas_data")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN surat_tugas_data TEXT DEFAULT ''");
       if (!existingColumns.includes("province")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN province TEXT DEFAULT ''");
       if (!existingColumns.includes("city")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN city TEXT DEFAULT ''");
       if (!existingColumns.includes("registered_at")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN registered_at TEXT DEFAULT ''");
     }
+
+    if (table === "rankings") {
+      if (!existingColumns.includes("deleted_at")) await client.execute("ALTER TABLE rankings ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+    }
+  }
+
+  // Migration: add UNIQUE(hospital_name, specialty) constraint to submissions
+  try {
+    const tblInfo = await client.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='submissions'");
+    const tblSql: string = (tblInfo.rows[0] as any)?.sql || "";
+    if (!tblSql.toUpperCase().includes("UNIQUE")) {
+      await client.execute(`
+        CREATE TABLE submissions_new (
+          id TEXT PRIMARY KEY,
+          hospital_name TEXT NOT NULL,
+          hospital_code TEXT DEFAULT '',
+          specialty TEXT NOT NULL,
+          pic_name TEXT,
+          submitted_date TEXT,
+          status TEXT,
+          scores TEXT,
+          details TEXT,
+          deleted_at DATETIME DEFAULT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(hospital_name, specialty)
+        )
+      `);
+      await client.execute(`
+        INSERT OR IGNORE INTO submissions_new
+          (id, hospital_name, hospital_code, specialty, pic_name, submitted_date, status, scores, details, deleted_at, created_at)
+        SELECT id, hospital_name, hospital_code, specialty, pic_name, submitted_date, status, scores, details, deleted_at, created_at
+        FROM submissions
+      `);
+      await client.execute("DROP TABLE submissions");
+      await client.execute("ALTER TABLE submissions_new RENAME TO submissions");
+    }
+  } catch (e) {
+    console.warn("Submissions UNIQUE constraint migration skipped:", e);
   }
 
   tablesInitialized = true;
@@ -277,12 +329,13 @@ async function initTursoTables() {
 
 async function addHospitalAccount({ acc }: any) {
   await initTursoTables();
+  const passwordHash = await bcrypt.hash(acc.password, 10);
   await db().execute({
-    sql: `INSERT INTO hospital_accounts (email, password, hospital_name, pic_name, province, city, status, surat_tugas_filename, surat_tugas_data, registered_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO hospital_accounts (email, password, password_hash, hospital_name, pic_name, province, city, status, surat_tugas_filename, surat_tugas_data, registered_at)
+          VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       acc.email,
-      acc.password,
+      passwordHash,
       acc.hospitalName,
       acc.picName,
       acc.province || "",
@@ -295,12 +348,68 @@ async function addHospitalAccount({ acc }: any) {
   });
 }
 
+async function loginHospital({ email, password }: any) {
+  await initTursoTables();
+  const rs = await db().execute({
+    sql: "SELECT email, password_hash, hospital_name, pic_name, province, city, status FROM hospital_accounts WHERE email = ?",
+    args: [email],
+  });
+
+  const row = rs.rows[0] as any;
+  if (!row || !row.password_hash) {
+    return { success: false, error: "invalid_credentials" };
+  }
+
+  const match = await bcrypt.compare(password, row.password_hash);
+  if (!match) {
+    return { success: false, error: "invalid_credentials" };
+  }
+
+  const status = row.status as string;
+  if (status !== "activated" && status !== "active" && status !== "aktif") {
+    if (status === "rejected" || status === "ditolak") {
+      return { success: false, error: "rejected" };
+    }
+    return { success: false, error: "pending_activation" };
+  }
+
+  const account = {
+    email: row.email,
+    hospitalName: row.hospital_name,
+    picName: row.pic_name,
+    province: row.province || "",
+    city: row.city || "",
+    status: "activated" as const,
+  };
+
+  const token = signToken({ email: row.email, role: "hospital" });
+  return { success: true, token, account };
+}
+
+async function loginAdmin({ username, password }: any) {
+  await initTursoTables();
+  const rs = await db().execute({
+    sql: "SELECT id, username, password_hash, role FROM admins WHERE username = ?",
+    args: [username],
+  });
+
+  const row = rs.rows[0] as any;
+  if (!row) return { success: false, error: "invalid_credentials" };
+
+  const match = await bcrypt.compare(password, row.password_hash);
+  if (!match) return { success: false, error: "invalid_credentials" };
+
+  const token = signToken({ username: row.username, role: row.role || "admin" });
+  return { success: true, token };
+}
+
 async function getAllHospitalAccounts() {
   await initTursoTables();
-  const rs = await db().execute("SELECT email, password, hospital_name, pic_name, province, city, status, surat_tugas_filename, registered_at FROM hospital_accounts ORDER BY registered_at DESC");
+  const rs = await db().execute(
+    "SELECT email, hospital_name, pic_name, province, city, status, surat_tugas_filename, registered_at FROM hospital_accounts ORDER BY registered_at DESC"
+  );
   return rs.rows.map((r: any) => ({
     email: r.email,
-    password: r.password,
     hospitalName: r.hospital_name,
     picName: r.pic_name,
     province: r.province || "",
@@ -328,10 +437,12 @@ async function updateAccountStatus({ email, status }: any) {
   });
 }
 
-async function addSubmission({ submission }: any) {
+async function addSubmission({ submission, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  const hospitalCode = submission.hospitalCode || submission.details?.hospitalCode || "";
+  const hospitalCode = _hospitalEmail
+    ? hospitalCodeFromEmail(_hospitalEmail)
+    : (submission.hospitalCode || submission.details?.hospitalCode || "");
   const details = {
     ...(submission.details || {}),
     hospitalCode,
@@ -372,7 +483,7 @@ async function addSubmission({ submission }: any) {
 
 async function getAllSubmissions() {
   await initTursoTables();
-  const rs = await db().execute("SELECT * FROM submissions ORDER BY created_at DESC");
+  const rs = await db().execute("SELECT * FROM submissions WHERE deleted_at IS NULL ORDER BY created_at DESC");
   return rs.rows.map((r: any) => {
     const details = parseJson(r.details, {});
     return {
@@ -386,22 +497,63 @@ async function getAllSubmissions() {
       scores: parseJson(r.scores, {}),
       details,
       reviewerNotes: details.reviewerNotes || "",
+      updatedAt: r.updated_at || null,
     };
   });
 }
 
-async function updateSubmissionStatus({ id, status }: any) {
+async function softDeleteSubmission({ id }: any) {
   await initTursoTables();
-  await db().execute({
-    sql: "UPDATE submissions SET status = ? WHERE id = ?",
-    args: [status, id],
+  const now = new Date().toISOString();
+  const client = db();
+  await client.execute({ sql: "UPDATE submissions SET deleted_at = ? WHERE id = ?", args: [now, id] });
+  await client.execute({ sql: "UPDATE rankings SET deleted_at = ? WHERE submission_id = ?", args: [now, id] });
+}
+
+async function restoreSubmission({ id }: any) {
+  await initTursoTables();
+  const client = db();
+  await client.execute({ sql: "UPDATE submissions SET deleted_at = NULL WHERE id = ?", args: [id] });
+  await client.execute({ sql: "UPDATE rankings SET deleted_at = NULL WHERE submission_id = ?", args: [id] });
+}
+
+async function getDeletedSubmissions() {
+  await initTursoTables();
+  const rs = await db().execute("SELECT * FROM submissions WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
+  return rs.rows.map((r: any) => {
+    const details = parseJson(r.details, {});
+    return {
+      id: r.id,
+      hospitalName: r.hospital_name || details.hospitalName || "",
+      hospitalCode: r.hospital_code || details.hospitalCode || "",
+      specialty: r.specialty || "",
+      picName: r.pic_name || details.picName || "",
+      submittedDate: r.submitted_date || "",
+      status: r.status,
+      scores: parseJson(r.scores, {}),
+      details,
+      deletedAt: r.deleted_at,
+    };
   });
+}
+
+async function updateSubmissionStatus({ id, status, updatedAt }: any) {
+  await initTursoTables();
+  const result = await db().execute({
+    sql: "UPDATE submissions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND (updated_at = ? OR updated_at IS NULL)",
+    args: [status, id, updatedAt ?? null],
+  });
+  if (result.rowsAffected === 0) {
+    const err: any = new Error("Conflict: submission was modified by another session");
+    err.statusCode = 409;
+    throw err;
+  }
 }
 
 async function updateSubmissionReview({ id, status, details }: any) {
   await initTursoTables();
   await db().execute({
-    sql: "UPDATE submissions SET status = ?, details = ? WHERE id = ?",
+    sql: "UPDATE submissions SET status = ?, details = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
     args: [status, JSON.stringify(details), id],
   });
 }
@@ -419,7 +571,7 @@ async function publishRankingToDb({ ranking }: any) {
       sql: `UPDATE rankings SET
               hospital_name = ?, city = ?, province = ?, specialty = ?,
               final_score = ?, rsbk_score = ?, clinical_audit_score = ?,
-              patient_report_score = ?, grade = ?, approved_at = ?
+              patient_report_score = ?, grade = ?, approved_at = ?, deleted_at = NULL
             WHERE submission_id = ?`,
       args: [
         ranking.hospitalName, ranking.city, ranking.province, ranking.specialty,
@@ -451,7 +603,7 @@ async function unpublishRankingFromDb({ submissionId }: any) {
 
 async function getAllRankingsFromDb() {
   await initTursoTables();
-  const rs = await db().execute("SELECT * FROM rankings ORDER BY final_score DESC");
+  const rs = await db().execute("SELECT * FROM rankings WHERE deleted_at IS NULL ORDER BY final_score DESC");
   return rs.rows.map((r: any) => ({
     id: r.id,
     hospitalName: r.hospital_name,
@@ -474,6 +626,14 @@ async function addNewsToDb({ news }: any) {
     sql: `INSERT INTO news (id, title, excerpt, content, category, image_url, author, published_at, featured)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [news.id, news.title, news.excerpt, news.content, news.category, news.imageUrl, news.author, news.publishedAt, news.featured ? 1 : 0],
+  });
+}
+
+async function updateNewsInDb({ id, news }: any) {
+  await initTursoTables();
+  await db().execute({
+    sql: `UPDATE news SET title=?, excerpt=?, content=?, category=?, image_url=?, author=?, published_at=?, featured=? WHERE id=?`,
+    args: [news.title, news.excerpt, news.content, news.category, news.imageUrl, news.author, news.publishedAt, news.featured ? 1 : 0, id],
   });
 }
 
@@ -502,9 +662,17 @@ async function getAllNews() {
 async function addEventToDb({ event }: any) {
   await initTursoTables();
   await db().execute({
-    sql: `INSERT INTO events (id, title, description, date, end_date, location, type, image_url, registration_url, featured)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [event.id, event.title, event.description, event.date, event.endDate || "", event.location, event.type, event.imageUrl, event.registrationUrl || "", event.featured ? 1 : 0],
+    sql: `INSERT INTO events (id, title, description, date, end_date, location, type, image_url, registration_url, links, featured)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [event.id, event.title, event.description, event.date, event.endDate || "", event.location, event.type, event.imageUrl, event.registrationUrl || "", JSON.stringify(event.links || []), event.featured ? 1 : 0],
+  });
+}
+
+async function updateEventInDb({ id, event }: any) {
+  await initTursoTables();
+  await db().execute({
+    sql: `UPDATE events SET title=?, description=?, date=?, end_date=?, location=?, type=?, image_url=?, registration_url=?, links=?, featured=? WHERE id=?`,
+    args: [event.title, event.description, event.date, event.endDate || "", event.location, event.type, event.imageUrl, event.registrationUrl || "", JSON.stringify(event.links || []), event.featured ? 1 : 0, id],
   });
 }
 
@@ -526,41 +694,29 @@ async function getAllEvents() {
     type: r.type,
     imageUrl: r.image_url,
     registrationUrl: r.registration_url,
+    links: parseJson(r.links, []),
     featured: r.featured === 1,
     createdAt: r.created_at,
   }));
 }
 
-async function submitSurvey({ hospitalCode, specialty, survey }: any) {
+async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const patientRm = survey.medicalRecordNumber || survey.qRm || "";
   const existing = await client.execute({
     sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
-    args: [hospitalCode, specialty, patientRm],
+    args: [effectiveCode, specialty, patientRm],
   });
-
-  if (existing.rows.length > 0) {
-    return { success: false, duplicate: true };
-  }
+  if (existing.rows.length > 0) return { success: false, duplicate: true };
 
   const id = randomId();
   await client.execute({
     sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [
-      id,
-      hospitalCode,
-      specialty,
-      survey.patientName || survey.qName || "",
-      patientRm,
-      survey.premScore ?? 0,
-      survey.promScore ?? 0,
-      survey.overallScore ?? 0,
-      JSON.stringify(survey.answers || {}),
-    ],
+    args: [id, effectiveCode, specialty, survey.patientName || survey.qName || "", patientRm, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {})],
   });
-
   return { success: true, surveyId: id };
 }
 
@@ -610,8 +766,9 @@ async function resetSurveys({ hospitalCode, specialty }: any) {
   });
 }
 
-async function registerPatient({ hospitalCode, specialty, patient }: any) {
+async function registerPatient({ hospitalCode, specialty, patient, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const id = randomId();
   const info = await client.execute("PRAGMA table_info(patients)");
@@ -630,29 +787,22 @@ async function registerPatient({ hospitalCode, specialty, patient }: any) {
   const sColForSelect = sCols[0];
   const existing = await client.execute({
     sql: `SELECT id FROM patients WHERE ${hColForSelect} = ? AND ${sColForSelect} = ? AND ${rmColForSelect} = ?`,
-    args: [hospitalCode, specialty, patient.rm || ""],
+    args: [effectiveCode, specialty, patient.rm || ""],
   });
-
-  if (existing.rows.length > 0) {
-    return { success: false, duplicate: true };
-  }
+  if (existing.rows.length > 0) return { success: false, duplicate: true };
 
   const columns = ["id", ...hCols, ...nCols, ...rCols, ...sCols];
-  const args = [id];
-  hCols.forEach(() => args.push(hospitalCode));
+  const args: any[] = [id];
+  hCols.forEach(() => args.push(effectiveCode));
   nCols.forEach(() => args.push(patient.name));
   rCols.forEach(() => args.push(patient.rm || ""));
   sCols.forEach(() => args.push(specialty));
-  if (existingCols.includes("created_at")) {
-    columns.push("created_at");
-    args.push(new Date().toISOString());
-  }
+  if (existingCols.includes("created_at")) { columns.push("created_at"); args.push(new Date().toISOString()); }
 
   await client.execute({
     sql: `INSERT INTO patients (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
     args,
   });
-
   return { success: true, patient: { id, name: patient.name, rm: patient.rm } };
 }
 
@@ -672,7 +822,6 @@ async function getPatients({ hospitalCode, specialty }: any) {
     sql: `SELECT ${idCol} as id, ${nameCol} as name, ${rmCol} as rm, ${sCol} as specialty FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY ${orderCol} DESC`,
     args: [hospitalCode, specialty],
   });
-
   return rs.rows.map((r: any) => ({
     id: r.id || `temp-${Math.random()}`,
     name: r.name,
@@ -688,17 +837,10 @@ async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data }: an
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   const dataJson = JSON.stringify(data);
-
   if (existing.rows.length > 0) {
-    await client.execute({
-      sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
-      args: [dataJson, draftId],
-    });
+    await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [dataJson, draftId] });
   } else {
-    await client.execute({
-      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
-      args: [draftId, "custom-survey", hospitalCode, specialtyKey, dataJson],
-    });
+    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "custom-survey", hospitalCode, specialtyKey, dataJson] });
   }
 }
 
@@ -709,17 +851,10 @@ async function saveCustomSurveyPdfChunk({ hospitalCode, specialtyKey, index, tot
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   const dataJson = JSON.stringify({ index, total, chunk });
-
   if (existing.rows.length > 0) {
-    await client.execute({
-      sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
-      args: [dataJson, draftId],
-    });
+    await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [dataJson, draftId] });
   } else {
-    await client.execute({
-      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
-      args: [draftId, "custom-survey-pdf", hospitalCode, specialtyKey, dataJson],
-    });
+    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "custom-survey-pdf", hospitalCode, specialtyKey, dataJson] });
   }
 }
 
@@ -741,11 +876,7 @@ async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
     const parsed = chunkRs.rows[0] ? parseJson((chunkRs.rows[0] as any).data, null) : null;
     chunks.push(parsed?.chunk || "");
   }
-
-  return {
-    ...metadata,
-    base64: chunks.join(""),
-  };
+  return { ...metadata, base64: chunks.join("") };
 }
 
 async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
@@ -784,20 +915,27 @@ async function getDraft({ type, hospitalCode, specialty }: any) {
   return rs.rows[0] ? parseJson((rs.rows[0] as any).data, null) : null;
 }
 
-async function saveDraft({ type, hospitalCode, specialty, draft }: any) {
+async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
-  const draftId = `${type}-${hospitalCode}-${specialty}`;
+  const draftId = `${type}-${effectiveCode}-${specialty}`;
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (existing.rows.length > 0) {
     await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [JSON.stringify(draft), draftId] });
   } else {
-    await client.execute({
-      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
-      args: [draftId, type, hospitalCode, specialty, JSON.stringify(draft)],
-    });
+    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, type, effectiveCode, specialty, JSON.stringify(draft)] });
   }
+}
+
+async function deleteDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) {
+  await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  const client = db();
+  const { idCol } = await getDraftSchema(client);
+  const draftId = `${type}-${effectiveCode}-${specialty}`;
+  await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
 }
 
 async function saveHospitalDraft({ draft }: any) {
@@ -809,10 +947,7 @@ async function saveHospitalDraft({ draft }: any) {
   if (existing.rows.length > 0) {
     await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [JSON.stringify(draft), draftId] });
   } else {
-    await client.execute({
-      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
-      args: [draftId, "hospital-assessment", draft.hospitalName, "Multiple", JSON.stringify(draft)],
-    });
+    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "hospital-assessment", draft.hospitalName, "Multiple", JSON.stringify(draft)] });
   }
 }
 
@@ -840,20 +975,27 @@ async function bulkAddSurveys({ hospitalCode, specialty, surveys }: any) {
 const operations: Record<string, (payload: any) => Promise<any>> = {
   initTursoTables,
   addHospitalAccount,
+  loginHospital,
+  loginAdmin,
   getAllHospitalAccounts,
   getHospitalSuratTugas,
   updateAccountStatus,
   addSubmission,
   getAllSubmissions,
+  softDeleteSubmission,
+  restoreSubmission,
+  getDeletedSubmissions,
   updateSubmissionStatus,
   updateSubmissionReview,
   publishRankingToDb,
   unpublishRankingFromDb,
   getAllRankingsFromDb,
   addNewsToDb,
+  updateNewsInDb,
   deleteNewsFromDb,
   getAllNews,
   addEventToDb,
+  updateEventInDb,
   deleteEventFromDb,
   getAllEvents,
   submitSurvey,
@@ -869,6 +1011,7 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   removePatient,
   getDraft,
   saveDraft,
+  deleteDraft,
   saveHospitalDraft,
   getAllHospitalDrafts,
   deleteHospitalDraft,
@@ -877,8 +1020,6 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
 
 export async function handleTursoOperation(operation: string, payload: any) {
   const handler = operations[operation];
-  if (!handler) {
-    throw new Error(`Unknown Turso operation: ${operation}`);
-  }
+  if (!handler) throw new Error(`Unknown Turso operation: ${operation}`);
   return handler(payload || {});
 }
