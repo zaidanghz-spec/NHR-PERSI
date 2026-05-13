@@ -9,7 +9,7 @@ import { useData } from "../context/DataContext";
 export function AdminLoginPage() {
   const navigate = useNavigate();
   const { adminLogin, isAdmin } = useData();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ export function AdminLoginPage() {
     setError("");
     setLoading(true);
     try {
-      const success = await adminLogin(email, password);
+      const success = await adminLogin(username, password);
       if (success) {
         navigate("/admin/dashboard");
       } else {
@@ -55,17 +55,17 @@ export function AdminLoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-[600] text-gray-700">
-                Email
+              <Label htmlFor="username" className="text-sm font-[600] text-gray-700">
+                Username
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@persi.or.id"
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin@persi"
                   className="pl-10 h-11"
                   required
                 />
