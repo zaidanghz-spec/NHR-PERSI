@@ -24,17 +24,6 @@ export function AdminLoginPage() {
     setError("");
     setLoading(true);
 
-    setTimeout(() => {
-      try {
-        const success = adminLogin(email, password);
-        if (success) {
-          navigate("/admin/dashboard");
-        } else {
-          setError("Email atau password salah.");
-        }
-      } catch (err) {
-        console.error("Admin login failed:", err);
-        setError("Login admin gagal. Periksa konfigurasi admin di deployment.");
     try {
       const success = await adminLogin(username, password);
       if (success) {
@@ -42,7 +31,8 @@ export function AdminLoginPage() {
       } else {
         setError("Username atau password salah.");
       }
-    } catch {
+    } catch (err) {
+      console.error("Admin login failed:", err);
       setError("Terjadi kesalahan. Silakan coba lagi.");
     } finally {
       setLoading(false);
@@ -73,15 +63,10 @@ export function AdminLoginPage() {
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
-                  id="email"
+                  id="username"
                   type="text"
                   autoCapitalize="none"
                   autoCorrect="off"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@persi.or.id"
-                  id="username"
-                  type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="admin@persi"
