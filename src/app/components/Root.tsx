@@ -135,6 +135,12 @@ export function Root() {
       );
     }
 
+    // ADD THIS:
+    if (!isAdmin) {
+      navigate("/admin/login");
+      return null;
+    }
+
     const adminLinks = [
       { label: "Control Center", to: "/admin/dashboard", icon: LayoutDashboard },
       { label: "Review NHR", to: "/siap-persi/admin/dashboard", icon: Shield },
