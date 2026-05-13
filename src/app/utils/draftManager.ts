@@ -12,11 +12,13 @@ export interface DraftData {
     [specialty: string]: {
       rsbk: {
         completed: boolean;
+        confirmed?: boolean;
         data: Record<string, string>;
         score?: number;
       };
       clinicalAudit: {
         completed: boolean;
+        confirmed?: boolean;
         data: Record<string, string>;
         patientMeta?: Record<string, { initials: string; code: string }>;
         activeDiseaseIndex?: number;
@@ -25,6 +27,7 @@ export interface DraftData {
       };
       patientReport: {
         completed: boolean;
+        confirmed?: boolean;
         data: Record<string, any>;
         score?: number;
         patientCount?: number;
@@ -154,6 +157,7 @@ export const draftManager = {
     stage: "rsbk" | "clinicalAudit" | "patientReport",
     data: {
       completed?: boolean;
+      confirmed?: boolean;
       data?: Record<string, any>;
       score?: number;
       patientMeta?: Record<string, { initials: string; code: string }>;

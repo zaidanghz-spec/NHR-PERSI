@@ -368,6 +368,7 @@ export function ClinicalAuditPage() {
         currentPatient,
         activeDiseaseIndex,
         completed: allDiseasesHaveData,
+        confirmed: true,
       });
     }
     navigate(`/siap-persi/patient-report/${specialty}`);
@@ -424,10 +425,10 @@ export function ClinicalAuditPage() {
         {/* Header */}
         <div className="mb-6">
           <Link
-            to={`/siap-persi/rsbk/${specialty}`}
+            to="/siap-persi/select-specialty"
             className="inline-flex items-center text-[#0F4C81] hover:underline mb-4"
           >
-            ← Kembali ke Hospital Structure Form
+            ← Kembali ke Pilih Pelayanan
           </Link>
           <div className="flex items-center justify-between">
             <div>
@@ -439,10 +440,10 @@ export function ClinicalAuditPage() {
               </p>
             </div>
             {/* Grand Total Score Badge */}
-            <div className="bg-gradient-to-br from-[#0F4C81] to-[#14B8A6] rounded-2xl px-6 py-4 text-white text-center min-w-[140px]">
-              <div className="text-xs font-semibold opacity-80 mb-1">Skor Total Audit</div>
-              <div className="text-4xl font-bold">{specialtyScore}</div>
-              <div className="text-xs opacity-70 mt-1">/ 100</div>
+            <div className="bg-white rounded-xl border border-gray-200 px-6 py-4 text-center min-w-[160px]">
+              <p className="text-sm text-gray-600 mb-1">Skor Total Audit</p>
+              <p className="text-xl font-bold text-[#0F4C81]">{specialtyScore}</p>
+              <p className="text-xs text-gray-500 mt-1">Dinilai oleh reviewer</p>
             </div>
           </div>
         </div>
@@ -473,8 +474,6 @@ export function ClinicalAuditPage() {
                   <div className="font-bold">{disease.diseaseName}</div>
                   <div className={`text-xs mt-1 flex items-center justify-center gap-2 ${isActive ? "text-white/80" : "text-gray-500"}`}>
                     <span>Bobot: {disease.weight}</span>
-                    <span>•</span>
-                    <span>{completed}/30 RM</span>
                     {completed > 0 && (
                       <>
                         <span>•</span>
@@ -484,60 +483,10 @@ export function ClinicalAuditPage() {
                       </>
                     )}
                   </div>
-                  {completed > 0 && (
-                    <div className={`mt-2 h-1.5 rounded-full ${isActive ? "bg-white/20" : "bg-gray-200"}`}>
-                      <div
-                        className={`h-1.5 rounded-full ${isActive ? "bg-yellow-400" : "bg-[#0F4C81]"}`}
-                        style={{ width: `${(completed / 30) * 100}%` }}
-                      />
-                    </div>
-                  )}
                 </button>
               );
             })}
           </div>
-        </div>
-
-        {/* ===== Progress Bar for Active Disease ===== */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-700">
-              Progress Rekam Medis — <span className="text-[#0F4C81]">{activeDisease.diseaseName}</span>
-            </span>
-            <div className="flex items-center gap-3">
-              <AutosaveIndicator state={autosaveState} timestamp={lastAutosavedAt} />
-              <span className="text-sm text-gray-600">
-                {activeCompletedPatients} / 30 rekam medis ({activeProgress.toFixed(0)}%)
-              </span>
-            </div>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-            <div
-              className="bg-gradient-to-r from-purple-500 to-indigo-500 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${activeProgress}%` }}
-            />
-          </div>
-
-          {/* Scoring Range Info */}
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { range: "1–5 RM", pct: "80%", desc: "Sampel Minimal", color: activeCompletedPatients >= 1 && activeCompletedPatients <= 5 ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 border border-amber-200" },
-              { range: "6–10 RM", pct: "85%", desc: "Sampel Cukup", color: activeCompletedPatients >= 6 && activeCompletedPatients <= 10 ? "bg-yellow-500 text-white" : "bg-yellow-50 text-yellow-700 border border-yellow-200" },
-              { range: "11–20 RM", pct: "92%", desc: "Sampel Baik", color: activeCompletedPatients >= 11 && activeCompletedPatients <= 20 ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-700 border border-blue-200" },
-              { range: "21–30 RM", pct: "100%", desc: "Sampel Lengkap", color: activeCompletedPatients >= 21 ? "bg-green-500 text-white" : "bg-green-50 text-green-700 border border-green-200" },
-            ].map((tier) => (
-              <div key={tier.range} className={`rounded-lg px-3 py-2 text-center transition-all ${tier.color}`}>
-                <p className="font-bold text-sm">{tier.pct}</p>
-                <p className="font-semibold text-xs">{tier.range}</p>
-                <p className="text-[10px] opacity-80">{tier.desc}</p>
-              </div>
-            ))}
-          </div>
-          {activeCompletedPatients > 0 && (
-            <p className="text-xs text-center text-gray-500 mt-2">
-              ✓ {activeDisease.diseaseName}: skor raw × <strong>{(activeValidity * 100).toFixed(0)}%</strong> bobot validitas ({activeCompletedPatients} rekam medis) = <strong>{activeDiseaseScore}</strong>
-            </p>
-          )}
         </div>
 
         {/* ===== Patient Selector ===== */}
@@ -746,47 +695,44 @@ export function ClinicalAuditPage() {
             </table>
           </div>
 
-          {/* Active Disease Category Breakdown */}
-          {activeCategoryScores.length > 0 && (
-            <>
-              <h4 className="font-bold text-gray-700 mb-3 text-sm">
-                Detail Kategori — {activeDisease.diseaseName}:
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 px-4 text-gray-500 font-semibold">Kategori</th>
-                      <th className="text-center py-2 px-4 text-gray-500 font-semibold">Nilai</th>
-                      <th className="text-center py-2 px-4 text-gray-500 font-semibold">Bobot</th>
-                      <th className="text-center py-2 px-4 text-gray-500 font-semibold">Nilai Berbobot</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeCategoryScores.map((cat, i) => {
-                      const colors = ["text-blue-700 bg-blue-50/50", "text-teal-700 bg-teal-50/50", "text-purple-700 bg-purple-50/50"];
-                      const colorClass = colors[i % colors.length];
-                      const textColor = colorClass.split(" ")[0];
-                      return (
-                        <tr key={cat.name} className={`border-b border-gray-100 ${colorClass.split(" ")[1]}`}>
-                          <td className="py-2 px-4 font-medium text-gray-900">{cat.name}</td>
-                          <td className={`py-2 px-4 text-center font-bold ${textColor}`}>{cat.score}</td>
-                          <td className="py-2 px-4 text-center text-gray-600">{(cat.weight * 100).toFixed(0)}%</td>
-                          <td className={`py-2 px-4 text-center font-bold ${textColor}`}>{cat.weightedScore}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 mt-4">
+          <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
             <p><strong>Rumus:</strong> Skor Penyakit = (Kategori × Bobot%) dijumlahkan lalu × bobot validitas sampel</p>
             <p className="mt-1">Skor Total = Σ(Skor Penyakit × Bobot Penyakit)</p>
           </div>
         </div>
+
+        {/* ===== Detail Kategori ===== */}
+        {activeCategoryScores.length > 0 && (
+          <div className="bg-white rounded-xl border-2 border-[#0F4C81] p-6 mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-1">Detail Kategori</h3>
+            <p className="text-sm text-gray-500 mb-4">{activeDisease.diseaseName}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeCategoryScores.map((cat, i) => {
+                const colors = [
+                  { bg: "bg-blue-50/50", border: "border-blue-100", text: "text-blue-700", num: "text-blue-900" },
+                  { bg: "bg-teal-50/50", border: "border-teal-100", text: "text-teal-700", num: "text-teal-900" },
+                  { bg: "bg-purple-50/50", border: "border-purple-100", text: "text-purple-700", num: "text-purple-900" }
+                ];
+                const color = colors[i % colors.length];
+                return (
+                  <div key={cat.name} className={`rounded-xl ${color.bg} ${color.border} border p-4`}>
+                    <p className={`text-xs font-black uppercase tracking-widest ${color.text} mb-1`}>{cat.name}</p>
+                    <div className="flex justify-between items-end mt-2">
+                      <div>
+                        <p className={`text-2xl font-black ${color.num}`}>{cat.score}</p>
+                        <p className={`text-xs ${color.text} mt-1`}>Nilai</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-lg font-bold ${color.num}`}>{cat.weightedScore}</p>
+                        <p className={`text-xs ${color.text} mt-1`}>Berbobot ({(cat.weight * 100).toFixed(0)}%)</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ===== Action Buttons ===== */}
         <div className="flex gap-4 mt-8">

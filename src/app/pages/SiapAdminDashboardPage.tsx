@@ -28,10 +28,17 @@ export function SiapAdminDashboardPage() {
     }
   }, [isAdmin, syncWithCloud]);
 
-  const handleUnpublish = (id: string) => {
+  const handleUnpublish = async (id: string) => {
     if (window.confirm("Apakah Anda yakin ingin menarik submission ini dari Ranking publik?")) {
       unpublishRanking(id);
-      updateSubmissionStatus(id, "Pending", "Ranking ditarik untuk peninjauan ulang oleh Admin Pusat.");
+      try {
+        await updateSubmissionStatus(id, "Pending");
+      } catch (err: any) {
+        if (err?.statusCode === 409 || /\(409\)/.test(err?.message || "")) {
+          alert("This submission was updated by another session. Please review the latest version.");
+          await syncWithCloud();
+        }
+      }
     }
   };
 

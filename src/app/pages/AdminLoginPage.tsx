@@ -19,20 +19,22 @@ export function AdminLoginPage() {
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-    setTimeout(() => {
-      const success = adminLogin(email, password);
+    try {
+      const success = await adminLogin(email, password);
       if (success) {
         navigate("/admin/dashboard");
       } else {
-        setError("Email atau password salah.");
+        setError("Username atau password salah.");
       }
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (

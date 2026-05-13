@@ -105,42 +105,28 @@ export function HospitalLoginPage() {
     setSuratTugasFile(file);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      const account = loginHospital(loginEmail, loginPassword);
+    try {
+      const account = await loginHospital(loginEmail, loginPassword);
       if (account) {
-        if (account.status === "pending_activation") {
-          setError("Akun Anda belum diaktivasi oleh admin PERSI. Silakan menunggu proses aktivasi.");
-          setLoading(false);
-          return;
-        }
-        if (account.status === "rejected") {
-          setError("Akun Anda ditolak oleh admin PERSI. Hubungi admin untuk informasi lebih lanjut.");
-          setLoading(false);
-          return;
-        }
-        // hospitalCode must match what Turso uses — derived from email (the Turso PK)
-        import("../utils/api").then(({ getHospitalCode }) => {
-          const hospitalCode = getHospitalCode(account.email);
-          sessionStorage.setItem("hospitalAuth", JSON.stringify({
-            hospitalName: account.hospitalName,
-            picName: account.picName,
-            email: account.email,
-            hospitalCode,
-            authenticated: true,
-          }));
-          navigate("/submit");
-        });
-        setLoading(false);
-        return;
+        navigate("/submit");
       } else {
         setError("Email atau password salah. Pastikan Anda sudah mendaftar terlebih dahulu.");
       }
+    } catch (err: any) {
+      if (err.message === "pending_activation") {
+        setError("Akun Anda belum diaktivasi oleh admin PERSI. Silakan menunggu proses aktivasi.");
+      } else if (err.message === "rejected") {
+        setError("Akun Anda ditolak oleh admin PERSI. Hubungi admin untuk informasi lebih lanjut.");
+      } else {
+        setError("Terjadi kesalahan. Silakan coba lagi.");
+      }
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {

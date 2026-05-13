@@ -45,7 +45,6 @@ export function SpecialtyProgressTracker({
   const currentIndex = selectedSpecialties.indexOf(currentSpecialty);
 
   const stages = ["rsbk", "clinical-audit", "patient-report", "result"];
-  const currentStageIndex = stages.indexOf(currentStage);
 
   const navigateToSpecialty = (spec: string, stage: string) => {
     if (stage === "rsbk") navigate(`/siap-persi/rsbk/${spec}`);
@@ -76,21 +75,9 @@ export function SpecialtyProgressTracker({
         )}
       </div>
 
-      {/* Progress Bar */}
-      {selectedSpecialties.length > 1 && (
-        <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-          <div
-            className="bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] h-3 rounded-full transition-all duration-500"
-            style={{
-              width: `${((currentIndex + 1) / selectedSpecialties.length) * 100}%`,
-            }}
-          />
-        </div>
-      )}
-
       {/* Specialty Navigation */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {selectedSpecialties.map((spec, index) => {
+        {selectedSpecialties.map((spec) => {
           const isCurrent = spec === currentSpecialty;
 
           return (
@@ -113,7 +100,7 @@ export function SpecialtyProgressTracker({
 
       {/* Stage Navigation (within same specialty) */}
       <div className="flex gap-2 mb-3">
-        {stages.map((stage, idx) => {
+        {stages.map((stage) => {
           const isCurrent = stage === currentStage;
           
           // Determine completion and proportion
@@ -125,20 +112,20 @@ export function SpecialtyProgressTracker({
           let proportion = 0; // 0 to 1
 
           if (stage === "rsbk") {
-            isCompleted = progress?.rsbk?.completed || false;
+            isCompleted = progress?.rsbk?.confirmed || false;
             proportion = isCompleted ? 1 : (Object.keys(progress?.rsbk?.data || {}).length > 0 ? 0.5 : 0);
           } else if (stage === "clinical-audit") {
-            isCompleted = progress?.clinicalAudit?.completed || false;
+            isCompleted = progress?.clinicalAudit?.confirmed || false;
             const sCount = sessionStorage.getItem(`${currentSpecialty}_auditPatientCount`);
             const actualCount = sCount ? parseInt(sCount) : (progress?.clinicalAudit?.currentPatient || 0);
             proportion = isCompleted ? 1 : (actualCount / 30);
           } else if (stage === "patient-report") {
-            isCompleted = progress?.patientReport?.completed || false;
+            isCompleted = progress?.patientReport?.confirmed || false;
             const sCount = sessionStorage.getItem(`${currentSpecialty}_prmPatientCount`);
             const actualCount = sCount ? parseInt(sCount) : (progress?.patientReport?.patientCount || 0);
             proportion = isCompleted ? 1 : (actualCount / 30);
           } else if (stage === "result") {
-            isCompleted = !!(progress?.rsbk?.completed && progress?.clinicalAudit?.completed && progress?.patientReport?.completed);
+            isCompleted = !!(progress?.rsbk?.confirmed && progress?.clinicalAudit?.confirmed && progress?.patientReport?.confirmed);
           }
 
           let buttonClasses = `flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer relative overflow-hidden flex items-center justify-center `;
@@ -168,7 +155,6 @@ export function SpecialtyProgressTracker({
             >
               <span className="relative z-10 flex items-center gap-1.5 text-center leading-tight">
                 {isCompleted && !isCurrent && "✓"} {stageLabels[stage]}
-                {!isCompleted && proportion > 0 && !isCurrent && `(${(proportion * 100).toFixed(0)}%)`}
               </span>
             </button>
           );

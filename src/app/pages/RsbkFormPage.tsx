@@ -150,6 +150,7 @@ export function RsbkFormPage() {
       data: cleanFormData,
       score: totalRsbkScore,
       completed: filledItems === totalItems,
+      confirmed: true,
     });
     sessionStorage.setItem(`${specialty}_rsbkScore`, totalRsbkScore.toString());
     sessionStorage.setItem("currentSpecialty", specialty || "");
@@ -190,7 +191,7 @@ export function RsbkFormPage() {
         {/* Progress Bar */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-700">Progress Pengisian</span>
+            <span className="text-base font-bold text-gray-700">Progress Pengisian</span>
             <div className="flex items-center gap-3">
               <AutosaveIndicator state={autosaveState} timestamp={lastAutosavedAt} />
               <span className="text-sm text-gray-600">{filledItems} / {totalItems} item ({progress.toFixed(0)}%)</span>
@@ -307,21 +308,31 @@ export function RsbkFormPage() {
             Data sudah direkap untuk proses review. Skor RSBK tidak ditampilkan otomatis kepada rumah sakit untuk menghindari miskonsepsi penilaian.
           </p>
           <div className="grid md:grid-cols-3 gap-3">
-            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-blue-700 mb-1">SDM</p>
-              <p className="text-2xl font-black text-blue-900">{sdmItems.filter(item => formData[item.id] !== null && formData[item.id] !== undefined).length}</p>
-              <p className="text-xs text-blue-700 mt-1">item terisi</p>
-            </div>
-            <div className="rounded-xl bg-teal-50 border border-teal-100 p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-teal-700 mb-1">Sarana & Prasarana</p>
-              <p className="text-2xl font-black text-teal-900">{saranaItems.filter(item => formData[item.id] !== null && formData[item.id] !== undefined).length}</p>
-              <p className="text-xs text-teal-700 mt-1">item terisi</p>
-            </div>
-            <div className="rounded-xl bg-purple-50 border border-purple-100 p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-purple-700 mb-1">Alat Medis</p>
-              <p className="text-2xl font-black text-purple-900">{alatItems.filter(item => formData[item.id] !== null && formData[item.id] !== undefined).length}</p>
-              <p className="text-xs text-purple-700 mt-1">item terisi</p>
-            </div>
+          {[
+            { label: "SDM", items: sdmItems, bg: "bg-blue-50", border: "border-blue-100", text: "text-blue-700", num: "text-blue-900" },
+            { label: "Sarana & Prasarana", items: saranaItems, bg: "bg-teal-50", border: "border-teal-100", text: "text-teal-700", num: "text-teal-900" },
+            { label: "Alat Medis", items: alatItems, bg: "bg-purple-50", border: "border-purple-100", text: "text-purple-700", num: "text-purple-900" },
+          ].map(({ label, items, bg, border, text, num }) => {
+            const filled = items.filter(item => formData[item.id] !== null && formData[item.id] !== undefined).length;
+            const total = items.length;
+            const complete = filled === total && total > 0;
+            return (
+              <div key={label} className={`rounded-xl ${bg} ${border} border p-4`}>
+                <p className={`text-xs font-black uppercase tracking-widest ${text} mb-1`}>{label}</p>
+                {complete ? (
+                  <>
+                    <CheckCircle2 className={`w-8 h-8 ${text} mb-1`} />
+                    <p className={`text-xs ${text} mt-1`}>semua sudah terisi</p>
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-2xl font-black ${num}`}>{filled}/{total}</p>
+                    <p className={`text-xs ${text} mt-1`}>item terisi</p>
+                  </>
+                )}
+              </div>
+            );
+          })}
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 mt-4">
             <strong>Status nilai:</strong> Menunggu review dan validasi PERSI.
@@ -410,7 +421,9 @@ function QuantityInput({ item, value, onChange }: {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     if (raw === "" || raw === "-") { onChange(item.id, null); return; }
-    const parsed = parseInt(raw);
+    const stripped = raw.startsWith("-") ? raw.slice(1) : raw;
+    if (stripped === "") { onChange(item.id, null); return; }
+    const parsed = parseInt(stripped);
     if (!isNaN(parsed) && parsed >= 0) onChange(item.id, parsed);
   };
 
@@ -419,7 +432,13 @@ function QuantityInput({ item, value, onChange }: {
       <div className="flex items-center gap-4">
         <div className="flex-1">
           <label className="font-medium text-gray-900">{item.name}</label>
-          <p className="text-xs text-gray-500 mt-1">Isi jumlah aktual yang tersedia dan berfungsi.</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {item.category === "sdm"
+              ? "Isi jumlah tenaga yang tersedia dan bertugas"
+              : item.category === "sarana"
+              ? "Isi jumlah ruangan yang tersedia dan berfungsi"
+              : "Isi jumlah aktual yang tersedia dan berfungsi."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={handleDecrement}

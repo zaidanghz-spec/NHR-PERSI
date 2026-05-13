@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { 
-  getAllSubmissions, 
-  addSubmission as addSubmissionToDb, 
+import {
+  getAllSubmissions,
+  addSubmission as addSubmissionToDb,
   updateSubmissionStatus as updateStatusInDb,
   updateSubmissionReview as updateReviewInDb,
   getAllHospitalAccounts,
@@ -11,11 +11,17 @@ import {
   unpublishRankingFromDb,
   getAllRankingsFromDb,
   addNewsToDb,
+  updateNewsInDb,
   deleteNewsFromDb,
   getAllNews,
   addEventToDb,
+  updateEventInDb,
   deleteEventFromDb,
-  getAllEvents
+  getAllEvents,
+  loginHospital as apiLoginHospital,
+  loginAdmin as apiLoginAdmin,
+  getHospitalCode,
+  deleteDraft as deleteDraftApi,
 } from "../utils/api";
 import { draftManager } from "../utils/draftManager";
 
@@ -47,7 +53,6 @@ export interface EventItem {
 
 export interface HospitalAccount {
   email: string;
-  password: string;
   hospitalName: string;
   picName: string;
   province: string;
@@ -55,7 +60,6 @@ export interface HospitalAccount {
   registeredAt: string;
   status: "pending_activation" | "activated" | "rejected";
   suratTugasFileName?: string;
-  suratTugasData?: string; // base64 data URL
 }
 
 export interface ApprovedRanking {
@@ -90,19 +94,10 @@ export interface SubmissionType {
   };
   details: any;
   reviewerNotes?: string;
+  updatedAt?: string | null;
 }
 
-// ============ DEFAULT DATA ============
-const LEGACY_DEFAULT_NEWS_TITLES = new Set([
-  "PERSI Luncurkan Platform Ranking Rumah Sakit Nasional Berbasis Data",
-  "Kemenkes Dorong Digitalisasi Penilaian Mutu Rumah Sakit di Seluruh Indonesia",
-  "Clinical Audit: Standar Baru Evaluasi Mutu Layanan Spesialistik RS",
-  "Implementasi PREM dan PROM Sebagai Indikator Patient-Centered Care",
-]);
-
-const removeLegacyDefaultNews = (items: NewsItem[] = []) =>
-  items.filter((item) => !LEGACY_DEFAULT_NEWS_TITLES.has(item.title));
-
+// ============ UTILITIES ============
 const normalizeAccountStatus = (status: string = ""): HospitalAccount["status"] => {
   const normalized = status.trim().toLowerCase();
   if (["activated", "active", "aktif"].includes(normalized)) return "activated";
@@ -117,66 +112,16 @@ const normalizeAccount = (account: HospitalAccount): HospitalAccount => ({
 
 const mergeHospitalAccounts = (primary: HospitalAccount[] = [], secondary: HospitalAccount[] = []) => {
   const merged = new Map<string, HospitalAccount>();
-
   [...secondary, ...primary].forEach((account) => {
     const key = account.email.trim().toLowerCase();
     if (!key) return;
     const existing = merged.get(key);
     merged.set(key, normalizeAccount({ ...existing, ...account }));
   });
-
   return Array.from(merged.values()).sort((a, b) =>
     new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime()
   );
 };
-
-const defaultEvents: EventItem[] = [
-  {
-    id: "event-1",
-    title: "Hospital Expo & Forum (HEF) 2026",
-    description: "Pameran dan forum terbesar bagi industri rumah sakit di Indonesia. Menampilkan inovasi terkini dalam teknologi kesehatan, manajemen RS, dan layanan pasien.",
-    date: "2026-10-21",
-    endDate: "2026-10-24",
-    location: "Jakarta Convention Center (JCC)",
-    type: "congress",
-    imageUrl: "https://images.unsplash.com/photo-1660795308754-4c6422baf2f6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwY29uZmVyZW5jZSUyMHNlbWluYXIlMjBoZWFsdGhjYXJlfGVufDF8fHx8MTc3MzM2NjU2MHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    registrationUrl: "#",
-    featured: true,
-  },
-  {
-    id: "event-2",
-    title: "Workshop NHR PERSI Assessment untuk Rumah Sakit",
-    description: "Pelatihan teknis cara mengisi dan mempersiapkan data untuk NHR PERSI Assessment. Terbuka untuk semua rumah sakit anggota PERSI.",
-    date: "2026-04-15",
-    location: "Online (Zoom Webinar)",
-    type: "workshop",
-    imageUrl: "https://images.unsplash.com/photo-1758691462743-f9fc9e430d39?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3NwaXRhbCUyMGRvY3RvcnMlMjBtZWV0aW5nJTIwcHJvZmVzc2lvbmFsfGVufDF8fHx8MTc3MzM2NjU2MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    registrationUrl: "#",
-    featured: true,
-  },
-  {
-    id: "event-3",
-    title: "Seminar Nasional: Transformasi Mutu RS di Era Digital",
-    description: "Pembicara kunci dari Kemenkes RI, WHO Indonesia, dan praktisi RS terkemuka membahas strategi peningkatan mutu berbasis data dan teknologi.",
-    date: "2026-05-20",
-    location: "Hotel Mulia Senayan, Jakarta",
-    type: "seminar",
-    imageUrl: "https://images.unsplash.com/photo-1650946706426-99f46fe7106a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBob3NwaXRhbCUyMGJ1aWxkaW5nJTIwSW5kb25lc2lhfGVufDF8fHx8MTc3MzM2NjU2MHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    registrationUrl: "#",
-    featured: false,
-  },
-  {
-    id: "event-4",
-    title: "Webinar: Best Practices Clinical Audit di Rumah Sakit",
-    description: "Panduan praktis melaksanakan clinical audit yang efektif dan efisien, termasuk cara mengumpulkan dan menganalisis 30 rekam medis sesuai standar NHR PERSI.",
-    date: "2026-04-28",
-    location: "Online (Zoom Webinar)",
-    type: "webinar",
-    imageUrl: "https://images.unsplash.com/photo-1758691462848-ba1e929da259?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoZWFsdGhjYXJlJTIwdGVjaG5vbG9neSUyMGRpZ2l0YWwlMjBpbm5vdmF0aW9ufGVufDF8fHx8MTc3MzM2NjU2MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    registrationUrl: "#",
-    featured: false,
-  },
-];
 
 // ============ CONTEXT ============
 interface DataContextType {
@@ -195,13 +140,13 @@ interface DataContextType {
   // Hospital Accounts
   hospitalAccounts: HospitalAccount[];
   registerHospitalFull: (email: string, password: string, hospitalName: string, picName: string, suratTugasFileName: string, suratTugasData: string, province?: string, city?: string) => Promise<boolean>;
-  loginHospital: (email: string, password: string) => HospitalAccount | null;
+  loginHospital: (email: string, password: string) => Promise<HospitalAccount | null>;
   activateHospital: (email: string) => void;
   rejectHospital: (email: string) => void;
 
   // Admin Auth
   isAdmin: boolean;
-  adminLogin: (email: string, password: string) => boolean;
+  adminLogin: (username: string, password: string) => Promise<boolean>;
   adminLogout: () => void;
 
   // Hospital Auth
@@ -225,12 +170,8 @@ import { safeLocalStorageSet, loadFromStorage } from "../utils/storage";
 const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [news, setNews] = useState<NewsItem[]>(() => {
-    const cleaned = removeLegacyDefaultNews(loadFromStorage("persi_news", []));
-    safeLocalStorageSet("persi_news", JSON.stringify(cleaned));
-    return cleaned;
-  });
-  const [events, setEvents] = useState<EventItem[]>(() => loadFromStorage("persi_events", defaultEvents));
+  const [news, setNews] = useState<NewsItem[]>(() => loadFromStorage("persi_news", []));
+  const [events, setEvents] = useState<EventItem[]>(() => loadFromStorage("persi_events", []));
   const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>(() =>
     mergeHospitalAccounts(loadFromStorage("persi_hospital_accounts", []), [])
   );
@@ -261,8 +202,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     }
     syncSubmissions();
-    
-    // Sync Hospital Accounts
+
     async function syncAccounts() {
       try {
         const dbAccs = await getAllHospitalAccounts();
@@ -292,16 +232,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     }
     syncRankings();
-    
+
     async function syncNewsAndEvents() {
       try {
         const dbNews = await getAllNews();
         if (dbNews !== null) {
-          const cleanedNews = removeLegacyDefaultNews(dbNews);
-          setNews(cleanedNews);
-          safeLocalStorageSet("persi_news", JSON.stringify(cleanedNews));
+          setNews(dbNews);
+          safeLocalStorageSet("persi_news", JSON.stringify(dbNews));
         }
-        
         const dbEvents = await getAllEvents();
         if (dbEvents !== null) {
           setEvents(dbEvents);
@@ -316,12 +254,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const forcePushToCloud = useCallback(async () => {
     try {
-      // Pushes all local accounts and submissions to the cloud if they are missing
       for (const account of hospitalAccounts) {
-        await addAccountToDb(account).catch(() => {});
+        await addAccountToDb(account).catch(() => { });
       }
       for (const sub of submissions) {
-        await addSubmissionToDb(sub).catch(() => {});
+        await addSubmissionToDb(sub).catch(() => { });
       }
       return true;
     } catch (err) {
@@ -340,31 +277,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         getAllEvents()
       ]);
 
-      // SAFETY MERGE: Never overwrite local data with nothing if local has contents.
-      // This solves the "tiba-tiba hilang" issue if cloud returns an empty or partial set.
-      
       if (dbSubs !== null) {
         setSubmissions(prev => {
           const merged = [...dbSubs];
-          // Keep local submissions that haven't hit the cloud yet
-          prev.forEach(p => {
-            if (!merged.find(m => m.id === p.id)) merged.push(p);
-          });
+          prev.forEach(p => { if (!merged.find(m => m.id === p.id)) merged.push(p); });
           return merged;
         });
       }
-      
       if (dbAccs !== null) {
-        setHospitalAccounts(prev => {
-          const merged = mergeHospitalAccounts(dbAccs, prev);
-          return merged;
-        });
+        setHospitalAccounts(prev => mergeHospitalAccounts(dbAccs, prev));
       }
+      if (dbRankings !== null) setApprovedRankings(dbRankings);
+      if (dbNews !== null) setNews(dbNews);
+      if (dbEvents !== null) setEvents(dbEvents);
 
-      if (dbRankings !== null) { setApprovedRankings(dbRankings); }
-      if (dbNews !== null) { setNews(removeLegacyDefaultNews(dbNews)); }
-      if (dbEvents !== null) { setEvents(dbEvents); }
-      
       draftManager.syncWithCloud();
     } catch (err) {
       console.error("Manual sync failed:", err);
@@ -372,10 +298,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Polling for updates (every 30 seconds)
-    const interval = setInterval(() => {
-      syncWithCloud();
-    }, 30000);
+    const interval = setInterval(() => { syncWithCloud(); }, 30000);
     return () => clearInterval(interval);
   }, [syncWithCloud]);
 
@@ -398,7 +321,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateNews = useCallback((id: string, item: Partial<NewsItem>) => {
-    setNews(prev => prev.map(n => n.id === id ? { ...n, ...item } : n));
+    setNews(prev => {
+      return prev.map(n => {
+        if (n.id === id) {
+          const updated = { ...n, ...item };
+          updateNewsInDb(id, updated).catch(console.error);
+          return updated;
+        }
+        return n;
+      });
+    });
   }, []);
 
   const deleteNews = useCallback((id: string) => {
@@ -422,7 +354,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateEvent = useCallback((id: string, item: Partial<EventItem>) => {
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, ...item } : e));
+    setEvents(prev => {
+      return prev.map(e => {
+        if (e.id === id) {
+          const updated = { ...e, ...item };
+          updateEventInDb(id, updated).catch(console.error);
+          return updated;
+        }
+        return e;
+      });
+    });
   }, []);
 
   const deleteEvent = useCallback((id: string) => {
@@ -434,7 +375,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     deleteEventFromDb(id).catch(console.error);
   }, []);
 
-  // Hospital Registration (open registration, activation by admin)
+  // Hospital Registration
   const registerHospitalFull = useCallback(async (
     email: string, password: string, hospitalName: string, picName: string,
     suratTugasFileName: string, suratTugasData: string,
@@ -444,14 +385,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const storedAcc = localStorage.getItem("persi_hospital_accounts");
       if (storedAcc) currentAccounts = JSON.parse(storedAcc);
-    } catch {}
+    } catch { }
 
-    // Check if email already registered
     if (currentAccounts.find(a => a.email.toLowerCase() === email.toLowerCase())) return false;
 
     const account: HospitalAccount = {
       email: email.toLowerCase(),
-      password,
       hospitalName,
       picName,
       province: province || "",
@@ -459,11 +398,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       registeredAt: new Date().toISOString(),
       status: "pending_activation",
       suratTugasFileName,
-      suratTugasData,
     };
-    
+
     try {
-      await addAccountToDb(account);
+      // Send password to server for hashing — never store it locally
+      await addAccountToDb({ ...account, password, suratTugasData });
       const updatedAccounts = [...currentAccounts, account];
       setHospitalAccounts(updatedAccounts);
       safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updatedAccounts));
@@ -474,33 +413,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [hospitalAccounts]);
 
-  const loginHospital = useCallback((email: string, password: string): HospitalAccount | null => {
-    let accounts = hospitalAccounts;
-    try {
-      const stored = localStorage.getItem("persi_hospital_accounts");
-      if (stored) accounts = JSON.parse(stored);
-    } catch {}
+  const loginHospital = useCallback(async (email: string, password: string): Promise<HospitalAccount | null> => {
+    const result = await apiLoginHospital(email, password);
 
-    const account = accounts.find(
-      a => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-    );
-    if (account) {
-      if (account.status === "activated") {
-        setCurrentHospital(account);
-        // Also store email in session so hospitalCode can be derived consistently
-        sessionStorage.setItem("persi_hospital_session", JSON.stringify(account));
-      }
-      return account;
+    if (!result.success) {
+      if (result.error === "pending_activation") throw new Error("pending_activation");
+      if (result.error === "rejected") throw new Error("rejected");
+      return null;
     }
-    return null;
-  }, [hospitalAccounts]);
+
+    if (result.token) {
+      localStorage.setItem("hospitalToken", result.token);
+    }
+
+    const account = result.account as HospitalAccount;
+    setCurrentHospital(account);
+    sessionStorage.setItem("persi_hospital_session", JSON.stringify(account));
+
+    const hospitalCode = getHospitalCode(account.email);
+    sessionStorage.setItem("hospitalAuth", JSON.stringify({
+      hospitalName: account.hospitalName,
+      picName: account.picName,
+      hospitalCode,
+      email: account.email,
+      authenticated: true,
+    }));
+
+    return account;
+  }, []);
 
   const activateHospital = useCallback((email: string) => {
     setHospitalAccounts(prev => {
       const updated = prev.map(a =>
-        a.email.toLowerCase() === email.toLowerCase()
-          ? { ...a, status: "activated" as const }
-          : a
+        a.email.toLowerCase() === email.toLowerCase() ? { ...a, status: "activated" as const } : a
       );
       safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updated));
       return updated;
@@ -511,9 +456,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const rejectHospital = useCallback((email: string) => {
     setHospitalAccounts(prev => {
       const updated = prev.map(a =>
-        a.email.toLowerCase() === email.toLowerCase()
-          ? { ...a, status: "rejected" as const }
-          : a
+        a.email.toLowerCase() === email.toLowerCase() ? { ...a, status: "rejected" as const } : a
       );
       safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updated));
       return updated;
@@ -523,26 +466,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const hospitalLogout = useCallback(() => {
     setCurrentHospital(null);
+    localStorage.removeItem("hospitalToken");
     sessionStorage.removeItem("persi_hospital_session");
     sessionStorage.removeItem("hospitalAuth");
   }, []);
 
   // Admin Auth
-  const adminLogin = useCallback((email: string, password: string): boolean => {
-    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-    
-    if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
-      setIsAdmin(true);
-      sessionStorage.setItem("persi_admin", "true");
-      return true;
+  const adminLogin = useCallback(async (username: string, password: string): Promise<boolean> => {
+    const result = await apiLoginAdmin(username, password);
+    if (!result.success) return false;
+    if (result.token) {
+      sessionStorage.setItem("auth_token", result.token);
     }
-    return false;
+    setIsAdmin(true);
+    sessionStorage.setItem("persi_admin", "true");
+    return true;
   }, []);
 
   const adminLogout = useCallback(() => {
     setIsAdmin(false);
     sessionStorage.removeItem("persi_admin");
+    sessionStorage.removeItem("auth_token");
   }, []);
 
   // Rankings
@@ -554,39 +498,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
         finalRanking.id = prev[existing].id;
         const updated = [...prev];
         updated[existing] = finalRanking as ApprovedRanking;
-        
-        // Push to cloud background
         publishRankingToDb(finalRanking).catch(console.error);
         return updated;
       }
-      
       finalRanking.id = `rank-${Date.now()}`;
-      
-      // Push to cloud background
       publishRankingToDb(finalRanking).catch(console.error);
-      
       return [...prev, finalRanking as ApprovedRanking].sort((a, b) => b.finalScore - a.finalScore);
     });
   }, []);
 
   const unpublishRanking = useCallback((submissionId: string) => {
     setApprovedRankings(prev => prev.filter(r => r.submissionId !== submissionId));
-    // Remove from cloud background
     unpublishRankingFromDb(submissionId).catch(console.error);
   }, []);
 
   const addSubmission = useCallback(async (sub: Omit<SubmissionType, "id">) => {
     const newId = `SUB-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}`;
     const fullSub = { ...sub, id: newId };
-    
+
     setSubmissions(prev => {
       const updated = [fullSub, ...prev];
       safeLocalStorageSet("persi_submissions", JSON.stringify(updated));
       return updated;
     });
-    
+
     try {
       await addSubmissionToDb(fullSub);
+      await Promise.allSettled([
+        deleteDraftApi("clinical-audit", fullSub.hospitalCode || "", fullSub.specialty),
+        deleteDraftApi("patient-report", fullSub.hospitalCode || "", fullSub.specialty),
+        deleteDraftApi("rsbk", fullSub.hospitalCode || "", fullSub.specialty),
+      ]);
     } catch (err) {
       console.error("Cloud push failed:", err);
       throw err;
@@ -595,41 +537,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateSubmissionStatus = useCallback(async (id: string, status: SubmissionType["status"], notes?: string, revisionTargets?: any, revisionNotes?: any) => {
     let updatedDetailsJson: any = null;
-    
+    let currentUpdatedAt: string | null = null;
+
     setSubmissions(prev => prev.map(s => {
       if (s.id === id) {
-        // Embed reviewer notes directly into details for database mapping
-        const newDetails = { 
-          ...(s.details || {}), 
+        currentUpdatedAt = s.updatedAt ?? null;
+        const newDetails = {
+          ...(s.details || {}),
           reviewerNotes: notes !== undefined ? notes : s.details?.reviewerNotes,
           revisionTargets: revisionTargets || s.details?.revisionTargets,
           revisionNotes: revisionNotes || s.details?.revisionNotes,
           revisionRequestedAt: status === "Revision Required" ? new Date().toISOString() : s.details?.revisionRequestedAt,
         };
         updatedDetailsJson = newDetails;
-        
-        return { 
-          ...s, 
-          status, 
-          details: newDetails,
-          reviewerNotes: notes !== undefined ? notes : s.reviewerNotes // keep flat for UI compat
-        };
+        return { ...s, status, details: newDetails, reviewerNotes: notes !== undefined ? notes : s.reviewerNotes };
       }
       return s;
     }));
 
-    // Sync to cloud
     try {
       if (updatedDetailsJson) {
         await updateReviewInDb(id, status, updatedDetailsJson);
       } else {
-        await updateStatusInDb(id, status);
+        await updateStatusInDb(id, status, currentUpdatedAt);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Cloud status update failed:", err);
+      if (err?.statusCode === 409 || /\(409\)/.test(err?.message || "")) {
+        throw err;
+      }
     }
 
-    // Auto-takedown: if changing to Revision Required, remove from rankings
     if (status === "Revision Required") {
       unpublishRanking(id);
     }
