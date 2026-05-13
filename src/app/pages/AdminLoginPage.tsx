@@ -25,11 +25,16 @@ export function AdminLoginPage() {
     setLoading(true);
 
     setTimeout(() => {
-      const success = adminLogin(email, password);
-      if (success) {
-        navigate("/admin/dashboard");
-      } else {
-        setError("Email atau password salah.");
+      try {
+        const success = adminLogin(email, password);
+        if (success) {
+          navigate("/admin/dashboard");
+        } else {
+          setError("Email atau password salah.");
+        }
+      } catch (err) {
+        console.error("Admin login failed:", err);
+        setError("Login admin gagal. Periksa konfigurasi admin di deployment.");
       }
       setLoading(false);
     }, 800);
@@ -60,7 +65,9 @@ export function AdminLoginPage() {
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   id="email"
-                  type="email"
+                  type="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@persi.or.id"
