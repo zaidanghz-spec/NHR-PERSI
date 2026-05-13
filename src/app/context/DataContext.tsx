@@ -472,6 +472,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Admin Auth
+  const adminLogin = useCallback((email: string, password: string): boolean => {
+    const normalizeAdminId = (value: string = "") => value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const adminEmail = String(import.meta.env.VITE_ADMIN_EMAIL || "");
+    const adminPassword = String(import.meta.env.VITE_ADMIN_PASSWORD || "");
+    const enteredEmail = email.trim();
+    const enteredPassword = password.trim();
+    
+    if (
+      adminEmail &&
+      adminPassword &&
+      normalizeAdminId(enteredEmail) === normalizeAdminId(adminEmail) &&
+      enteredPassword === adminPassword.trim()
+    ) {
+      setIsAdmin(true);
+      sessionStorage.setItem("persi_admin", "true");
+      return true;
   const adminLogin = useCallback(async (username: string, password: string): Promise<boolean> => {
     const result = await apiLoginAdmin(username, password);
     if (!result.success) return false;
