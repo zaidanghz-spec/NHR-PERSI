@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { CheckCircle2, Clock, Mail, ArrowRight, Heart, Brain, Activity } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -5,6 +6,11 @@ import { specialtyAuditData } from "../data/specialtyAuditData";
 
 export function SubmissionSuccessPage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const auth = sessionStorage.getItem("hospitalAuth");
+    if (!auth) { navigate("/hospital-login"); return; }
+  }, [navigate]);
 
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
   const hospitalName = authData.hospitalName || "Rumah Sakit";
