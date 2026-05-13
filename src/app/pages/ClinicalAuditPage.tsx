@@ -64,6 +64,13 @@ export function ClinicalAuditPage() {
   const hospitalName = authData.hospitalName || "Unknown Hospital";
   const hospitalCode = authData.hospitalCode || getHospitalCode(authData.email || "");
 
+  useEffect(() => {
+    const auth = sessionStorage.getItem("hospitalAuth");
+    if (!auth) { navigate("/hospital-login"); return; }
+  }, [navigate]);
+
+  if (!authData.hospitalName) return null;
+  
   // Load draft on mount
   useEffect(() => {
     if (!specialty) return;
