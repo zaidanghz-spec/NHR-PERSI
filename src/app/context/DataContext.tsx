@@ -414,7 +414,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [hospitalAccounts]);
 
   const loginHospital = useCallback(async (email: string, password: string): Promise<HospitalAccount | null> => {
-    const result = await apiLoginHospital(email, password);
+    const result = await apiLoginHospital(email.trim().toLowerCase(), password.trim());
 
     if (!result.success) {
       if (result.error === "pending_activation") throw new Error("pending_activation");
@@ -426,7 +426,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("hospitalToken", result.token);
     }
 
-    const account = result.account as HospitalAccount;
+    const account = normalizeAccount(result.account as HospitalAccount);
     setCurrentHospital(account);
     sessionStorage.setItem("persi_hospital_session", JSON.stringify(account));
 
@@ -438,6 +438,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       email: account.email,
       authenticated: true,
     }));
+
+    setHospitalAccounts(prev => {
+      const merged = mergeHospitalAccounts([account], prev);
+      safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(merged));
+      return merged;
+    });
 
     return account;
   }, []);
@@ -472,24 +478,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Admin Auth
-  const adminLogin = useCallback((email: string, password: string): boolean => {
-    const normalizeAdminId = (value: string = "") => value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    const adminEmail = String(import.meta.env.VITE_ADMIN_EMAIL || "");
-    const adminPassword = String(import.meta.env.VITE_ADMIN_PASSWORD || "");
-    const enteredEmail = email.trim();
-    const enteredPassword = password.trim();
-    
-    if (
-      adminEmail &&
-      adminPassword &&
-      normalizeAdminId(enteredEmail) === normalizeAdminId(adminEmail) &&
-      enteredPassword === adminPassword.trim()
-    ) {
-      setIsAdmin(true);
-      sessionStorage.setItem("persi_admin", "true");
-      return true;
   const adminLogin = useCallback(async (username: string, password: string): Promise<boolean> => {
-    const result = await apiLoginAdmin(username, password);
+    const result = await apiLoginAdmin(username.trim(), password.trim());
     if (!result.success) return false;
     if (result.token) {
       sessionStorage.setItem("auth_token", result.token);

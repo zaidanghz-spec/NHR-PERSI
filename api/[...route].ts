@@ -33,14 +33,16 @@ function getPath(req: any) {
   return (req.url || "").split("?")[0];
 }
 
+function getJwtSecret(): string {
+  return process.env.JWT_SECRET || process.env.VITE_JWT_SECRET || "nhr-persi-session-secret";
+}
+
 function verifyJwt(req: any): boolean {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) return false;
   const auth: string = req.headers?.authorization || req.headers?.Authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) return false;
   try {
-    const decoded = jwt.verify(token, secret) as any;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
     req.hospitalEmail = decoded?.email || null;
     return true;
   } catch {
