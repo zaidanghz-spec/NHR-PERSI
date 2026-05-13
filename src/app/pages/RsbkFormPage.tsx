@@ -14,6 +14,11 @@ export function RsbkFormPage() {
   const [formData, setFormData] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
+    const auth = sessionStorage.getItem("hospitalAuth");
+    if (!auth) { navigate("/hospital-login"); return; }
+  }, [navigate]);
+  
+  useEffect(() => {
     setFormData({});
     const draftId = draftManager.getCurrentDraftId();
     if (draftId && specialty) {
