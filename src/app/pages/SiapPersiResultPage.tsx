@@ -17,6 +17,12 @@ export function SiapPersiResultPage() {
   const { specialty } = useParams<{ specialty: string }>();
   const navigate = useNavigate();
   const { addSubmission } = useData();
+
+  useEffect(() => {
+    const auth = sessionStorage.getItem("hospitalAuth");
+    if (!auth) { navigate("/hospital-login"); return; }
+  }, [navigate]);
+  
   const specialtyInfo = specialtyAuditData[specialty as keyof typeof specialtyAuditData];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const draftId = draftManager.getCurrentDraftId();
