@@ -288,7 +288,9 @@ async function initTursoTables() {
       if (!existingColumns.includes("status")) await client.execute("ALTER TABLE submissions ADD COLUMN status TEXT DEFAULT 'Pending'");
       if (!existingColumns.includes("created_at")) await client.execute("ALTER TABLE submissions ADD COLUMN created_at TEXT DEFAULT ''");
       if (!existingColumns.includes("deleted_at")) await client.execute("ALTER TABLE submissions ADD COLUMN deleted_at DATETIME DEFAULT NULL");
-      if (!existingColumns.includes("updated_at")) await client.execute("ALTER TABLE submissions ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+      if (!existingColumns.includes("updated_at")) {
+        await client.execute("ALTER TABLE submissions ADD COLUMN updated_at TEXT DEFAULT ''");
+      }
     }
 
     if (table === "hospital_accounts") {
