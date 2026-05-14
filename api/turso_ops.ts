@@ -39,9 +39,29 @@ function normalizeAdminId(value: string = "") {
   return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function getConfiguredAdminUsername(): string {
+  return String(
+    process.env.VITE_ADMIN_EMAIL ||
+    process.env.ADMIN_EMAIL ||
+    process.env.VITE_ADMIN_USERNAME ||
+    process.env.ADMIN_USERNAME ||
+    process.env.VITE_EMAIL ||
+    ""
+  );
+}
+
+function getConfiguredAdminPassword(): string {
+  return String(
+    process.env.VITE_ADMIN_PASSWORD ||
+    process.env.ADMIN_PASSWORD ||
+    process.env.VITE_PASSWORD ||
+    ""
+  );
+}
+
 function isConfiguredAdminLogin(username: string, password: string): boolean {
-  const configuredUsername = String(process.env.VITE_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "");
-  const configuredPassword = String(process.env.VITE_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "");
+  const configuredUsername = getConfiguredAdminUsername();
+  const configuredPassword = getConfiguredAdminPassword();
   if (!configuredUsername || !configuredPassword) return false;
   return (
     normalizeAdminId(username) === normalizeAdminId(configuredUsername) &&
@@ -425,19 +445,18 @@ async function loginAdmin({ username, password }: any) {
   await initTursoTables();
   const normalizedUsername = String(username || "").trim();
   const normalizedPassword = String(password || "").trim();
+  if (isConfiguredAdminLogin(normalizedUsername, normalizedPassword)) {
+    const token = signToken({ username: getConfiguredAdminUsername() || normalizedUsername, role: "admin" });
+    return { success: true, token };
+  }
+
   const rs = await db().execute({
     sql: "SELECT id, username, password_hash, role FROM admins WHERE LOWER(username) = LOWER(?)",
     args: [normalizedUsername],
   });
 
   const row = rs.rows[0] as any;
-  if (!row) {
-    if (isConfiguredAdminLogin(normalizedUsername, normalizedPassword)) {
-      const token = signToken({ username: normalizedUsername, role: "admin" });
-      return { success: true, token };
-    }
-    return { success: false, error: "invalid_credentials" };
-  }
+  if (!row) return { success: false, error: "invalid_credentials" };
 
   const match = await bcrypt.compare(normalizedPassword, row.password_hash);
   if (!match) return { success: false, error: "invalid_credentials" };
