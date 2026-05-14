@@ -127,15 +127,15 @@ const mergeHospitalAccounts = (primary: HospitalAccount[] = [], secondary: Hospi
 interface DataContextType {
   // News
   news: NewsItem[];
-  addNews: (item: Omit<NewsItem, "id">) => void;
-  updateNews: (id: string, item: Partial<NewsItem>) => void;
-  deleteNews: (id: string) => void;
+  addNews: (item: Omit<NewsItem, "id">) => Promise<void>;
+  updateNews: (id: string, item: Partial<NewsItem>) => Promise<void>;
+  deleteNews: (id: string) => Promise<void>;
 
   // Events
   events: EventItem[];
-  addEvent: (item: Omit<EventItem, "id">) => void;
-  updateEvent: (id: string, item: Partial<EventItem>) => void;
-  deleteEvent: (id: string) => void;
+  addEvent: (item: Omit<EventItem, "id">) => Promise<void>;
+  updateEvent: (id: string, item: Partial<EventItem>) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
 
   // Hospital Accounts
   hospitalAccounts: HospitalAccount[];
@@ -170,8 +170,8 @@ import { safeLocalStorageSet, loadFromStorage } from "../utils/storage";
 const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [news, setNews] = useState<NewsItem[]>(() => loadFromStorage("persi_news", []));
-  const [events, setEvents] = useState<EventItem[]>(() => loadFromStorage("persi_events", []));
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>(() =>
     mergeHospitalAccounts(loadFromStorage("persi_hospital_accounts", []), [])
   );
@@ -235,15 +235,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     async function syncNewsAndEvents() {
       try {
+        localStorage.removeItem("persi_news");
+        localStorage.removeItem("persi_events");
         const dbNews = await getAllNews();
         if (dbNews !== null) {
           setNews(dbNews);
-          safeLocalStorageSet("persi_news", JSON.stringify(dbNews));
         }
         const dbEvents = await getAllEvents();
         if (dbEvents !== null) {
           setEvents(dbEvents);
-          safeLocalStorageSet("persi_events", JSON.stringify(dbEvents));
         }
       } catch (err) {
         console.error("Failed to sync news/events:", err);
@@ -288,6 +288,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setHospitalAccounts(prev => mergeHospitalAccounts(dbAccs, prev));
       }
       if (dbRankings !== null) setApprovedRankings(dbRankings);
+      localStorage.removeItem("persi_news");
+      localStorage.removeItem("persi_events");
       if (dbNews !== null) setNews(dbNews);
       if (dbEvents !== null) setEvents(dbEvents);
 
@@ -302,78 +304,61 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [syncWithCloud]);
 
-  // Persist to localStorage
-  useEffect(() => { safeLocalStorageSet("persi_news", JSON.stringify(news)); }, [news]);
-  useEffect(() => { safeLocalStorageSet("persi_events", JSON.stringify(events)); }, [events]);
+  // Persist operational data to localStorage. News/events intentionally stay Turso-only,
+  // so stale content from another device/browser cannot appear when Turso is empty.
   useEffect(() => { safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(hospitalAccounts)); }, [hospitalAccounts]);
   useEffect(() => { safeLocalStorageSet("persi_rankings", JSON.stringify(approvedRankings)); }, [approvedRankings]);
   useEffect(() => { safeLocalStorageSet("persi_submissions", JSON.stringify(submissions)); }, [submissions]);
 
   // News
-  const addNews = useCallback((item: Omit<NewsItem, "id">) => {
+  const refreshNews = useCallback(async () => {
+    const dbNews = await getAllNews();
+    setNews(dbNews || []);
+    localStorage.removeItem("persi_news");
+  }, []);
+
+  const refreshEvents = useCallback(async () => {
+    const dbEvents = await getAllEvents();
+    setEvents(dbEvents || []);
+    localStorage.removeItem("persi_events");
+  }, []);
+
+  const addNews = useCallback(async (item: Omit<NewsItem, "id">) => {
     const newItem = { ...item, id: `news-${Date.now()}` };
-    setNews((prev) => {
-      const updated = [newItem, ...prev];
-      safeLocalStorageSet("persi_news", JSON.stringify(updated));
-      return updated;
-    });
-    addNewsToDb(newItem).catch(console.error);
-  }, []);
+    await addNewsToDb(newItem);
+    await refreshNews();
+  }, [refreshNews]);
 
-  const updateNews = useCallback((id: string, item: Partial<NewsItem>) => {
-    setNews(prev => {
-      return prev.map(n => {
-        if (n.id === id) {
-          const updated = { ...n, ...item };
-          updateNewsInDb(id, updated).catch(console.error);
-          return updated;
-        }
-        return n;
-      });
-    });
-  }, []);
+  const updateNews = useCallback(async (id: string, item: Partial<NewsItem>) => {
+    const current = news.find(n => n.id === id);
+    if (!current) return;
+    await updateNewsInDb(id, { ...current, ...item });
+    await refreshNews();
+  }, [news, refreshNews]);
 
-  const deleteNews = useCallback((id: string) => {
-    setNews((prev) => {
-      const updated = prev.filter((n) => n.id !== id);
-      safeLocalStorageSet("persi_news", JSON.stringify(updated));
-      return updated;
-    });
-    deleteNewsFromDb(id).catch(console.error);
-  }, []);
+  const deleteNews = useCallback(async (id: string) => {
+    await deleteNewsFromDb(id);
+    await refreshNews();
+  }, [refreshNews]);
 
   // Events
-  const addEvent = useCallback((item: Omit<EventItem, "id">) => {
+  const addEvent = useCallback(async (item: Omit<EventItem, "id">) => {
     const newItem = { ...item, id: `event-${Date.now()}` };
-    setEvents((prev) => {
-      const updated = [newItem, ...prev];
-      safeLocalStorageSet("persi_events", JSON.stringify(updated));
-      return updated;
-    });
-    addEventToDb(newItem).catch(console.error);
-  }, []);
+    await addEventToDb(newItem);
+    await refreshEvents();
+  }, [refreshEvents]);
 
-  const updateEvent = useCallback((id: string, item: Partial<EventItem>) => {
-    setEvents(prev => {
-      return prev.map(e => {
-        if (e.id === id) {
-          const updated = { ...e, ...item };
-          updateEventInDb(id, updated).catch(console.error);
-          return updated;
-        }
-        return e;
-      });
-    });
-  }, []);
+  const updateEvent = useCallback(async (id: string, item: Partial<EventItem>) => {
+    const current = events.find(e => e.id === id);
+    if (!current) return;
+    await updateEventInDb(id, { ...current, ...item });
+    await refreshEvents();
+  }, [events, refreshEvents]);
 
-  const deleteEvent = useCallback((id: string) => {
-    setEvents((prev) => {
-      const updated = prev.filter((e) => e.id !== id);
-      safeLocalStorageSet("persi_events", JSON.stringify(updated));
-      return updated;
-    });
-    deleteEventFromDb(id).catch(console.error);
-  }, []);
+  const deleteEvent = useCallback(async (id: string) => {
+    await deleteEventFromDb(id);
+    await refreshEvents();
+  }, [refreshEvents]);
 
   // Hospital Registration
   const registerHospitalFull = useCallback(async (

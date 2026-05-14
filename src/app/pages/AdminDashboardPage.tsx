@@ -476,10 +476,11 @@ function NewsTab({
     publishedAt: string;
     author: string;
   }>;
-  onAdd: (item: any) => void;
-  onDelete: (id: string) => void;
+  onAdd: (item: any) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "",
     excerpt: "",
@@ -491,25 +492,33 @@ function NewsTab({
     featured: false,
   });
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd({
-      ...form,
-      imageUrl:
-        form.imageUrl ||
-        "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Crect x='340' y='240' width='120' height='120' rx='24' fill='%231E3A8A'/%3E%3Csvg x='364' y='264' width='72' height='72' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z'/%3E%3Cpath d='M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2'/%3E%3Cpath d='M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 10h4'/%3E%3Cpath d='M10 14h4'/%3E%3Cpath d='M10 18h4'/%3E%3C/svg%3E%3C/svg%3E",
-    });
-    setForm({
-      title: "",
-      excerpt: "",
-      content: "",
-      category: "berita",
-      imageUrl: "",
-      author: "Tim Redaksi PERSI",
-      publishedAt: new Date().toISOString().split("T")[0],
-      featured: false,
-    });
-    setShowForm(false);
+    setSaving(true);
+    try {
+      await onAdd({
+        ...form,
+        imageUrl:
+          form.imageUrl ||
+          "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Crect x='340' y='240' width='120' height='120' rx='24' fill='%231E3A8A'/%3E%3Csvg x='364' y='264' width='72' height='72' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z'/%3E%3Cpath d='M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2'/%3E%3Cpath d='M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 10h4'/%3E%3Cpath d='M10 14h4'/%3E%3Cpath d='M10 18h4'/%3E%3C/svg%3E%3C/svg%3E",
+      });
+      setForm({
+        title: "",
+        excerpt: "",
+        content: "",
+        category: "berita",
+        imageUrl: "",
+        author: "Tim Redaksi PERSI",
+        publishedAt: new Date().toISOString().split("T")[0],
+        featured: false,
+      });
+      setShowForm(false);
+    } catch (err) {
+      console.error("Failed to save news:", err);
+      alert("Berita gagal disimpan ke Turso.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -631,9 +640,10 @@ function NewsTab({
           <div className="flex gap-3">
             <Button
               type="submit"
+              disabled={saving}
               className="bg-[#0D9488] hover:bg-[#0b7f75] font-[600]"
             >
-              Simpan Berita
+              {saving ? "Menyimpan..." : "Simpan Berita"}
             </Button>
             <Button
               type="button"
@@ -697,7 +707,7 @@ function NewsTab({
                 </td>
                 <td className="px-5 py-3 text-right">
                   <button
-                    onClick={() => onDelete(item.id)}
+                    onClick={() => onDelete(item.id).catch(() => alert("Berita gagal dihapus dari Turso."))}
                     className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -725,10 +735,11 @@ function EventsTab({
     date: string;
     location: string;
   }>;
-  onAdd: (item: any) => void;
-  onDelete: (id: string) => void;
+  onAdd: (item: any) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -762,27 +773,35 @@ function EventsTab({
     });
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd({
-      ...form,
-      imageUrl:
-        form.imageUrl ||
-        "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Crect x='340' y='240' width='120' height='120' rx='24' fill='%231E3A8A'/%3E%3Csvg x='364' y='264' width='72' height='72' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z'/%3E%3Cpath d='M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2'/%3E%3Cpath d='M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 10h4'/%3E%3Cpath d='M10 14h4'/%3E%3Cpath d='M10 18h4'/%3E%3C/svg%3E%3C/svg%3E",
-    });
-    setForm({
-      title: "",
-      description: "",
-      date: "",
-      endDate: "",
-      location: "",
-      type: "seminar",
-      imageUrl: "",
-      registrationUrl: "#",
-      links: [],
-      featured: false,
-    });
-    setShowForm(false);
+    setSaving(true);
+    try {
+      await onAdd({
+        ...form,
+        imageUrl:
+          form.imageUrl ||
+          "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='100%25' height='100%25' fill='%23f8fafc'/%3E%3Crect x='340' y='240' width='120' height='120' rx='24' fill='%231E3A8A'/%3E%3Csvg x='364' y='264' width='72' height='72' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z'/%3E%3Cpath d='M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2'/%3E%3Cpath d='M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M10 6h4'/%3E%3Cpath d='M10 10h4'/%3E%3Cpath d='M10 14h4'/%3E%3Cpath d='M10 18h4'/%3E%3C/svg%3E%3C/svg%3E",
+      });
+      setForm({
+        title: "",
+        description: "",
+        date: "",
+        endDate: "",
+        location: "",
+        type: "seminar",
+        imageUrl: "",
+        registrationUrl: "#",
+        links: [],
+        featured: false,
+      });
+      setShowForm(false);
+    } catch (err) {
+      console.error("Failed to save event:", err);
+      alert("Event gagal disimpan ke Turso.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -944,9 +963,10 @@ function EventsTab({
           <div className="flex gap-3">
             <Button
               type="submit"
+              disabled={saving}
               className="bg-[#0D9488] hover:bg-[#0b7f75] font-[600]"
             >
-              Simpan Event
+              {saving ? "Menyimpan..." : "Simpan Event"}
             </Button>
             <Button
               type="button"
@@ -1010,7 +1030,7 @@ function EventsTab({
                 </td>
                 <td className="px-5 py-3 text-right">
                   <button
-                    onClick={() => onDelete(item.id)}
+                    onClick={() => onDelete(item.id).catch(() => alert("Event gagal dihapus dari Turso."))}
                     className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
