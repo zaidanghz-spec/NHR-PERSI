@@ -18,6 +18,7 @@ import {
   XCircle,
   RefreshCw,
   AlertCircle,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -272,11 +273,12 @@ function AccountsTab({
 }: {
   accounts: Array<HospitalAccount>;
 }) {
-  const { activateHospital, rejectHospital } = useData();
+  const { activateHospital, rejectHospital, resetHospitalPassword } = useData();
   const [viewPdfUrl, setViewPdfUrl] = useState<string | null>(null);
   const [viewPdfName, setViewPdfName] = useState("");
   const [pdfLoadingEmail, setPdfLoadingEmail] = useState("");
   const [pdfError, setPdfError] = useState("");
+  const [resettingEmail, setResettingEmail] = useState("");
 
   const pendingCount = accounts.filter(a => a.status === "pending_activation").length;
   const activatedCount = accounts.filter(a => a.status === "activated").length;
@@ -303,6 +305,26 @@ function AccountsTab({
     }
 
     setPdfError(`Surat tugas untuk ${acc.hospitalName} belum tersimpan di server atau gagal diambil.`);
+  };
+
+  const handleResetPassword = async (acc: HospitalAccount) => {
+    const newPassword = window.prompt(`Masukkan password baru untuk ${acc.hospitalName}`);
+    if (!newPassword) return;
+    if (newPassword.trim().length < 6) {
+      alert("Password minimal 6 karakter.");
+      return;
+    }
+
+    setResettingEmail(acc.email);
+    try {
+      await resetHospitalPassword(acc.email, newPassword.trim());
+      alert(`Password ${acc.hospitalName} berhasil direset.`);
+    } catch (err) {
+      console.error("Failed to reset hospital password:", err);
+      alert("Reset password gagal. Pastikan Anda login sebagai admin.");
+    } finally {
+      setResettingEmail("");
+    }
   };
 
   return (
@@ -401,6 +423,19 @@ function AccountsTab({
                           </button>
                         </>
                       )}
+                      <button
+                        onClick={() => handleResetPassword(acc)}
+                        disabled={resettingEmail === acc.email}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#1E3A8A] text-white text-xs font-[600] rounded-lg hover:bg-[#1a3278] transition-colors disabled:opacity-60"
+                        title="Reset Password"
+                      >
+                        {resettingEmail === acc.email ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <KeyRound className="w-3.5 h-3.5" />
+                        )}
+                        Reset Password
+                      </button>
                       {acc.status === "activated" && (
                         <span className="text-xs text-green-600 font-[600]">Sudah aktif</span>
                       )}

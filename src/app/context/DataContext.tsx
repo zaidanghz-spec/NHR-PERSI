@@ -7,6 +7,7 @@ import {
   getAllHospitalAccounts,
   addHospitalAccount as addAccountToDb,
   updateAccountStatus as updateAccountStatusInDb,
+  resetHospitalPassword as resetHospitalPasswordInDb,
   publishRankingToDb,
   unpublishRankingFromDb,
   getAllRankingsFromDb,
@@ -143,6 +144,7 @@ interface DataContextType {
   loginHospital: (email: string, password: string) => Promise<HospitalAccount | null>;
   activateHospital: (email: string) => void;
   rejectHospital: (email: string) => void;
+  resetHospitalPassword: (email: string, password: string) => Promise<void>;
 
   // Admin Auth
   isAdmin: boolean;
@@ -455,6 +457,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateAccountStatusInDb(email, "rejected").catch(err => console.error("Cloud rejection failed:", err));
   }, []);
 
+  const resetHospitalPassword = useCallback(async (email: string, password: string) => {
+    await resetHospitalPasswordInDb(email, password);
+  }, []);
+
   const hospitalLogout = useCallback(() => {
     setCurrentHospital(null);
     localStorage.removeItem("hospitalToken");
@@ -568,7 +574,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider value={{
       news, addNews, updateNews, deleteNews,
       events, addEvent, updateEvent, deleteEvent,
-      hospitalAccounts, registerHospitalFull, loginHospital, activateHospital, rejectHospital,
+      hospitalAccounts, registerHospitalFull, loginHospital, activateHospital, rejectHospital, resetHospitalPassword,
       isAdmin, adminLogin, adminLogout,
       currentHospital, hospitalLogout,
       approvedRankings, publishRanking, unpublishRanking,

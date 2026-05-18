@@ -4,7 +4,7 @@ export const PREFIX = "/api";
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("hospitalToken") || sessionStorage.getItem("auth_token");
+  const token = sessionStorage.getItem("auth_token") || localStorage.getItem("hospitalToken");
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -94,6 +94,10 @@ export async function getHospitalSuratTugas(email: string): Promise<string | nul
 
 export async function updateAccountStatus(email: string, status: string): Promise<void> {
   await rpc("updateAccountStatus", { email, status });
+}
+
+export async function resetHospitalPassword(email: string, password: string): Promise<void> {
+  await rpc("resetHospitalPassword", { email, password });
 }
 
 export async function addSubmission(submission: any): Promise<void> {

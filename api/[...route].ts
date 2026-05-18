@@ -44,6 +44,7 @@ function verifyJwt(req: any): boolean {
   try {
     const decoded = jwt.verify(token, getJwtSecret()) as any;
     req.hospitalEmail = decoded?.email || null;
+    req.authRole = decoded?.role || null;
     return true;
   } catch {
     return false;
@@ -78,6 +79,7 @@ export default async function handler(req: any, res: any) {
       const { handleTursoOperation } = await import("./turso_ops.js");
       const body: Record<string, any> = { ...parseBody(req.body) };
       if (req.hospitalEmail) body._hospitalEmail = req.hospitalEmail;
+      if (req.authRole) body._authRole = req.authRole;
       const result = await handleTursoOperation(operation, body);
       sendJson(res, 200, { result: result ?? null });
     } catch (err: any) {

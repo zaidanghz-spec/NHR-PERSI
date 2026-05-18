@@ -499,6 +499,37 @@ async function updateAccountStatus({ email, status }: any) {
   });
 }
 
+async function resetHospitalPassword({ email, password, _authRole }: any) {
+  if (_authRole !== "admin") {
+    const err: any = new Error("Admin authorization required");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedPassword = String(password || "").trim();
+  if (!normalizedEmail || normalizedPassword.length < 6) {
+    const err: any = new Error("Email and password with at least 6 characters are required");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  await initTursoTables();
+  const passwordHash = await bcrypt.hash(normalizedPassword, 10);
+  const result = await db().execute({
+    sql: "UPDATE hospital_accounts SET password_hash = ?, password = '' WHERE LOWER(email) = LOWER(?)",
+    args: [passwordHash, normalizedEmail],
+  });
+
+  if (!result.rowsAffected) {
+    const err: any = new Error("Hospital account not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return { success: true };
+}
+
 async function addSubmission({ submission, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
@@ -1042,6 +1073,7 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   getAllHospitalAccounts,
   getHospitalSuratTugas,
   updateAccountStatus,
+  resetHospitalPassword,
   addSubmission,
   getAllSubmissions,
   softDeleteSubmission,
