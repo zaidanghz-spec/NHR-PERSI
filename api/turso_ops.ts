@@ -250,13 +250,25 @@ async function initTursoTables() {
   // Migrate news table columns (added after initial schema)
   const newsInfo = await client.execute("PRAGMA table_info(news)");
   const newsCols = newsInfo.rows.map((r: any) => r.name);
+  if (!newsCols.includes("excerpt")) await client.execute("ALTER TABLE news ADD COLUMN excerpt TEXT");
+  if (!newsCols.includes("content")) await client.execute("ALTER TABLE news ADD COLUMN content TEXT");
+  if (!newsCols.includes("category")) await client.execute("ALTER TABLE news ADD COLUMN category TEXT");
+  if (!newsCols.includes("image_url")) await client.execute("ALTER TABLE news ADD COLUMN image_url TEXT");
   if (!newsCols.includes("published_at")) await client.execute("ALTER TABLE news ADD COLUMN published_at TEXT");
   if (!newsCols.includes("author")) await client.execute("ALTER TABLE news ADD COLUMN author TEXT");
   if (!newsCols.includes("featured")) await client.execute("ALTER TABLE news ADD COLUMN featured BOOLEAN");
 
   const eventsInfo = await client.execute("PRAGMA table_info(events)");
   const eventsCols = eventsInfo.rows.map((r: any) => r.name);
+  if (!eventsCols.includes("description")) await client.execute("ALTER TABLE events ADD COLUMN description TEXT");
+  if (!eventsCols.includes("date")) await client.execute("ALTER TABLE events ADD COLUMN date TEXT");
+  if (!eventsCols.includes("end_date")) await client.execute("ALTER TABLE events ADD COLUMN end_date TEXT");
+  if (!eventsCols.includes("location")) await client.execute("ALTER TABLE events ADD COLUMN location TEXT");
+  if (!eventsCols.includes("type")) await client.execute("ALTER TABLE events ADD COLUMN type TEXT");
+  if (!eventsCols.includes("image_url")) await client.execute("ALTER TABLE events ADD COLUMN image_url TEXT");
+  if (!eventsCols.includes("registration_url")) await client.execute("ALTER TABLE events ADD COLUMN registration_url TEXT");
   if (!eventsCols.includes("links")) await client.execute("ALTER TABLE events ADD COLUMN links TEXT DEFAULT '[]'");
+  if (!eventsCols.includes("featured")) await client.execute("ALTER TABLE events ADD COLUMN featured BOOLEAN");
   for (const table of tablesToMigrate) {
     const info = await client.execute(`PRAGMA table_info(${table})`);
     const existingColumns = info.rows.map((r: any) => r.name);
@@ -716,7 +728,7 @@ async function getAllRankingsFromDb() {
 async function addNewsToDb({ news }: any) {
   await initTursoTables();
   await db().execute({
-    sql: `INSERT INTO news (id, title, excerpt, content, category, image_url, author, published_at, featured)
+    sql: `INSERT OR REPLACE INTO news (id, title, excerpt, content, category, image_url, author, published_at, featured)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [news.id, news.title, news.excerpt, news.content, news.category, news.imageUrl, news.author, news.publishedAt, news.featured ? 1 : 0],
   });
