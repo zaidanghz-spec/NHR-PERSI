@@ -4,6 +4,15 @@ import { useData } from "../context/DataContext";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { useState } from "react";
 
+function renderInlineFormatting(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={idx} className="font-[700] text-gray-900">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
 export function NewsPage() {
   const { news } = useData();
   const [activeCategory, setActiveCategory] = useState<string>("semua");
@@ -171,7 +180,7 @@ export function NewsDetailPage() {
         </div>
         <div className="prose max-w-none text-gray-700 leading-relaxed">
           {article.content.split("\n\n").map((paragraph, idx) => (
-            <p key={idx} className="mb-4">{paragraph}</p>
+            <p key={idx} className="mb-4">{renderInlineFormatting(paragraph)}</p>
           ))}
         </div>
       </div>
