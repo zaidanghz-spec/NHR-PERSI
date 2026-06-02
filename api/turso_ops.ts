@@ -1,13 +1,38 @@
 import { createClient } from "@libsql/client";
 import bcrypt from "bcryptjs";
+import fs from "node:fs";
+import path from "node:path";
 import jwt from "jsonwebtoken";
 
 let tablesInitialized = false;
 
+function getDatabaseUrl() {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.LIBSQL_URL ||
+    process.env.TURSO_DATABASE_URL ||
+    "file:./data/nhr-persi.db"
+  );
+}
+
+function isFileDatabaseUrl(url: string) {
+  return url.startsWith("file:");
+}
+
+function ensureFileDatabaseDirectory(url: string) {
+  if (!isFileDatabaseUrl(url)) return;
+  const rawPath = url.slice("file:".length);
+  if (!rawPath || rawPath === ":memory:") return;
+  const databasePath = rawPath.startsWith("//") ? new URL(url).pathname : rawPath;
+  fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+}
+
 function db() {
-  const url = process.env.TURSO_DATABASE_URL || "";
-  const authToken = process.env.TURSO_AUTH_TOKEN || "";
-  if (!url) throw new Error("TURSO_DATABASE_URL is not configured");
+  const url = getDatabaseUrl();
+  const authToken = process.env.LIBSQL_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || "";
+  if (!url) throw new Error("DATABASE_URL is not configured");
+  ensureFileDatabaseDirectory(url);
+  if (isFileDatabaseUrl(url) || !authToken) return createClient({ url });
   return createClient({ url, authToken });
 }
 

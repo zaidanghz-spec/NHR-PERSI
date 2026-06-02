@@ -37,6 +37,17 @@ function getJwtSecret(): string {
   return process.env.JWT_SECRET || process.env.VITE_JWT_SECRET || "nhr-persi-session-secret";
 }
 
+function getDatabaseUrl() {
+  return process.env.DATABASE_URL || process.env.LIBSQL_URL || process.env.TURSO_DATABASE_URL || "";
+}
+
+function getDatabaseMode(url: string) {
+  if (!url) return "not-configured";
+  if (url.startsWith("file:")) return "sqlite-file";
+  if (url.startsWith("libsql:")) return "libsql-remote";
+  return "custom";
+}
+
 function verifyJwt(req: any): boolean {
   const auth: string = req.headers?.authorization || req.headers?.Authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
@@ -57,8 +68,11 @@ export default async function handler(req: any, res: any) {
   const path = getPath(req);
 
   if (req.method === "GET" && path === "/api/health") {
+    const databaseUrl = getDatabaseUrl();
     sendJson(res, 200, {
       status: "ok",
+      databaseConfigured: Boolean(databaseUrl),
+      databaseMode: getDatabaseMode(databaseUrl),
       tursoDatabaseUrlConfigured: Boolean(process.env.TURSO_DATABASE_URL),
       tursoAuthTokenConfigured: Boolean(process.env.TURSO_AUTH_TOKEN),
       jwtSecretConfigured: Boolean(process.env.JWT_SECRET),
