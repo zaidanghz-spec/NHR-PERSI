@@ -556,13 +556,7 @@ async function deleteHospitalAccount({ email, _authRole }: any) {
     args: [normalizedEmail],
   });
 
-  if (!result.rowsAffected) {
-    const err: any = new Error("Hospital account not found");
-    err.statusCode = 404;
-    throw err;
-  }
-
-  return { success: true };
+  return { success: true, deleted: Number(result.rowsAffected || 0) > 0 };
 }
 
 async function resetHospitalPassword({ email, password, _authRole }: any) {

@@ -460,7 +460,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteHospitalAccount = useCallback(async (email: string) => {
-    await deleteHospitalAccountInDb(email);
+    try {
+      await deleteHospitalAccountInDb(email);
+    } catch (err: any) {
+      if (err?.statusCode === 401 || /\(401\)/.test(err?.message || "")) throw err;
+      console.warn("Cloud account delete skipped; removing local account only:", err);
+    }
     setHospitalAccounts(prev => {
       const updated = prev.filter(a => a.email.toLowerCase() !== email.toLowerCase());
       safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updated));
