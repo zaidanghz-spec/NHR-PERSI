@@ -7,6 +7,7 @@ import {
   getAllHospitalAccounts,
   addHospitalAccount as addAccountToDb,
   updateAccountStatus as updateAccountStatusInDb,
+  deleteHospitalAccount as deleteHospitalAccountInDb,
   resetHospitalPassword as resetHospitalPasswordInDb,
   publishRankingToDb,
   unpublishRankingFromDb,
@@ -144,6 +145,7 @@ interface DataContextType {
   loginHospital: (email: string, password: string) => Promise<HospitalAccount | null>;
   activateHospital: (email: string) => void;
   rejectHospital: (email: string) => void;
+  deleteHospitalAccount: (email: string) => Promise<void>;
   resetHospitalPassword: (email: string, password: string) => Promise<void>;
 
   // Admin Auth
@@ -457,6 +459,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateAccountStatusInDb(email, "rejected").catch(err => console.error("Cloud rejection failed:", err));
   }, []);
 
+  const deleteHospitalAccount = useCallback(async (email: string) => {
+    await deleteHospitalAccountInDb(email);
+    setHospitalAccounts(prev => {
+      const updated = prev.filter(a => a.email.toLowerCase() !== email.toLowerCase());
+      safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updated));
+      return updated;
+    });
+    setCurrentHospital(prev => (
+      prev?.email?.toLowerCase() === email.toLowerCase() ? null : prev
+    ));
+  }, []);
+
   const resetHospitalPassword = useCallback(async (email: string, password: string) => {
     await resetHospitalPasswordInDb(email, password);
   }, []);
@@ -574,7 +588,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider value={{
       news, addNews, updateNews, deleteNews,
       events, addEvent, updateEvent, deleteEvent,
-      hospitalAccounts, registerHospitalFull, loginHospital, activateHospital, rejectHospital, resetHospitalPassword,
+      hospitalAccounts, registerHospitalFull, loginHospital, activateHospital, rejectHospital, deleteHospitalAccount, resetHospitalPassword,
       isAdmin, adminLogin, adminLogout,
       currentHospital, hospitalLogout,
       approvedRankings, publishRanking, unpublishRanking,

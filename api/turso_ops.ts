@@ -536,6 +536,35 @@ async function updateAccountStatus({ email, status }: any) {
   });
 }
 
+async function deleteHospitalAccount({ email, _authRole }: any) {
+  if (_authRole !== "admin") {
+    const err: any = new Error("Admin authorization required");
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    const err: any = new Error("Hospital account email is required");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  await initTursoTables();
+  const result = await db().execute({
+    sql: "DELETE FROM hospital_accounts WHERE LOWER(email) = LOWER(?)",
+    args: [normalizedEmail],
+  });
+
+  if (!result.rowsAffected) {
+    const err: any = new Error("Hospital account not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return { success: true };
+}
+
 async function resetHospitalPassword({ email, password, _authRole }: any) {
   if (_authRole !== "admin") {
     const err: any = new Error("Admin authorization required");
@@ -1110,6 +1139,7 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   getAllHospitalAccounts,
   getHospitalSuratTugas,
   updateAccountStatus,
+  deleteHospitalAccount,
   resetHospitalPassword,
   addSubmission,
   getAllSubmissions,

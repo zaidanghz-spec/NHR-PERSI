@@ -96,6 +96,10 @@ export async function updateAccountStatus(email: string, status: string): Promis
   await rpc("updateAccountStatus", { email, status });
 }
 
+export async function deleteHospitalAccount(email: string): Promise<void> {
+  await rpc("deleteHospitalAccount", { email });
+}
+
 export async function resetHospitalPassword(email: string, password: string): Promise<void> {
   await rpc("resetHospitalPassword", { email, password });
 }

@@ -273,12 +273,13 @@ function AccountsTab({
 }: {
   accounts: Array<HospitalAccount>;
 }) {
-  const { activateHospital, rejectHospital, resetHospitalPassword } = useData();
+  const { activateHospital, rejectHospital, deleteHospitalAccount, resetHospitalPassword } = useData();
   const [viewPdfUrl, setViewPdfUrl] = useState<string | null>(null);
   const [viewPdfName, setViewPdfName] = useState("");
   const [pdfLoadingEmail, setPdfLoadingEmail] = useState("");
   const [pdfError, setPdfError] = useState("");
   const [resettingEmail, setResettingEmail] = useState("");
+  const [deletingEmail, setDeletingEmail] = useState("");
 
   const pendingCount = accounts.filter(a => a.status === "pending_activation").length;
   const activatedCount = accounts.filter(a => a.status === "activated").length;
@@ -324,6 +325,24 @@ function AccountsTab({
       alert("Reset password gagal. Pastikan Anda login sebagai admin.");
     } finally {
       setResettingEmail("");
+    }
+  };
+
+  const handleDeleteAccount = async (acc: HospitalAccount) => {
+    const ok = window.confirm(
+      `Hapus akun ${acc.hospitalName}?\n\nAkun RS tidak akan bisa login lagi. Data submission/ranking yang sudah ada tidak ikut dihapus.`
+    );
+    if (!ok) return;
+
+    setDeletingEmail(acc.email);
+    try {
+      await deleteHospitalAccount(acc.email);
+      alert(`Akun ${acc.hospitalName} berhasil dihapus.`);
+    } catch (err) {
+      console.error("Failed to delete hospital account:", err);
+      alert("Hapus akun gagal. Pastikan Anda login sebagai admin.");
+    } finally {
+      setDeletingEmail("");
     }
   };
 
@@ -425,7 +444,7 @@ function AccountsTab({
                       )}
                       <button
                         onClick={() => handleResetPassword(acc)}
-                        disabled={resettingEmail === acc.email}
+                        disabled={resettingEmail === acc.email || deletingEmail === acc.email}
                         className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#1E3A8A] text-white text-xs font-[600] rounded-lg hover:bg-[#1a3278] transition-colors disabled:opacity-60"
                         title="Reset Password"
                       >
@@ -435,6 +454,19 @@ function AccountsTab({
                           <KeyRound className="w-3.5 h-3.5" />
                         )}
                         Reset Password
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAccount(acc)}
+                        disabled={deletingEmail === acc.email || resettingEmail === acc.email}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-[600] rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60"
+                        title="Hapus Akun"
+                      >
+                        {deletingEmail === acc.email ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                        Hapus
                       </button>
                       {acc.status === "activated" && (
                         <span className="text-xs text-green-600 font-[600]">Sudah aktif</span>
