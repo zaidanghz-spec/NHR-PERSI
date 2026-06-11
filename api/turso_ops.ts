@@ -46,6 +46,18 @@ function parseJson(value: unknown, fallback: any) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
+function normalizePatientCodeKey(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/\d+/g, (digits) => String(Number(digits)));
+}
+
+function normalizePatientNameKey(value: unknown) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 function getJwtSecret(): string {
   return process.env.JWT_SECRET || process.env.VITE_JWT_SECRET || "nhr-persi-session-secret";
 }
@@ -962,6 +974,39 @@ async function reconcileSurveySpecialties(client: any, hospitalCode: string) {
             )`,
     args: [hospitalCode, hospitalCode],
   });
+
+  const [patientsRs, surveysRs] = await Promise.all([
+    client.execute({
+      sql: "SELECT hospital_code, specialty, name, rm FROM patients WHERE hospital_code = ?",
+      args: [hospitalCode],
+    }),
+    client.execute({
+      sql: "SELECT id, hospital_code, specialty, patient_name, patient_rm FROM surveys WHERE hospital_code = ?",
+      args: [hospitalCode],
+    }),
+  ]);
+  const patients = patientsRs.rows.map((row: any) => ({
+    specialty: String(row.specialty || ""),
+    nameKey: normalizePatientNameKey(row.name),
+    rmKey: normalizePatientCodeKey(row.rm),
+  }));
+
+  for (const survey of surveysRs.rows as any[]) {
+    const surveyRmKey = normalizePatientCodeKey(survey.patient_rm);
+    if (!surveyRmKey) continue;
+    const surveyNameKey = normalizePatientNameKey(survey.patient_name);
+    const sameCode = patients.filter((patient: any) => patient.rmKey === surveyRmKey);
+    const sameCodeAndName = sameCode.filter((patient: any) => patient.nameKey && patient.nameKey === surveyNameKey);
+    const candidates = sameCodeAndName.length > 0 ? sameCodeAndName : sameCode;
+    const uniqueSpecialties = Array.from(new Set(candidates.map((patient: any) => patient.specialty).filter(Boolean)));
+
+    if (uniqueSpecialties.length === 1 && uniqueSpecialties[0] !== survey.specialty) {
+      await client.execute({
+        sql: "UPDATE surveys SET specialty = ? WHERE id = ?",
+        args: [uniqueSpecialties[0], survey.id],
+      });
+    }
+  }
 }
 
 async function getSurveys({ hospitalCode, specialty }: any) {

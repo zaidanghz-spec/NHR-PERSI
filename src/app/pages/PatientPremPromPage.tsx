@@ -41,6 +41,15 @@ const defaultPromQuestions = [
   { id: "prom-4", question: "Kepuasan terhadap hasil pengobatan" },
 ];
 
+const normalizePatientCodeKey = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/\d+/g, (digits) => String(Number(digits)));
+
+const normalizePatientNameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+
 // LocalStorage key for patient survey responses
 export function getPatientSurveyKey(hospitalCode: string, specialty: string) {
   return `patient-surveys-${hospitalCode}-${specialty}`;
@@ -98,7 +107,6 @@ export function PatientPremPromPage() {
       setEffectiveDiseaseIndex(requestedDiseaseIndex);
       if (!hospitalCode || !selectedSpecialty || !qRm || !specData?.diseases?.length) return;
 
-      const normalize = (value: string) => value.trim().toLowerCase();
       try {
         const diseasePatientLists = await Promise.all(
           specData.diseases.map(async (_disease, index) => {
@@ -110,8 +118,10 @@ export function PatientPremPromPage() {
 
         const candidates = diseasePatientLists
           .flat()
-          .filter((patient: any) => normalize(String(patient.rm || "")) === normalize(qRm));
-        const nameMatched = candidates.find((patient: any) => normalize(String(patient.name || "")) === normalize(qName));
+          .filter((patient: any) => normalizePatientCodeKey(String(patient.rm || "")) === normalizePatientCodeKey(qRm));
+        const nameMatched = candidates.find(
+          (patient: any) => normalizePatientNameKey(String(patient.name || "")) === normalizePatientNameKey(qName)
+        );
         const resolved = nameMatched || (candidates.length === 1 ? candidates[0] : null);
 
         if (resolved) {
