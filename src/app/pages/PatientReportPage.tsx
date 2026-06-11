@@ -39,6 +39,12 @@ interface RegisteredPatient {
   surveyed: boolean;
 }
 
+const normalizePatientCode = (value?: string) =>
+  String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const normalizePatientName = (value?: string) =>
+  String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+
 export function PatientReportPage() {
   const { specialty } = useParams<{ specialty: string }>();
   const navigate = useNavigate();
@@ -318,10 +324,23 @@ export function PatientReportPage() {
   }, [refreshPatientReportData]);
 
   // Mark registered patients that already have surveys
+  const getPatientResponse = (patient: RegisteredPatient) => {
+    const patientCode = normalizePatientCode(patient.rm);
+    const patientName = normalizePatientName(patient.name);
+
+    return surveyResponses.find((response: any) => {
+      const responseCode = normalizePatientCode(
+        response.medicalRecordNumber || response.patientRm || response.qRm || response.rm
+      );
+      if (patientCode && responseCode && patientCode === responseCode) return true;
+
+      const responseName = normalizePatientName(response.patientName || response.qName || response.name);
+      return Boolean(patientName && responseName && patientName === responseName);
+    });
+  };
+
   const patientsWithStatus = registeredPatients.map(p => {
-    const response = surveyResponses.find(
-      r => r.medicalRecordNumber === p.rm && r.patientName === p.name
-    );
+    const response = getPatientResponse(p);
     return {
       ...p,
       surveyed: !!response,
@@ -579,13 +598,6 @@ export function PatientReportPage() {
       });
     }
     navigate(`/siap-persi/result/${specialty}`);
-  };
-
-  // Get survey response for a patient (for review)
-  const getPatientResponse = (patient: RegisteredPatient) => {
-    return surveyResponses.find(
-      r => r.medicalRecordNumber === patient.rm && r.patientName === patient.name
-    );
   };
 
   if (loading) {
