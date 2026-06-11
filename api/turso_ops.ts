@@ -895,32 +895,7 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
   return { success: true, surveyId: id };
 }
 
-async function getSurveys({ hospitalCode, specialty }: any) {
-  await initTursoTables();
-  const rs = await db().execute({
-    sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? ORDER BY created_at DESC",
-    args: [hospitalCode, specialty],
-  });
-  return rs.rows.map((r: any) => ({
-    id: r.id,
-    patientName: r.patient_name,
-    medicalRecordNumber: r.patient_rm,
-    premScore: r.prem_score,
-    promScore: r.prom_score,
-    overallScore: r.overall_score,
-    answers: parseJson(r.answers, {}),
-    timestamp: r.created_at,
-  }));
-}
-
-async function getSurveyByPatient({ hospitalCode, specialty, patientRm }: any) {
-  await initTursoTables();
-  const rs = await db().execute({
-    sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
-    args: [hospitalCode, specialty, patientRm],
-  });
-  const r: any = rs.rows[0];
-  if (!r) return null;
+function mapSurveyRow(r: any) {
   return {
     id: r.id,
     patientName: r.patient_name,
@@ -930,7 +905,87 @@ async function getSurveyByPatient({ hospitalCode, specialty, patientRm }: any) {
     overallScore: r.overall_score,
     answers: parseJson(r.answers, {}),
     submittedAt: r.created_at,
+    timestamp: r.created_at,
   };
+}
+
+async function reconcileSurveySpecialties(client: any, hospitalCode: string) {
+  if (!hospitalCode) return;
+
+  // Older QR links could carry a stale disease index, so some surveys landed under
+  // the wrong disease key. The patient registry is the source of truth for PRM.
+  await client.execute({
+    sql: `UPDATE surveys
+          SET specialty = (
+            SELECT p.specialty
+            FROM patients p
+            WHERE p.hospital_code = surveys.hospital_code
+              AND p.rm = surveys.patient_rm
+              AND LOWER(TRIM(p.name)) = LOWER(TRIM(surveys.patient_name))
+            LIMIT 1
+          )
+          WHERE hospital_code = ?
+            AND EXISTS (
+              SELECT 1
+              FROM patients p
+              WHERE p.hospital_code = surveys.hospital_code
+                AND p.rm = surveys.patient_rm
+                AND LOWER(TRIM(p.name)) = LOWER(TRIM(surveys.patient_name))
+                AND p.specialty <> surveys.specialty
+            )`,
+    args: [hospitalCode],
+  });
+
+  await client.execute({
+    sql: `WITH unique_patient AS (
+            SELECT hospital_code, rm, MIN(specialty) AS specialty, COUNT(*) AS cnt
+            FROM patients
+            WHERE hospital_code = ?
+            GROUP BY hospital_code, rm
+          )
+          UPDATE surveys
+          SET specialty = (
+            SELECT specialty
+            FROM unique_patient up
+            WHERE up.hospital_code = surveys.hospital_code
+              AND up.rm = surveys.patient_rm
+              AND up.cnt = 1
+          )
+          WHERE hospital_code = ?
+            AND EXISTS (
+              SELECT 1
+              FROM unique_patient up
+              WHERE up.hospital_code = surveys.hospital_code
+                AND up.rm = surveys.patient_rm
+                AND up.cnt = 1
+                AND up.specialty <> surveys.specialty
+            )`,
+    args: [hospitalCode, hospitalCode],
+  });
+}
+
+async function getSurveys({ hospitalCode, specialty }: any) {
+  await initTursoTables();
+  const client = db();
+  await reconcileSurveySpecialties(client, hospitalCode);
+  const rs = await client.execute({
+    sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? ORDER BY created_at DESC",
+    args: [hospitalCode, specialty],
+  });
+  return rs.rows.map(mapSurveyRow);
+}
+
+async function getSurveyByPatient({ hospitalCode, specialty, patientRm }: any) {
+  await initTursoTables();
+  const client = db();
+  await reconcileSurveySpecialties(client, hospitalCode);
+  const rs = await client.execute({
+    sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
+    args: [hospitalCode, specialty, patientRm],
+  });
+  const r: any = rs.rows[0];
+  if (!r) return null;
+  return mapSurveyRow(r);
 }
 
 async function resetSurveys({ hospitalCode, specialty }: any) {
@@ -984,6 +1039,7 @@ async function registerPatient({ hospitalCode, specialty, patient, _hospitalEmai
 async function getPatients({ hospitalCode, specialty }: any) {
   await initTursoTables();
   const client = db();
+  await reconcileSurveySpecialties(client, hospitalCode);
   const info = await client.execute("PRAGMA table_info(patients)");
   const cols = info.rows.map((r: any) => r.name);
   const hCol = cols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
