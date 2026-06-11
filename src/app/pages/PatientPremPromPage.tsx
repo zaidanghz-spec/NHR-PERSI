@@ -79,6 +79,8 @@ export function PatientPremPromPage() {
 
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
   const [effectiveDiseaseIndex, setEffectiveDiseaseIndex] = useState(requestedDiseaseIndex);
@@ -145,6 +147,8 @@ export function PatientPremPromPage() {
   useEffect(() => {
     setFormData({});
     setIsSubmitted(false);
+    setIsSubmitting(false);
+    setSubmitError("");
     setAutosaveState("idle");
     if (!hospitalCode || !selectedSpecialty || !qRm) return;
     try {
@@ -165,6 +169,7 @@ export function PatientPremPromPage() {
   }, [formData, hospitalCode, isSubmitted, qRm, selectedSpecialty, surveyDraftKey]);
 
   const handleChange = (id: string, value: string) => {
+    setSubmitError("");
     setFormData({ ...formData, [id]: value });
   };
 
@@ -194,8 +199,10 @@ export function PatientPremPromPage() {
     return { premScore: Math.round(premAvg), promScore: Math.round(promAvg), overallScore: overall };
   };
 
-  const handleSubmit = () => {
-    if (!isComplete || !hospitalCode) return;
+  const handleSubmit = async () => {
+    if (!isComplete || !hospitalCode || isSubmitting) return;
+    setSubmitError("");
+    setIsSubmitting(true);
 
     const scores = calculateScores();
 
@@ -211,13 +218,19 @@ export function PatientPremPromPage() {
       submittedAt: new Date().toISOString(),
     };
 
-    // Submit to server with disease-specific key (fire and forget, show success immediately)
-    submitSurvey(hospitalCode, diseaseSpecialtyKey, response).catch((err) => {
+    try {
+      const result = await submitSurvey(hospitalCode, diseaseSpecialtyKey, response);
+      if (!result.success && !result.duplicate) {
+        throw new Error("Server belum menerima jawaban. Silakan coba kirim ulang.");
+      }
+      localStorage.removeItem(surveyDraftKey);
+      setIsSubmitted(true);
+    } catch (err: any) {
       console.error("Failed to submit survey to server:", err);
-    });
-
-    localStorage.removeItem(surveyDraftKey);
-    setIsSubmitted(true);
+      setSubmitError(err?.message || "Gagal mengirim jawaban ke server. Silakan coba lagi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Invalid link - no patient info
@@ -410,11 +423,16 @@ export function PatientPremPromPage() {
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
           <Button
             onClick={handleSubmit}
-            disabled={!isComplete}
+            disabled={!isComplete || isSubmitting}
             className="w-full h-14 text-lg bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {!isComplete ? "Lengkapi semua pertanyaan" : "Kirim Jawaban"}
+            {isSubmitting ? "Mengirim ke server..." : !isComplete ? "Lengkapi semua pertanyaan" : "Kirim Jawaban"}
           </Button>
+          {submitError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {submitError}
+            </div>
+          )}
           {!isComplete && (
             <p className="text-sm text-gray-500 text-center mt-3">
               Pastikan semua pertanyaan telah dijawab
