@@ -37,6 +37,9 @@ interface RegisteredPatient {
   rm: string;
   registeredAt: string;
   surveyed: boolean;
+  diseaseIndex?: number;
+  diseaseKey?: string;
+  diseaseName?: string;
 }
 
 const normalizePatientCode = (value?: string) =>
@@ -219,11 +222,22 @@ export function PatientReportPage() {
     if (!hasHospitalAuth || !hospitalCode || !specialty) return;
     try {
       const patients = await api.getPatients(hospitalCode, diseaseSpecialtyKey);
-      setRegisteredPatients(patients);
+      setRegisteredPatients(patients.map((patient: any) => {
+        const diseaseIndex =
+          typeof patient.diseaseIndex === "number"
+            ? patient.diseaseIndex
+            : Number(String(patient.diseaseKey || patient.specialty || "").match(/-d(\d+)$/)?.[1] ?? activeDiseaseIndex);
+        return {
+          ...patient,
+          diseaseIndex,
+          diseaseKey: patient.diseaseKey || patient.specialty || `${specialty}-d${diseaseIndex}`,
+          diseaseName: diseases[diseaseIndex]?.diseaseName || activeDisease?.diseaseName || "",
+        };
+      }));
     } catch (err) {
       console.error("Failed to load patients:", err);
     }
-  }, [hasHospitalAuth, hospitalCode, diseaseSpecialtyKey, specialty]);
+  }, [hasHospitalAuth, hospitalCode, diseaseSpecialtyKey, specialty, activeDiseaseIndex, activeDisease?.diseaseName, diseases]);
 
   // Load survey responses from server
   const loadResponses = useCallback(async () => {
@@ -370,10 +384,14 @@ export function PatientReportPage() {
 
   // Build personalized survey URL with disease index
   const buildSurveyUrl = (patient: RegisteredPatient) => {
+    const patientDiseaseIndex =
+      typeof patient.diseaseIndex === "number" && Number.isFinite(patient.diseaseIndex)
+        ? patient.diseaseIndex
+        : activeDiseaseIndex;
     const params = new URLSearchParams({
       name: patient.name,
       rm: patient.rm,
-      disease: String(activeDiseaseIndex),
+      disease: String(patientDiseaseIndex),
     });
     return `${window.location.origin}/patient-survey/${hospitalCode}/${specialty}?${params.toString()}`;
   };
@@ -399,6 +417,9 @@ export function PatientReportPage() {
       rm: newPatientRM.trim(),
       registeredAt: new Date().toISOString(),
       surveyed: false,
+      diseaseIndex: activeDiseaseIndex,
+      diseaseKey: diseaseSpecialtyKey,
+      diseaseName: activeDisease?.diseaseName || "",
     };
 
     try {
@@ -1301,7 +1322,7 @@ export function PatientReportPage() {
           surveyUrl={buildSurveyUrl(showQRModal)}
           hospitalName={hospitalName}
           specialtyName={specData?.name || ""}
-          diseaseName={activeDisease?.diseaseName || ""}
+          diseaseName={showQRModal.diseaseName || activeDisease?.diseaseName || ""}
           onClose={() => setShowQRModal(null)}
         />
       )}

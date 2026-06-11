@@ -858,9 +858,31 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
   const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const patientRm = survey.medicalRecordNumber || survey.qRm || "";
+  let effectiveSpecialty = specialty;
+
+  if (patientRm) {
+    const patientInfo = await client.execute("PRAGMA table_info(patients)");
+    const patientCols = patientInfo.rows.map((r: any) => r.name);
+    const hCol = patientCols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
+    const sCol = patientCols.find((c: string) => ["specialty", "specialtyname"].includes(c.toLowerCase())) || "specialty";
+    const rmCol = patientCols.find((c: string) => ["rm", "patient_rm", "patientrm", "medical_record_number", "medicalrecordnumber"].includes(c.toLowerCase())) || "rm";
+    const nameCol = patientCols.find((c: string) => ["name", "patient_name", "patientname"].includes(c.toLowerCase())) || "name";
+    const registered = await client.execute({
+      sql: `SELECT ${sCol} as specialty, ${nameCol} as name FROM patients WHERE ${hCol} = ? AND ${rmCol} = ?`,
+      args: [effectiveCode, patientRm],
+    });
+    if (registered.rows.length === 1) {
+      effectiveSpecialty = String((registered.rows[0] as any).specialty || specialty);
+    } else if (registered.rows.length > 1) {
+      const submittedName = String(survey.patientName || survey.qName || "").trim().toLowerCase();
+      const matched = registered.rows.find((row: any) => String(row.name || "").trim().toLowerCase() === submittedName);
+      if (matched) effectiveSpecialty = String((matched as any).specialty || specialty);
+    }
+  }
+
   const existing = await client.execute({
     sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
-    args: [effectiveCode, specialty, patientRm],
+    args: [effectiveCode, effectiveSpecialty, patientRm],
   });
   if (existing.rows.length > 0) return { success: false, duplicate: true };
 
@@ -868,7 +890,7 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
   await client.execute({
     sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, effectiveCode, specialty, survey.patientName || survey.qName || "", patientRm, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {})],
+    args: [id, effectiveCode, effectiveSpecialty, survey.patientName || survey.qName || "", patientRm, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {})],
   });
   return { success: true, surveyId: id };
 }
@@ -976,6 +998,8 @@ async function getPatients({ hospitalCode, specialty }: any) {
     args: [hospitalCode, specialty],
   });
   return rs.rows.map((r: any) => ({
+    diseaseIndex: Number(String(r.specialty || "").match(/-d(\d+)$/)?.[1] ?? 0),
+    diseaseKey: r.specialty,
     id: r.id || `temp-${Math.random()}`,
     name: r.name,
     rm: r.rm,
