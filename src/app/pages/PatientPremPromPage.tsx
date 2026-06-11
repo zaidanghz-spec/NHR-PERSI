@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from "react-router";
 import { Heart, MessageSquare, CheckCircle2, Building2, Shield, Star, Clock, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
-import { submitSurvey } from "../utils/api";
+import { getPatients, submitSurvey } from "../utils/api";
 
 // ===== LIKERT SCALE 1-5 =====
 // Based on NHS PREM framework & validated patient experience instruments
@@ -66,16 +66,18 @@ export function PatientPremPromPage() {
   const qName = searchParams.get("name") || "";
   const qRm = searchParams.get("rm") || "";
   const qDisease = parseInt(searchParams.get("disease") || "0", 10);
+  const requestedDiseaseIndex = Number.isFinite(qDisease) && qDisease >= 0 ? qDisease : 0;
 
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
+  const [effectiveDiseaseIndex, setEffectiveDiseaseIndex] = useState(requestedDiseaseIndex);
   const selectedSpecialty = urlSpecialty || "";
 
   // Get specialty-specific questions from the disease
   const specData = selectedSpecialty ? specialtyAuditData[selectedSpecialty as keyof typeof specialtyAuditData] : null;
-  const disease = specData?.diseases[qDisease];
+  const disease = specData?.diseases[effectiveDiseaseIndex];
   const diseaseName = disease?.diseaseName || "";
 
   // Use disease-specific PREM/PROM questions
@@ -87,10 +89,53 @@ export function PatientPremPromPage() {
     : defaultPromQuestions.map(q => ({ ...q, subCategory: undefined }));
 
   // Use disease-specific specialty key for API
-  const diseaseSpecialtyKey = `${selectedSpecialty}-d${qDisease}`;
+  const diseaseSpecialtyKey = `${selectedSpecialty}-d${effectiveDiseaseIndex}`;
   const surveyDraftKey = `patient-survey-draft-${hospitalCode || ""}-${diseaseSpecialtyKey}-${qRm || ""}`;
 
   useEffect(() => {
+    let active = true;
+    const resolveDiseaseFromRegistry = async () => {
+      setEffectiveDiseaseIndex(requestedDiseaseIndex);
+      if (!hospitalCode || !selectedSpecialty || !qRm || !specData?.diseases?.length) return;
+
+      const normalize = (value: string) => value.trim().toLowerCase();
+      try {
+        const diseasePatientLists = await Promise.all(
+          specData.diseases.map(async (_disease, index) => {
+            const patients = await getPatients(hospitalCode, `${selectedSpecialty}-d${index}`);
+            return patients.map((patient: any) => ({ ...patient, resolvedDiseaseIndex: index }));
+          })
+        );
+        if (!active) return;
+
+        const candidates = diseasePatientLists
+          .flat()
+          .filter((patient: any) => normalize(String(patient.rm || "")) === normalize(qRm));
+        const nameMatched = candidates.find((patient: any) => normalize(String(patient.name || "")) === normalize(qName));
+        const resolved = nameMatched || (candidates.length === 1 ? candidates[0] : null);
+
+        if (resolved) {
+          const registryIndex =
+            typeof resolved.diseaseIndex === "number" && Number.isFinite(resolved.diseaseIndex)
+              ? resolved.diseaseIndex
+              : resolved.resolvedDiseaseIndex;
+          setEffectiveDiseaseIndex(registryIndex);
+        }
+      } catch (err) {
+        console.error("Failed to resolve patient survey disease:", err);
+      }
+    };
+
+    resolveDiseaseFromRegistry();
+    return () => {
+      active = false;
+    };
+  }, [hospitalCode, qName, qRm, requestedDiseaseIndex, selectedSpecialty, specData?.diseases]);
+
+  useEffect(() => {
+    setFormData({});
+    setIsSubmitted(false);
+    setAutosaveState("idle");
     if (!hospitalCode || !selectedSpecialty || !qRm) return;
     try {
       const saved = localStorage.getItem(surveyDraftKey);
