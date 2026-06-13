@@ -1108,6 +1108,48 @@ async function getPatients({ hospitalCode, specialty }: any) {
   }));
 }
 
+async function resolvePatientSurveyDisease({ hospitalCode, specialty, patientName, patientRm }: any) {
+  await initTursoTables();
+  const client = db();
+  const info = await client.execute("PRAGMA table_info(patients)");
+  const cols = info.rows.map((r: any) => r.name);
+  const hCol = cols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
+  const sCol = cols.find((c: string) => ["specialty", "specialtyname"].includes(c.toLowerCase())) || "specialty";
+  const nameCol = cols.find((c: string) => ["name", "patient_name"].includes(c.toLowerCase())) || "name";
+  const rmCol = cols.find((c: string) => ["rm", "patient_rm"].includes(c.toLowerCase())) || "rm";
+  const specialtyPrefix = specialty ? `${String(specialty)}-d` : "";
+
+  const rs = await client.execute({
+    sql: `SELECT ${nameCol} as name, ${rmCol} as rm, ${sCol} as specialty
+          FROM patients
+          WHERE ${hCol} = ? ${specialtyPrefix ? `AND ${sCol} LIKE ?` : ""}`,
+    args: specialtyPrefix ? [hospitalCode, `${specialtyPrefix}%`] : [hospitalCode],
+  });
+
+  const requestedRmKey = normalizePatientCodeKey(patientRm);
+  const requestedNameKey = normalizePatientNameKey(patientName);
+  const candidates = rs.rows
+    .map((row: any) => ({
+      name: String(row.name || ""),
+      rm: String(row.rm || ""),
+      specialty: String(row.specialty || ""),
+      rmKey: normalizePatientCodeKey(row.rm),
+      nameKey: normalizePatientNameKey(row.name),
+    }))
+    .filter((row: any) => row.rmKey && row.rmKey === requestedRmKey);
+  const nameMatches = candidates.filter((row: any) => row.nameKey && row.nameKey === requestedNameKey);
+  const resolvedCandidates = nameMatches.length > 0 ? nameMatches : candidates;
+  const uniqueSpecialties = Array.from(new Set(resolvedCandidates.map((row: any) => row.specialty).filter(Boolean)));
+
+  if (uniqueSpecialties.length !== 1) return { found: false };
+  const diseaseIndex = Number(String(uniqueSpecialties[0]).match(/-d(\d+)$/)?.[1] ?? 0);
+  return {
+    found: true,
+    diseaseIndex,
+    diseaseKey: uniqueSpecialties[0],
+  };
+}
+
 async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data }: any) {
   await initTursoTables();
   const client = db();
@@ -1284,6 +1326,7 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   resetSurveys,
   registerPatient,
   getPatients,
+  resolvePatientSurveyDisease,
   saveCustomSurveyMetadata,
   saveCustomSurveyPdfChunk,
   getCustomSurveyMetadata,

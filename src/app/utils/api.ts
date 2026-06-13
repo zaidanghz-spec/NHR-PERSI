@@ -198,6 +198,20 @@ export async function submitSurvey(
   return rpc("submitSurvey", { hospitalCode, specialty, survey });
 }
 
+export async function resolvePatientSurveyDisease(
+  hospitalCode: string,
+  specialty: string,
+  patientName: string,
+  patientRm: string
+): Promise<{ found: boolean; diseaseIndex?: number; diseaseKey?: string }> {
+  try {
+    return await rpc("resolvePatientSurveyDisease", { hospitalCode, specialty, patientName, patientRm });
+  } catch (err) {
+    console.error("Resolve Patient Survey Disease Error:", err);
+    return { found: false };
+  }
+}
+
 export async function getSurveys(hospitalCode: string, specialty: string): Promise<any[]> {
   try { return await rpc<any[]>("getSurveys", { hospitalCode, specialty }, { retries: 2 }); }
   catch (err) { console.error("Get Surveys Error:", err); return []; }

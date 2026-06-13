@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from "react-router";
 import { Heart, MessageSquare, CheckCircle2, Building2, Shield, Star, Clock, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
-import { getPatients, submitSurvey } from "../utils/api";
+import { resolvePatientSurveyDisease, submitSurvey } from "../utils/api";
 
 // ===== LIKERT SCALE 1-5 =====
 // Based on NHS PREM framework & validated patient experience instruments
@@ -40,15 +40,6 @@ const defaultPromQuestions = [
   { id: "prom-3", question: "Kemampuan melakukan aktivitas sehari-hari" },
   { id: "prom-4", question: "Kepuasan terhadap hasil pengobatan" },
 ];
-
-const normalizePatientCodeKey = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .replace(/\d+/g, (digits) => String(Number(digits)));
-
-const normalizePatientNameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
 
 // LocalStorage key for patient survey responses
 export function getPatientSurveyKey(hospitalCode: string, specialty: string) {
@@ -110,28 +101,11 @@ export function PatientPremPromPage() {
       if (!hospitalCode || !selectedSpecialty || !qRm || !specData?.diseases?.length) return;
 
       try {
-        const diseasePatientLists = await Promise.all(
-          specData.diseases.map(async (_disease, index) => {
-            const patients = await getPatients(hospitalCode, `${selectedSpecialty}-d${index}`);
-            return patients.map((patient: any) => ({ ...patient, resolvedDiseaseIndex: index }));
-          })
-        );
         if (!active) return;
-
-        const candidates = diseasePatientLists
-          .flat()
-          .filter((patient: any) => normalizePatientCodeKey(String(patient.rm || "")) === normalizePatientCodeKey(qRm));
-        const nameMatched = candidates.find(
-          (patient: any) => normalizePatientNameKey(String(patient.name || "")) === normalizePatientNameKey(qName)
-        );
-        const resolved = nameMatched || (candidates.length === 1 ? candidates[0] : null);
-
-        if (resolved) {
-          const registryIndex =
-            typeof resolved.diseaseIndex === "number" && Number.isFinite(resolved.diseaseIndex)
-              ? resolved.diseaseIndex
-              : resolved.resolvedDiseaseIndex;
-          setEffectiveDiseaseIndex(registryIndex);
+        const resolved = await resolvePatientSurveyDisease(hospitalCode, selectedSpecialty, qName, qRm);
+        if (!active) return;
+        if (resolved.found && typeof resolved.diseaseIndex === "number") {
+          setEffectiveDiseaseIndex(resolved.diseaseIndex);
         }
       } catch (err) {
         console.error("Failed to resolve patient survey disease:", err);

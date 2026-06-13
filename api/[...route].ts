@@ -7,6 +7,8 @@ const PUBLIC_OPERATIONS = new Set([
   "getAllRankingsFromDb",
   "getAllNews",
   "getAllEvents",
+  "submitSurvey",
+  "resolvePatientSurveyDisease",
   "initTursoTables",
 ]);
 
