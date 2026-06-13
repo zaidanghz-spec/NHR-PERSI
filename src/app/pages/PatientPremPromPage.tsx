@@ -71,6 +71,7 @@ export function PatientPremPromPage() {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResolvingDisease, setIsResolvingDisease] = useState(true);
   const [submitError, setSubmitError] = useState("");
   const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
@@ -97,8 +98,12 @@ export function PatientPremPromPage() {
   useEffect(() => {
     let active = true;
     const resolveDiseaseFromRegistry = async () => {
+      setIsResolvingDisease(true);
       setEffectiveDiseaseIndex(requestedDiseaseIndex);
-      if (!hospitalCode || !selectedSpecialty || !qRm || !specData?.diseases?.length) return;
+      if (!hospitalCode || !selectedSpecialty || !qRm || !specData?.diseases?.length) {
+        setIsResolvingDisease(false);
+        return;
+      }
 
       try {
         if (!active) return;
@@ -109,6 +114,8 @@ export function PatientPremPromPage() {
         }
       } catch (err) {
         console.error("Failed to resolve patient survey disease:", err);
+      } finally {
+        if (active) setIsResolvingDisease(false);
       }
     };
 
@@ -174,7 +181,7 @@ export function PatientPremPromPage() {
   };
 
   const handleSubmit = async () => {
-    if (!isComplete || !hospitalCode || isSubmitting) return;
+    if (!isComplete || !hospitalCode || isSubmitting || isResolvingDisease) return;
     setSubmitError("");
     setIsSubmitting(true);
 
@@ -397,10 +404,10 @@ export function PatientPremPromPage() {
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
           <Button
             onClick={handleSubmit}
-            disabled={!isComplete || isSubmitting}
+            disabled={!isComplete || isSubmitting || isResolvingDisease}
             className="w-full h-14 text-lg bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Mengirim ke server..." : !isComplete ? "Lengkapi semua pertanyaan" : "Kirim Jawaban"}
+            {isResolvingDisease ? "Mencocokkan data pasien..." : isSubmitting ? "Mengirim ke server..." : !isComplete ? "Lengkapi semua pertanyaan" : "Kirim Jawaban"}
           </Button>
           {submitError && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">

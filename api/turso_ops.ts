@@ -58,6 +58,10 @@ function normalizePatientNameKey(value: unknown) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function getSpecialtyBaseKey(specialty: unknown) {
+  return String(specialty || "").replace(/-d\d+$/, "");
+}
+
 function getJwtSecret(): string {
   return process.env.JWT_SECRET || process.env.VITE_JWT_SECRET || "nhr-persi-session-secret";
 }
@@ -870,26 +874,11 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
   const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const patientRm = survey.medicalRecordNumber || survey.qRm || "";
+  const patientName = survey.patientName || survey.qName || "";
   let effectiveSpecialty = specialty;
 
   if (patientRm) {
-    const patientInfo = await client.execute("PRAGMA table_info(patients)");
-    const patientCols = patientInfo.rows.map((r: any) => r.name);
-    const hCol = patientCols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
-    const sCol = patientCols.find((c: string) => ["specialty", "specialtyname"].includes(c.toLowerCase())) || "specialty";
-    const rmCol = patientCols.find((c: string) => ["rm", "patient_rm", "patientrm", "medical_record_number", "medicalrecordnumber"].includes(c.toLowerCase())) || "rm";
-    const nameCol = patientCols.find((c: string) => ["name", "patient_name", "patientname"].includes(c.toLowerCase())) || "name";
-    const registered = await client.execute({
-      sql: `SELECT ${sCol} as specialty, ${nameCol} as name FROM patients WHERE ${hCol} = ? AND ${rmCol} = ?`,
-      args: [effectiveCode, patientRm],
-    });
-    if (registered.rows.length === 1) {
-      effectiveSpecialty = String((registered.rows[0] as any).specialty || specialty);
-    } else if (registered.rows.length > 1) {
-      const submittedName = String(survey.patientName || survey.qName || "").trim().toLowerCase();
-      const matched = registered.rows.find((row: any) => String(row.name || "").trim().toLowerCase() === submittedName);
-      if (matched) effectiveSpecialty = String((matched as any).specialty || specialty);
-    }
+    effectiveSpecialty = await resolveRegisteredPatientSpecialty(client, effectiveCode, specialty, patientRm, patientName) || specialty;
   }
 
   const existing = await client.execute({
@@ -902,9 +891,44 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
   await client.execute({
     sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, effectiveCode, effectiveSpecialty, survey.patientName || survey.qName || "", patientRm, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {})],
+    args: [id, effectiveCode, effectiveSpecialty, patientName, patientRm, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {})],
   });
   return { success: true, surveyId: id };
+}
+
+async function resolveRegisteredPatientSpecialty(
+  client: any,
+  hospitalCode: string,
+  specialty: string,
+  patientRm: string,
+  patientName: string
+) {
+  const patientInfo = await client.execute("PRAGMA table_info(patients)");
+  const patientCols = patientInfo.rows.map((r: any) => r.name);
+  const hCol = patientCols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
+  const sCol = patientCols.find((c: string) => ["specialty", "specialtyname"].includes(c.toLowerCase())) || "specialty";
+  const rmCol = patientCols.find((c: string) => ["rm", "patient_rm", "patientrm", "medical_record_number", "medicalrecordnumber"].includes(c.toLowerCase())) || "rm";
+  const nameCol = patientCols.find((c: string) => ["name", "patient_name", "patientname"].includes(c.toLowerCase())) || "name";
+  const baseSpecialty = getSpecialtyBaseKey(specialty);
+  const registered = await client.execute({
+    sql: `SELECT ${sCol} as specialty, ${nameCol} as name, ${rmCol} as rm
+          FROM patients
+          WHERE ${hCol} = ? ${baseSpecialty ? `AND ${sCol} LIKE ?` : ""}`,
+    args: baseSpecialty ? [hospitalCode, `${baseSpecialty}-d%`] : [hospitalCode],
+  });
+  const requestedRmKey = normalizePatientCodeKey(patientRm);
+  const requestedNameKey = normalizePatientNameKey(patientName);
+  const candidates = registered.rows
+    .map((row: any) => ({
+      specialty: String(row.specialty || ""),
+      nameKey: normalizePatientNameKey(row.name),
+      rmKey: normalizePatientCodeKey(row.rm),
+    }))
+    .filter((row: any) => row.rmKey && row.rmKey === requestedRmKey);
+  const nameMatches = candidates.filter((row: any) => row.nameKey && row.nameKey === requestedNameKey);
+  const resolvedCandidates = nameMatches.length > 0 ? nameMatches : candidates;
+  const uniqueSpecialties = Array.from(new Set(resolvedCandidates.map((row: any) => row.specialty).filter(Boolean)));
+  return uniqueSpecialties.length === 1 ? String(uniqueSpecialties[0]) : null;
 }
 
 function mapSurveyRow(r: any) {
