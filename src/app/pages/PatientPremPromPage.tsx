@@ -66,7 +66,11 @@ export function PatientPremPromPage() {
   const qName = searchParams.get("name") || "";
   const qRm = searchParams.get("rm") || "";
   const qDisease = parseInt(searchParams.get("disease") || "0", 10);
-  const requestedDiseaseIndex = Number.isFinite(qDisease) && qDisease >= 0 ? qDisease : 0;
+  const qDiseaseKey = searchParams.get("diseaseKey") || "";
+  const qDiseaseKeyIndex = Number(qDiseaseKey.match(/-d(\d+)$/)?.[1] ?? NaN);
+  const requestedDiseaseIndex = Number.isFinite(qDiseaseKeyIndex) && qDiseaseKeyIndex >= 0
+    ? qDiseaseKeyIndex
+    : Number.isFinite(qDisease) && qDisease >= 0 ? qDisease : 0;
 
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);

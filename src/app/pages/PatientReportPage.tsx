@@ -392,6 +392,7 @@ export function PatientReportPage() {
       name: patient.name,
       rm: patient.rm,
       disease: String(patientDiseaseIndex),
+      diseaseKey: patient.diseaseKey || `${specialty}-d${patientDiseaseIndex}`,
     });
     return `${window.location.origin}/patient-survey/${hospitalCode}/${specialty}?${params.toString()}`;
   };
