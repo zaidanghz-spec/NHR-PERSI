@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   Shield,
@@ -64,6 +64,21 @@ export function AdminDashboardPage() {
       alert("Proses sinkronisasi paksa selesai.");
     }
   };
+
+  useEffect(() => {
+    if (!isAdmin || (activeTab !== "accounts" && activeTab !== "overview")) return;
+    let cancelled = false;
+    const refreshAccounts = async () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      await syncWithCloud();
+    };
+    refreshAccounts();
+    const interval = window.setInterval(refreshAccounts, 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeTab, isAdmin, syncWithCloud]);
 
   if (!isAdmin) {
     return (

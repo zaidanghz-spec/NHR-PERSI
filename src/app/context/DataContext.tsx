@@ -176,9 +176,7 @@ const DataContext = createContext<DataContextType | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>(() =>
-    mergeHospitalAccounts(loadFromStorage("persi_hospital_accounts", []), [])
-  );
+  const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>([]);
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("persi_admin") === "true");
   const [currentHospital, setCurrentHospital] = useState<HospitalAccount | null>(() => {
     const stored = sessionStorage.getItem("persi_hospital_session");
@@ -211,11 +209,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const dbAccs = await getAllHospitalAccounts();
         if (dbAccs !== null) {
-          setHospitalAccounts(prev => {
-            const merged = mergeHospitalAccounts(dbAccs, prev);
-            safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(merged));
-            return merged;
-          });
+          const cloudAccounts = mergeHospitalAccounts(dbAccs, []);
+          setHospitalAccounts(cloudAccounts);
+          safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(cloudAccounts));
         }
       } catch (err) {
         console.error("Failed to sync accounts:", err);
@@ -289,7 +285,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         });
       }
       if (dbAccs !== null) {
-        setHospitalAccounts(prev => mergeHospitalAccounts(dbAccs, prev));
+        const cloudAccounts = mergeHospitalAccounts(dbAccs, []);
+        setHospitalAccounts(cloudAccounts);
+        safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(cloudAccounts));
       }
       if (dbRankings !== null) setApprovedRankings(dbRankings);
       localStorage.removeItem("persi_news");
@@ -370,14 +368,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     suratTugasFileName: string, suratTugasData: string,
     province?: string, city?: string
   ): Promise<boolean> => {
-    let currentAccounts: HospitalAccount[] = hospitalAccounts;
-    try {
-      const storedAcc = localStorage.getItem("persi_hospital_accounts");
-      if (storedAcc) currentAccounts = JSON.parse(storedAcc);
-    } catch { }
-
-    if (currentAccounts.find(a => a.email.toLowerCase() === email.toLowerCase())) return false;
-
     const account: HospitalAccount = {
       email: email.toLowerCase(),
       hospitalName,
@@ -392,9 +382,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       // Send password to server for hashing — never store it locally
       await addAccountToDb({ ...account, password, suratTugasData });
-      const updatedAccounts = [...currentAccounts, account];
-      setHospitalAccounts(updatedAccounts);
-      safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updatedAccounts));
+      setHospitalAccounts(prev => {
+        const updatedAccounts = mergeHospitalAccounts([account], prev);
+        safeLocalStorageSet("persi_hospital_accounts", JSON.stringify(updatedAccounts));
+        return updatedAccounts;
+      });
       return true;
     } catch (err) {
       console.error("Cloud account push failed:", err);
