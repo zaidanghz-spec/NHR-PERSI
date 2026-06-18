@@ -1291,7 +1291,10 @@ async function saveHospitalDraft({ draft }: any) {
   if (existing.rows.length > 0) {
     await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [JSON.stringify(draft), draftId] });
   } else {
-    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "hospital-assessment", draft.hospitalName, "Multiple", JSON.stringify(draft)] });
+    await client.execute({
+      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
+      args: [draftId, "hospital-assessment", draft.hospitalCode || draft.hospitalEmail || draft.hospitalName, "Multiple", JSON.stringify(draft)],
+    });
   }
 }
 

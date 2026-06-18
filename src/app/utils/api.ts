@@ -275,7 +275,7 @@ export async function removePatient(hospitalCode: string, specialty: string, pat
 }
 
 export async function getDraft(
-  type: "clinical-audit" | "patient-report",
+  type: "rsbk" | "clinical-audit" | "patient-report",
   hospitalCode: string,
   specialty: string
 ): Promise<any | null> {
@@ -284,7 +284,7 @@ export async function getDraft(
 }
 
 export async function saveDraft(
-  type: "clinical-audit" | "patient-report",
+  type: "rsbk" | "clinical-audit" | "patient-report",
   hospitalCode: string,
   specialty: string,
   draft: any

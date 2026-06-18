@@ -4,6 +4,8 @@ import { safeLocalStorageSet } from "./storage";
 export interface DraftData {
   draftId: string;
   hospitalName: string;
+  hospitalCode?: string;
+  hospitalEmail?: string;
   picName: string;
   createdAt: string;
   updatedAt: string;
@@ -120,10 +122,18 @@ export const draftManager = {
   },
 
   // Create new draft
-  createDraft(hospitalName: string, picName: string, selectedSpecialties: string[]): DraftData {
+  createDraft(
+    hospitalName: string,
+    picName: string,
+    selectedSpecialties: string[],
+    hospitalCode?: string,
+    hospitalEmail?: string
+  ): DraftData {
     const draft: DraftData = {
       draftId: `draft_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       hospitalName,
+      hospitalCode,
+      hospitalEmail,
       picName,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

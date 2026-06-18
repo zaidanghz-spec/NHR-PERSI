@@ -13,6 +13,17 @@ export function SelectSpecialtyPage() {
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<DraftData[]>([]);
   const [showNewAssessment, setShowNewAssessment] = useState(false);
+  const normalize = (value?: string) => (value || "").trim().toLowerCase();
+  const deriveHospitalCode = (email?: string) =>
+    email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
+  const matchesHospitalDraft = (draft: DraftData, hospital: { hospitalName: string; email?: string; hospitalCode?: string }) => {
+    const code = hospital.hospitalCode || deriveHospitalCode(hospital.email);
+    return (
+      normalize(draft.hospitalName) === normalize(hospital.hospitalName) ||
+      Boolean(code && draft.hospitalCode && normalize(draft.hospitalCode) === normalize(code)) ||
+      Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email))
+    );
+  };
 
   // Check authentication on mount
   useEffect(() => {
@@ -28,7 +39,7 @@ export function SelectSpecialtyPage() {
     // Initial load from local
     const loadLocalDrafts = () => {
       const allDrafts = draftManager.getAllDrafts();
-      const hospitalDrafts = allDrafts.filter(d => d.hospitalName === parsedAuth.hospitalName);
+      const hospitalDrafts = allDrafts.filter(d => matchesHospitalDraft(d, parsedAuth));
       if (cancelled) return;
       setDrafts(hospitalDrafts);
     };
@@ -46,7 +57,7 @@ export function SelectSpecialtyPage() {
     const saved = sessionStorage.getItem("selectedSpecialties");
     const currentDraftId = draftManager.getCurrentDraftId();
     const currentDraft = currentDraftId ? draftManager.getDraftById(currentDraftId) : null;
-    if (currentDraft && currentDraft.hospitalName === parsedAuth.hospitalName) {
+    if (currentDraft && matchesHospitalDraft(currentDraft, parsedAuth)) {
       setSelectedSpecialties(currentDraft.selectedSpecialties);
     } else {
       sessionStorage.removeItem("selectedSpecialties");
@@ -58,9 +69,6 @@ export function SelectSpecialtyPage() {
     };
   }, [navigate, syncWithCloud]);
 
-  const normalize = (value?: string) => (value || "").trim().toLowerCase();
-  const deriveHospitalCode = (email?: string) =>
-    email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
   const authHospitalName = authData?.hospitalName || currentHospital?.hospitalName || "";
   const authHospitalCode = authData?.hospitalCode || deriveHospitalCode(authData?.email || currentHospital?.email);
   const hospitalSubmissions = submissions.filter((submission: any) => {
@@ -114,7 +122,9 @@ export function SelectSpecialtyPage() {
     const draft = draftManager.createDraft(
       authData.hospitalName,
       authData.picName,
-      selectedSpecialties
+      selectedSpecialties,
+      authData.hospitalCode || deriveHospitalCode(authData.email),
+      authData.email
     );
 
     draftManager.beginDraftSession(draft);
@@ -144,9 +154,15 @@ export function SelectSpecialtyPage() {
 
     // Create or reuse draft
     const existingDraftId = draftManager.getCurrentDraftId();
-    const existingDraft = existingDraftId ? draftManager.getDraftById(existingDraftId) : null;
+    const activeDraft = existingDraftId ? draftManager.getDraftById(existingDraftId) : null;
+    const reusableDraft = [...draftManager.getAllDrafts()]
+      .filter(d => matchesHospitalDraft(d, authData))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] || null;
+    const existingDraft = activeDraft && matchesHospitalDraft(activeDraft, authData) ? activeDraft : reusableDraft;
 
-    if (existingDraft && existingDraft.hospitalName === authData.hospitalName) {
+    if (existingDraft && matchesHospitalDraft(existingDraft, authData)) {
+      existingDraft.hospitalCode = existingDraft.hospitalCode || authData.hospitalCode || deriveHospitalCode(authData.email);
+      existingDraft.hospitalEmail = existingDraft.hospitalEmail || authData.email;
       // Update existing draft with new specialties
       if (!existingDraft.selectedSpecialties.includes(specId)) {
         existingDraft.selectedSpecialties.push(specId);
@@ -156,12 +172,12 @@ export function SelectSpecialtyPage() {
           patientReport: { completed: false, data: {} },
         };
         // BUGFIX: Persist the updated draft back to localStorage
-        const allDrafts = draftManager.getAllDrafts();
-        const idx = allDrafts.findIndex(d => d.draftId === existingDraft.draftId);
-        if (idx !== -1) {
-          allDrafts[idx] = existingDraft;
-          localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
-        }
+      }
+      const allDrafts = draftManager.getAllDrafts();
+      const idx = allDrafts.findIndex(d => d.draftId === existingDraft.draftId);
+      if (idx !== -1) {
+        allDrafts[idx] = existingDraft;
+        localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
       }
       draftManager.beginDraftSession(existingDraft);
     } else {
@@ -169,7 +185,9 @@ export function SelectSpecialtyPage() {
       const draft = draftManager.createDraft(
         authData.hospitalName,
         authData.picName,
-        specs
+        specs,
+        authData.hospitalCode || deriveHospitalCode(authData.email),
+        authData.email
       );
       draftManager.beginDraftSession(draft);
     }

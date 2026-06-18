@@ -5,6 +5,27 @@ import { Button } from "../components/ui/button";
 import { specialtyAuditData, RsbkItem } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import { draftManager, stripLegacyToolVariationFields } from "../utils/draftManager";
+import * as api from "../utils/api";
+import { getHospitalCode } from "../utils/api";
+
+function getRsbkDraftKey(specialty: string, hospitalCode: string) {
+  return `rsbk-draft-${hospitalCode}-${specialty}`;
+}
+
+function toNumericRsbkData(raw: Record<string, any> = {}) {
+  const converted: Record<string, number | null> = {};
+  Object.entries(stripLegacyToolVariationFields(raw)).forEach(([k, v]) => {
+    if (v === null || v === undefined || v === "") {
+      converted[k] = null;
+      return;
+    }
+    converted[k] = typeof v === "number" ? v : parseInt(v as string);
+    if (isNaN(converted[k] as number)) converted[k] = null;
+  });
+  return converted;
+}
+
+const normalize = (value?: string) => (value || "").trim().toLowerCase();
 
 export function RsbkFormPage() {
   const { specialty } = useParams<{ specialty: string }>();
@@ -12,6 +33,61 @@ export function RsbkFormPage() {
   const specialtyInfo = specialtyAuditData[specialty as keyof typeof specialtyAuditData];
 
   const [formData, setFormData] = useState<Record<string, number | null>>({});
+  const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
+  const hospitalCode = authData.hospitalCode || getHospitalCode(authData.email || "");
+
+  const matchesCurrentHospitalDraft = (draft: any) => {
+    return (
+      normalize(draft?.hospitalName) === normalize(authData.hospitalName) ||
+      Boolean(hospitalCode && draft?.hospitalCode && normalize(draft.hospitalCode) === normalize(hospitalCode)) ||
+      Boolean(authData.email && draft?.hospitalEmail && normalize(draft.hospitalEmail) === normalize(authData.email))
+    );
+  };
+
+  const ensureRsbkDraftSession = () => {
+    if (!specialty || !authData.hospitalName) return null;
+
+    const activeDraftId = draftManager.getCurrentDraftId();
+    const activeDraft = activeDraftId ? draftManager.getDraftById(activeDraftId) : null;
+    if (activeDraft && matchesCurrentHospitalDraft(activeDraft)) return activeDraftId;
+
+    const reusableDraft = [...draftManager.getAllDrafts()]
+      .filter(matchesCurrentHospitalDraft)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] || null;
+
+    if (reusableDraft) {
+      if (!reusableDraft.selectedSpecialties.includes(specialty)) {
+        reusableDraft.selectedSpecialties.push(specialty);
+      }
+      if (!reusableDraft.progress[specialty]) {
+        reusableDraft.progress[specialty] = {
+          rsbk: { completed: false, data: {} },
+          clinicalAudit: { completed: false, data: {} },
+          patientReport: { completed: false, data: {} },
+        };
+      }
+      reusableDraft.hospitalCode = reusableDraft.hospitalCode || hospitalCode;
+      reusableDraft.hospitalEmail = reusableDraft.hospitalEmail || authData.email;
+      const allDrafts = draftManager.getAllDrafts();
+      const idx = allDrafts.findIndex(d => d.draftId === reusableDraft.draftId);
+      if (idx !== -1) {
+        allDrafts[idx] = reusableDraft;
+        localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
+      }
+      draftManager.beginDraftSession(reusableDraft);
+      return reusableDraft.draftId;
+    }
+
+    const draft = draftManager.createDraft(
+      authData.hospitalName,
+      authData.picName || "",
+      [specialty],
+      hospitalCode,
+      authData.email
+    );
+    draftManager.beginDraftSession(draft);
+    return draft.draftId;
+  };
 
   useEffect(() => {
     const auth = sessionStorage.getItem("hospitalAuth");
@@ -20,24 +96,45 @@ export function RsbkFormPage() {
   
   useEffect(() => {
     setFormData({});
-    const draftId = draftManager.getCurrentDraftId();
-    if (draftId && specialty) {
-      const draft = draftManager.getDraftById(draftId);
+    if (!specialty || !hospitalCode) return;
+    let cancelled = false;
+    const capturedDraftId = draftManager.getCurrentDraftId();
+    const canHydrate = () => !cancelled && (!capturedDraftId || draftManager.getCurrentDraftId() === capturedDraftId);
+    const hydrate = (raw: Record<string, any>) => {
+      if (!canHydrate()) return false;
+      setFormData(toNumericRsbkData(raw));
+      return true;
+    };
+
+    async function loadRsbkDraft() {
+      const draftId = capturedDraftId;
+      const draft = draftId ? draftManager.getDraftById(draftId) : null;
       if (draft && draft.progress[specialty]?.rsbk?.data) {
-        const raw = stripLegacyToolVariationFields(draft.progress[specialty].rsbk.data);
-        const converted: Record<string, number | null> = {};
-        Object.entries(raw).forEach(([k, v]) => {
-          if (v === null || v === undefined || v === "") {
-            converted[k] = null;
-          } else {
-            converted[k] = typeof v === "number" ? v : parseInt(v as string);
-            if (isNaN(converted[k] as number)) converted[k] = null;
-          }
-        });
-        setFormData(converted);
+        hydrate(draft.progress[specialty].rsbk.data);
+        return;
       }
+
+      try {
+        const serverDraft = await api.getDraft("rsbk", hospitalCode, specialty);
+        const serverData = serverDraft?.formData || serverDraft?.data;
+        if (serverData && Object.keys(serverData).length > 0 && hydrate(serverData)) return;
+      } catch { /* fallback */ }
+
+      try {
+        const saved = localStorage.getItem(getRsbkDraftKey(specialty, hospitalCode));
+        if (saved) {
+          const localDraft = JSON.parse(saved);
+          const localData = localDraft?.formData || localDraft?.data;
+          if (localData) hydrate(localData);
+        }
+      } catch { /* ignore */ }
     }
-  }, [specialty]);
+
+    loadRsbkDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [specialty, hospitalCode]);
 
   const handleChange = (id: string, value: number | null) => {
     setFormData({ ...formData, [id]: value });
@@ -110,47 +207,77 @@ export function RsbkFormPage() {
     return () => clearTimeout(timer);
   }, [draftSavedMsg]);
 
-  // Auto-save: Persists state whenever formData or scores change
-  useEffect(() => {
-    if (!specialty || Object.keys(formData).length === 0) return;
-    
-    const draftId = draftManager.getCurrentDraftId();
-    if (!draftId) return;
+  const persistRsbkDraft = async () => {
+    if (!specialty || !hospitalCode) return null;
+    const draftId = ensureRsbkDraftSession();
+    const cleanFormData = stripLegacyToolVariationFields(formData);
 
-    setAutosaveState("saving");
-    const timer = setTimeout(() => {
-      if (draftManager.getCurrentDraftId() !== draftId) return;
+    if (draftId) {
       draftManager.updateDraft(draftId, specialty, "rsbk", {
-        data: formData,
+        data: cleanFormData,
         score: totalRsbkScore,
         completed: filledItems === totalItems,
       });
-      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-      setAutosaveState("saved");
-    }, 1500); // 1.5s debounce
+    }
 
-    return () => clearTimeout(timer);
-  }, [formData, specialty, totalRsbkScore, filledItems, totalItems]);
-
-  const handleSaveDraft = () => {
-    const draftId = draftManager.getCurrentDraftId();
-    if (!draftId || !specialty) return;
-    const cleanFormData = stripLegacyToolVariationFields(formData);
-    draftManager.updateDraft(draftId, specialty, "rsbk", {
-      data: cleanFormData,
+    const draftPayload = {
+      draftId,
+      formData: cleanFormData,
       score: totalRsbkScore,
       completed: filledItems === totalItems,
-    });
-    setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-    setAutosaveState("saved");
-    setDraftSavedMsg(true);
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(getRsbkDraftKey(specialty, hospitalCode), JSON.stringify(draftPayload));
+    await api.saveDraft("rsbk", hospitalCode, specialty, draftPayload);
+    return draftId;
   };
 
-  const handleSubmit = () => {
-    const draftId = draftManager.getCurrentDraftId();
-    if (!draftId || !specialty) return;
+  // Auto-save: Persists Hospital Structure by hospital code + specialty, so logout/login does not lose it.
+  useEffect(() => {
+    if (!specialty || Object.keys(formData).length === 0) return;
+
+    let cancelled = false;
+    setAutosaveState("saving");
+    const timer = setTimeout(async () => {
+      try {
+        await persistRsbkDraft();
+        if (cancelled) return;
+        setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+        setAutosaveState("saved");
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to autosave RSBK draft:", err);
+          setAutosaveState("idle");
+        }
+      }
+    }, 1500); // 1.5s debounce
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [formData, specialty, totalRsbkScore, filledItems, totalItems]);
+
+  const handleSaveDraft = async () => {
+    try {
+      setAutosaveState("saving");
+      await persistRsbkDraft();
+      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setAutosaveState("saved");
+      setDraftSavedMsg(true);
+    } catch (err) {
+      console.error("Failed to save RSBK draft:", err);
+      setAutosaveState("idle");
+      alert("Draft gagal disimpan ke server. Coba lagi sebentar.");
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!specialty) return;
     if (filledItems < totalItems) return;
     const cleanFormData = stripLegacyToolVariationFields(formData);
+    const draftId = await persistRsbkDraft();
+    if (!draftId) return;
     draftManager.updateDraft(draftId, specialty, "rsbk", {
       data: cleanFormData,
       score: totalRsbkScore,
