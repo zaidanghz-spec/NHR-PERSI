@@ -183,6 +183,21 @@ async function initTursoTables() {
   `);
 
   await client.execute(`
+    CREATE TABLE IF NOT EXISTS survey_backups (
+      id TEXT PRIMARY KEY,
+      hospital_code TEXT NOT NULL,
+      specialty TEXT NOT NULL,
+      patient_name TEXT DEFAULT '',
+      patient_rm TEXT DEFAULT '',
+      payload TEXT DEFAULT '{}',
+      status TEXT DEFAULT 'received',
+      error TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS patients (
       id TEXT PRIMARY KEY,
       hospital_code TEXT NOT NULL,
@@ -286,7 +301,7 @@ async function initTursoTables() {
     )
   `);
 
-  const tablesToMigrate = ["surveys", "patients", "drafts", "submissions", "hospital_accounts", "rankings"];
+  const tablesToMigrate = ["surveys", "survey_backups", "patients", "drafts", "submissions", "hospital_accounts", "rankings"];
 
   // Migrate news table columns (added after initial schema)
   const newsInfo = await client.execute("PRAGMA table_info(news)");
@@ -322,6 +337,18 @@ async function initTursoTables() {
       if (!existingColumns.includes("prom_score")) await client.execute("ALTER TABLE surveys ADD COLUMN prom_score REAL DEFAULT 0");
       if (!existingColumns.includes("overall_score")) await client.execute("ALTER TABLE surveys ADD COLUMN overall_score REAL DEFAULT 0");
       if (!existingColumns.includes("answers")) await client.execute("ALTER TABLE surveys ADD COLUMN answers TEXT DEFAULT '{}'");
+    }
+
+    if (table === "survey_backups") {
+      if (!existingColumns.includes("hospital_code")) await client.execute("ALTER TABLE survey_backups ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.includes("specialty")) await client.execute("ALTER TABLE survey_backups ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.includes("patient_name")) await client.execute("ALTER TABLE survey_backups ADD COLUMN patient_name TEXT DEFAULT ''");
+      if (!existingColumns.includes("patient_rm")) await client.execute("ALTER TABLE survey_backups ADD COLUMN patient_rm TEXT DEFAULT ''");
+      if (!existingColumns.includes("payload")) await client.execute("ALTER TABLE survey_backups ADD COLUMN payload TEXT DEFAULT '{}'");
+      if (!existingColumns.includes("status")) await client.execute("ALTER TABLE survey_backups ADD COLUMN status TEXT DEFAULT 'received'");
+      if (!existingColumns.includes("error")) await client.execute("ALTER TABLE survey_backups ADD COLUMN error TEXT DEFAULT ''");
+      if (!existingColumns.includes("created_at")) await client.execute("ALTER TABLE survey_backups ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP");
+      if (!existingColumns.includes("updated_at")) await client.execute("ALTER TABLE survey_backups ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP");
     }
 
     if (table === "patients") {
@@ -869,6 +896,47 @@ async function getAllEvents() {
   }));
 }
 
+async function saveSurveyBackup({ hospitalCode, specialty, survey, status = "received", error = "", _hospitalEmail }: any) {
+  await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  const patientRm = survey?.medicalRecordNumber || survey?.qRm || "";
+  const patientName = survey?.patientName || survey?.qName || "";
+  const id = `survey-backup-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  await db().execute({
+    sql: `INSERT INTO survey_backups (id, hospital_code, specialty, patient_name, patient_rm, payload, status, error)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, effectiveCode, specialty || "", patientName, patientRm, JSON.stringify(survey || {}), status, error || ""],
+  });
+  return { success: true, backupId: id };
+}
+
+async function getSurveyBackups({ hospitalCode, specialty, limit = 200 }: any) {
+  await initTursoTables();
+  const args: any[] = [hospitalCode];
+  let where = "hospital_code = ?";
+  if (specialty) {
+    where += " AND specialty = ?";
+    args.push(specialty);
+  }
+  args.push(Math.max(1, Math.min(1000, Number(limit) || 200)));
+  const rs = await db().execute({
+    sql: `SELECT * FROM survey_backups WHERE ${where} ORDER BY created_at DESC LIMIT ?`,
+    args,
+  });
+  return rs.rows.map((r: any) => ({
+    id: r.id,
+    hospitalCode: r.hospital_code,
+    specialty: r.specialty,
+    patientName: r.patient_name,
+    medicalRecordNumber: r.patient_rm,
+    payload: parseJson(r.payload, {}),
+    status: r.status,
+    error: r.error,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+}
+
 async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }: any) {
   await initTursoTables();
   const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
@@ -881,17 +949,45 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
     effectiveSpecialty = await resolveRegisteredPatientSpecialty(client, effectiveCode, specialty, patientRm, patientName) || specialty;
   }
 
+  await saveSurveyBackup({
+    hospitalCode: effectiveCode,
+    specialty: effectiveSpecialty,
+    survey: { ...survey, resolvedSpecialty: effectiveSpecialty },
+    status: "submit-received",
+  });
+
   const existing = await client.execute({
-    sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
+    sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
     args: [effectiveCode, effectiveSpecialty, patientRm],
   });
-  if (existing.rows.length > 0) return { success: false, duplicate: true };
+  if (existing.rows.length > 0) {
+    const existingId = String((existing.rows[0] as any).id);
+    await client.execute({
+      sql: `UPDATE surveys
+            SET patient_name = ?, prem_score = ?, prom_score = ?, overall_score = ?, answers = ?
+            WHERE id = ?`,
+      args: [patientName, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {}), existingId],
+    });
+    await saveSurveyBackup({
+      hospitalCode: effectiveCode,
+      specialty: effectiveSpecialty,
+      survey: { ...survey, surveyId: existingId, resolvedSpecialty: effectiveSpecialty },
+      status: "submit-updated-existing",
+    });
+    return { success: true, duplicate: true, updated: true, surveyId: existingId };
+  }
 
   const id = randomId();
   await client.execute({
     sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [id, effectiveCode, effectiveSpecialty, patientName, patientRm, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {})],
+  });
+  await saveSurveyBackup({
+    hospitalCode: effectiveCode,
+    specialty: effectiveSpecialty,
+    survey: { ...survey, surveyId: id, resolvedSpecialty: effectiveSpecialty },
+    status: "submit-inserted",
   });
   return { success: true, surveyId: id };
 }
@@ -1347,6 +1443,8 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   updateEventInDb,
   deleteEventFromDb,
   getAllEvents,
+  saveSurveyBackup,
+  getSurveyBackups,
   submitSurvey,
   getSurveys,
   getSurveyByPatient,

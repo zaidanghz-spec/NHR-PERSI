@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from "react-router";
 import { Heart, MessageSquare, CheckCircle2, Building2, Shield, Star, Clock, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { specialtyAuditData } from "../data/specialtyAuditData";
-import { resolvePatientSurveyDisease, submitSurvey } from "../utils/api";
+import { resolvePatientSurveyDisease, saveSurveyBackup, submitSurvey } from "../utils/api";
 
 // ===== LIKERT SCALE 1-5 =====
 // Based on NHS PREM framework & validated patient experience instruments
@@ -98,6 +98,7 @@ export function PatientPremPromPage() {
   // Use disease-specific specialty key for API
   const diseaseSpecialtyKey = `${selectedSpecialty}-d${effectiveDiseaseIndex}`;
   const surveyDraftKey = `patient-survey-draft-${hospitalCode || ""}-${diseaseSpecialtyKey}-${qRm || ""}`;
+  const surveyPendingKey = `patient-survey-pending-${hospitalCode || ""}-${diseaseSpecialtyKey}-${qRm || ""}`;
 
   useEffect(() => {
     let active = true;
@@ -147,11 +148,20 @@ export function PatientPremPromPage() {
     setAutosaveState("saving");
     const timer = setTimeout(() => {
       localStorage.setItem(surveyDraftKey, JSON.stringify(formData));
+      localStorage.setItem(surveyPendingKey, JSON.stringify({
+        hospitalCode,
+        specialty: diseaseSpecialtyKey,
+        patientName: qName,
+        medicalRecordNumber: qRm,
+        answers: formData,
+        status: "draft",
+        updatedAt: new Date().toISOString(),
+      }));
       setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
       setAutosaveState("saved");
     }, 600);
     return () => clearTimeout(timer);
-  }, [formData, hospitalCode, isSubmitted, qRm, selectedSpecialty, surveyDraftKey]);
+  }, [diseaseSpecialtyKey, formData, hospitalCode, isSubmitted, qName, qRm, selectedSpecialty, surveyDraftKey, surveyPendingKey]);
 
   const handleChange = (id: string, value: string) => {
     setSubmitError("");
@@ -202,16 +212,42 @@ export function PatientPremPromPage() {
       overallScore: scores.overallScore,
       submittedAt: new Date().toISOString(),
     };
+    localStorage.setItem(surveyPendingKey, JSON.stringify({
+      hospitalCode,
+      specialty: diseaseSpecialtyKey,
+      response,
+      status: "submit-pending",
+      updatedAt: new Date().toISOString(),
+    }));
 
     try {
+      try {
+        await saveSurveyBackup(hospitalCode, diseaseSpecialtyKey, response, "client-submit-start");
+      } catch (backupErr) {
+        console.warn("Survey backup preflight failed; keeping local pending copy:", backupErr);
+      }
       const result = await submitSurvey(hospitalCode, diseaseSpecialtyKey, response);
       if (!result.success && !result.duplicate) {
         throw new Error("Server belum menerima jawaban. Silakan coba kirim ulang.");
       }
       localStorage.removeItem(surveyDraftKey);
+      localStorage.removeItem(surveyPendingKey);
       setIsSubmitted(true);
     } catch (err: any) {
       console.error("Failed to submit survey to server:", err);
+      localStorage.setItem(surveyPendingKey, JSON.stringify({
+        hospitalCode,
+        specialty: diseaseSpecialtyKey,
+        response,
+        status: "submit-failed",
+        error: err?.message || String(err || ""),
+        updatedAt: new Date().toISOString(),
+      }));
+      try {
+        await saveSurveyBackup(hospitalCode, diseaseSpecialtyKey, response, "client-submit-failed", err?.message || String(err || ""));
+      } catch (backupErr) {
+        console.warn("Survey failure backup could not reach server; local pending copy retained:", backupErr);
+      }
       setSubmitError(err?.message || "Gagal mengirim jawaban ke server. Silakan coba lagi.");
     } finally {
       setIsSubmitting(false);

@@ -21,6 +21,7 @@ const PUBLIC_OPERATIONS = new Set([
   "getAllRankingsFromDb",
   "getAllNews",
   "getAllEvents",
+  "saveSurveyBackup",
   "submitSurvey",
   "resolvePatientSurveyDisease",
   "initTursoTables",

@@ -194,8 +194,18 @@ export async function submitSurvey(
   hospitalCode: string,
   specialty: string,
   survey: any
-): Promise<{ success: boolean; surveyId?: string; duplicate?: boolean }> {
+): Promise<{ success: boolean; surveyId?: string; duplicate?: boolean; updated?: boolean }> {
   return rpc("submitSurvey", { hospitalCode, specialty, survey });
+}
+
+export async function saveSurveyBackup(
+  hospitalCode: string,
+  specialty: string,
+  survey: any,
+  status = "client-backup",
+  error = ""
+): Promise<{ success: boolean; backupId?: string }> {
+  return rpc("saveSurveyBackup", { hospitalCode, specialty, survey, status, error });
 }
 
 export async function resolvePatientSurveyDisease(
