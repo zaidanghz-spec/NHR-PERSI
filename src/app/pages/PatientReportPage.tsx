@@ -93,6 +93,27 @@ export function PatientReportPage() {
   const lastFullProgressRefreshRef = useRef(0);
   // NOTE: PREM/PROM scores for PDF uploads are set ONLY by admin, not by the hospital
 
+  const getDiseaseIndexFromKey = (key?: string) => {
+    const parsed = Number(String(key || "").match(/-d(\d+)$/)?.[1] ?? NaN);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  };
+
+  const getPatientDiseaseIndex = (patient?: RegisteredPatient | null) => {
+    if (!patient) return activeDiseaseIndex;
+    if (typeof patient.diseaseIndex === "number" && Number.isFinite(patient.diseaseIndex)) return patient.diseaseIndex;
+    return getDiseaseIndexFromKey(patient.diseaseKey || "") ?? activeDiseaseIndex;
+  };
+
+  const getPatientDiseaseKey = (patient?: RegisteredPatient | null) => {
+    const diseaseIndex = getPatientDiseaseIndex(patient);
+    return patient?.diseaseKey || `${specialty}-d${diseaseIndex}`;
+  };
+
+  const getPatientDiseaseName = (patient?: RegisteredPatient | null) => {
+    const diseaseIndex = getPatientDiseaseIndex(patient);
+    return diseases[diseaseIndex]?.diseaseName || patient?.diseaseName || activeDisease?.diseaseName || "";
+  };
+
   useEffect(() => {
     if (!hasHospitalAuth) {
       navigate("/hospital-login");
@@ -226,7 +247,7 @@ export function PatientReportPage() {
         const diseaseIndex =
           typeof patient.diseaseIndex === "number"
             ? patient.diseaseIndex
-            : Number(String(patient.diseaseKey || patient.specialty || "").match(/-d(\d+)$/)?.[1] ?? activeDiseaseIndex);
+            : getDiseaseIndexFromKey(patient.diseaseKey || patient.specialty) ?? activeDiseaseIndex;
         return {
           ...patient,
           diseaseIndex,
@@ -384,15 +405,13 @@ export function PatientReportPage() {
 
   // Build personalized survey URL with disease index
   const buildSurveyUrl = (patient: RegisteredPatient) => {
-    const patientDiseaseIndex =
-      typeof patient.diseaseIndex === "number" && Number.isFinite(patient.diseaseIndex)
-        ? patient.diseaseIndex
-        : activeDiseaseIndex;
+    const patientDiseaseIndex = getPatientDiseaseIndex(patient);
+    const patientDiseaseKey = getPatientDiseaseKey(patient);
     const params = new URLSearchParams({
       name: patient.name,
       rm: patient.rm,
       disease: String(patientDiseaseIndex),
-      diseaseKey: patient.diseaseKey || `${specialty}-d${patientDiseaseIndex}`,
+      diseaseKey: patientDiseaseKey,
     });
     return `${window.location.origin}/patient-survey/${hospitalCode}/${specialty}?${params.toString()}`;
   };
@@ -894,7 +913,7 @@ export function PatientReportPage() {
               </li>
               <li className="flex gap-2">
                 <span className="font-bold text-[#0F4C81] shrink-0">4.</span>
-                <span>Pasien mengisi survei (Puas / Cukup / Kurang), jawaban otomatis masuk ke scoring</span>
+                <span>Pasien mengisi survei skala 1-5, jawaban otomatis masuk ke scoring</span>
               </li>
             </ol>
           </div>
@@ -1323,7 +1342,8 @@ export function PatientReportPage() {
           surveyUrl={buildSurveyUrl(showQRModal)}
           hospitalName={hospitalName}
           specialtyName={specData?.name || ""}
-          diseaseName={showQRModal.diseaseName || activeDisease?.diseaseName || ""}
+          diseaseName={getPatientDiseaseName(showQRModal)}
+          diseaseKey={getPatientDiseaseKey(showQRModal)}
           onClose={() => setShowQRModal(null)}
         />
       )}
@@ -1333,7 +1353,7 @@ export function PatientReportPage() {
         <SurveyReviewModal
           response={showReviewModal}
           specialty={specialty || ""}
-          diseaseIndex={activeDiseaseIndex}
+          diseaseIndex={getDiseaseIndexFromKey((showReviewModal as any).specialty) ?? activeDiseaseIndex}
           onClose={() => setShowReviewModal(null)}
         />
       )}
@@ -1371,9 +1391,17 @@ function SurveyReviewModal({
   const promQuestions = disease?.promQuestions || [];
 
   const getLabelColor = (value: string) => {
-    if (value === "puas") return { label: "Puas", emoji: "\u{1F60A}", bg: "bg-green-100", text: "text-green-700", border: "border-green-300" };
-    if (value === "cukup") return { label: "Cukup", emoji: "\u{1F610}", bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-300" };
-    return { label: "Kurang", emoji: "\u{1F61E}", bg: "bg-red-100", text: "text-red-700", border: "border-red-300" };
+    const normalized = String(value || "").trim().toLowerCase();
+    const legacyMap: Record<string, string> = { puas: "5", cukup: "3", kurang: "1" };
+    const numericValue = legacyMap[normalized] || normalized;
+    const scoreMap: Record<string, { label: string; score: number; bg: string; text: string; border: string }> = {
+      "5": { label: "Sangat Setuju", score: 100, bg: "bg-green-100", text: "text-green-700", border: "border-green-300" },
+      "4": { label: "Setuju", score: 75, bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-300" },
+      "3": { label: "Netral", score: 50, bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-300" },
+      "2": { label: "Tidak Setuju", score: 25, bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-300" },
+      "1": { label: "Sangat Tidak Setuju", score: 0, bg: "bg-red-100", text: "text-red-700", border: "border-red-300" },
+    };
+    return scoreMap[numericValue] || { label: value || "-", score: 0, bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" };
   };
 
   return (
@@ -1446,7 +1474,9 @@ function SurveyReviewModal({
                     </div>
                     {style ? (
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text} border ${style.border} flex-shrink-0`}>
-                        <span>{style.emoji}</span> {style.label}
+                        <span className="font-black">{style.score}</span>
+                        <span className="text-[10px] opacity-80">/100</span>
+                        <span className="hidden sm:inline">- {style.label}</span>
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400 italic">Tidak dijawab</span>
@@ -1476,7 +1506,9 @@ function SurveyReviewModal({
                     </div>
                     {style ? (
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text} border ${style.border} flex-shrink-0`}>
-                        <span>{style.emoji}</span> {style.label}
+                        <span className="font-black">{style.score}</span>
+                        <span className="text-[10px] opacity-80">/100</span>
+                        <span className="hidden sm:inline">- {style.label}</span>
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400 italic">Tidak dijawab</span>
@@ -1510,6 +1542,7 @@ function PatientQRModal({
   hospitalName,
   specialtyName,
   diseaseName,
+  diseaseKey,
   onClose,
 }: {
   patient: RegisteredPatient;
@@ -1517,6 +1550,7 @@ function PatientQRModal({
   hospitalName: string;
   specialtyName: string;
   diseaseName: string;
+  diseaseKey: string;
   onClose: () => void;
 }) {
   const handleCopy = () => {
@@ -1568,7 +1602,7 @@ function PatientQRModal({
       ctx.fillStyle = "#888888";
       ctx.font = "14px Arial";
       ctx.fillText("Scan QR Code di atas untuk mengisi survei", 300, 720);
-      ctx.fillText("Penilaian: Puas | Cukup | Kurang", 300, 745);
+      ctx.fillText("Skala: 5=Sangat Setuju sampai 1=Sangat Tidak Setuju", 300, 745);
 
       ctx.fillStyle = "#0F4C81";
       ctx.fillRect(0, 850, 600, 70);
@@ -1607,6 +1641,7 @@ function PatientQRModal({
           </div>
           <p className="text-gray-500 font-medium text-sm">{hospitalName}</p>
           <p className="text-xs text-teal-600 font-bold uppercase tracking-wider">{specialtyName} - {diseaseName}</p>
+          <p className="text-[11px] text-gray-400 font-mono">{diseaseKey}</p>
         </div>
 
         <div className="inline-block bg-white rounded-3xl border-4 border-[#0F4C81] p-6 mb-6 shadow-md">
@@ -1618,9 +1653,9 @@ function PatientQRModal({
         </p>
 
         <div className="flex items-center justify-center gap-3 text-sm mb-6">
-          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">Puas</span>
-          <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-semibold">Cukup</span>
-          <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-semibold">Kurang</span>
+          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">5 = 100</span>
+          <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-semibold">3 = 50</span>
+          <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-semibold">1 = 0</span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

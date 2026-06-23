@@ -1032,6 +1032,7 @@ function mapSurveyRow(r: any) {
     id: r.id,
     patientName: r.patient_name,
     medicalRecordNumber: r.patient_rm,
+    specialty: r.specialty,
     premScore: r.prem_score,
     promScore: r.prom_score,
     overallScore: r.overall_score,
