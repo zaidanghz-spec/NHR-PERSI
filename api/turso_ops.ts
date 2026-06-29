@@ -1395,12 +1395,43 @@ async function saveHospitalDraft({ draft }: any) {
   }
 }
 
-async function getAllHospitalDrafts() {
+async function getAllHospitalDrafts({ _hospitalEmail, _authRole }: any = {}) {
   await initTursoTables();
   const client = db();
-  const { typeCol, dataCol, updatedCol } = await getDraftSchema(client);
-  const rs = await client.execute(`SELECT ${dataCol} as data FROM drafts WHERE ${typeCol} = 'hospital-assessment' ORDER BY ${updatedCol} DESC`);
+  const { typeCol, hCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : "";
+  const shouldScopeToHospital = _authRole === "hospital" && Boolean(effectiveCode);
+  const rs = shouldScopeToHospital
+    ? await client.execute({
+        sql: `SELECT ${dataCol} as data FROM drafts WHERE ${typeCol} = 'hospital-assessment' AND ${hCol} = ? ORDER BY ${updatedCol} DESC`,
+        args: [effectiveCode],
+      })
+    : await client.execute(`SELECT ${dataCol} as data FROM drafts WHERE ${typeCol} = 'hospital-assessment' ORDER BY ${updatedCol} DESC`);
   return rs.rows.map((r: any) => parseJson(r.data, null)).filter(Boolean);
+}
+
+async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail }: any) {
+  await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  if (!effectiveCode) return [];
+  const client = db();
+  const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const rs = await client.execute({
+    sql: `SELECT ${idCol} as id, ${typeCol} as type, ${hCol} as hospitalCode, ${sCol} as specialty, ${dataCol} as data, ${updatedCol} as updatedAt
+          FROM drafts
+          WHERE ${hCol} = ?
+            AND ${typeCol} IN ('rsbk', 'clinical-audit', 'patient-report')
+          ORDER BY ${updatedCol} DESC`,
+    args: [effectiveCode],
+  });
+  return rs.rows.map((r: any) => ({
+    id: r.id,
+    type: r.type,
+    hospitalCode: r.hospitalCode,
+    specialty: r.specialty,
+    data: parseJson(r.data, null),
+    updatedAt: r.updatedAt,
+  })).filter((draft: any) => draft.data);
 }
 
 async function deleteHospitalDraft({ draftId }: any) {
@@ -1463,6 +1494,7 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   deleteDraft,
   saveHospitalDraft,
   getAllHospitalDrafts,
+  getHospitalModuleDrafts,
   deleteHospitalDraft,
   bulkAddSurveys,
 };

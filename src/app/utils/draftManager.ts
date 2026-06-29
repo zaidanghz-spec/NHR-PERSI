@@ -1,4 +1,9 @@
-import { saveHospitalDraft, getAllHospitalDrafts, deleteHospitalDraft as deleteCloudDraft } from "./api";
+import {
+  saveHospitalDraft,
+  getAllHospitalDrafts,
+  getHospitalModuleDrafts,
+  deleteHospitalDraft as deleteCloudDraft,
+} from "./api";
 import { safeLocalStorageSet } from "./storage";
 
 export interface DraftData {
@@ -50,6 +55,133 @@ const DRAFT_SCOPED_SESSION_SUFFIXES = [
   "_prmPatientCount",
   "_prmSummary",
 ];
+
+const normalize = (value?: string) => (value || "").trim().toLowerCase();
+
+function deriveHospitalCode(email?: string) {
+  return email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
+}
+
+function getDraftHospitalCode(draft: DraftData) {
+  return draft.hospitalCode || deriveHospitalCode(draft.hospitalEmail);
+}
+
+function matchesHospitalDraft(draft: DraftData, hospital?: { hospitalName?: string; email?: string; hospitalCode?: string }) {
+  if (!hospital) return true;
+  const code = hospital.hospitalCode || deriveHospitalCode(hospital.email);
+  return (
+    normalize(draft.hospitalName) === normalize(hospital.hospitalName) ||
+    Boolean(code && getDraftHospitalCode(draft) && normalize(getDraftHospitalCode(draft)) === normalize(code)) ||
+    Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email))
+  );
+}
+
+function stageFromModuleType(type: string): "rsbk" | "clinicalAudit" | "patientReport" | null {
+  if (type === "rsbk") return "rsbk";
+  if (type === "clinical-audit") return "clinicalAudit";
+  if (type === "patient-report") return "patientReport";
+  return null;
+}
+
+function normalizeModuleData(moduleDraft: any) {
+  const data = moduleDraft?.data || {};
+  if (moduleDraft?.type === "rsbk") {
+    return {
+      data: stripLegacyToolVariationFields(data.formData || data.data || {}),
+      score: data.score,
+      completed: Boolean(data.completed),
+    };
+  }
+  if (moduleDraft?.type === "clinical-audit") {
+    return {
+      data: data.formData || data.data || {},
+      patientMeta: data.patientMeta,
+      currentPatient: data.currentPatient,
+      activeDiseaseIndex: data.activeDiseaseIndex,
+      score: data.score,
+      completed: Boolean(data.completed),
+    };
+  }
+  if (moduleDraft?.type === "patient-report") {
+    const patients = Array.isArray(data.registeredPatients) ? data.registeredPatients : [];
+    return {
+      data: data.data || { registeredPatients: patients },
+      patientCount: data.patientCount ?? patients.length,
+      score: data.score,
+      completed: Boolean(data.completed),
+    };
+  }
+  return { data };
+}
+
+function mergeModuleDraftsIntoAssessments(
+  assessments: DraftData[],
+  moduleDrafts: any[],
+  hospital?: { hospitalName?: string; picName?: string; email?: string; hospitalCode?: string }
+) {
+  const modulesByHospital = new Map<string, any[]>();
+  moduleDrafts.forEach((moduleDraft) => {
+    const code = moduleDraft.hospitalCode || hospital?.hospitalCode || deriveHospitalCode(hospital?.email);
+    if (!code || !moduleDraft.specialty) return;
+    const key = normalize(code);
+    modulesByHospital.set(key, [...(modulesByHospital.get(key) || []), moduleDraft]);
+  });
+
+  modulesByHospital.forEach((modules, normalizedCode) => {
+    const code = modules[0]?.hospitalCode || hospital?.hospitalCode || deriveHospitalCode(hospital?.email);
+    let draft = assessments
+      .filter((item) => matchesHospitalDraft(item, { ...hospital, hospitalCode: code }))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+
+    if (!draft) {
+      draft = {
+        draftId: `draft_recovered_${code || normalizedCode}`,
+        hospitalName: hospital?.hospitalName || "Rumah Sakit",
+        hospitalCode: code,
+        hospitalEmail: hospital?.email,
+        picName: hospital?.picName || "",
+        createdAt: modules.reduce((oldest, item) => {
+          const stamp = item.updatedAt || new Date().toISOString();
+          return new Date(stamp) < new Date(oldest) ? stamp : oldest;
+        }, modules[0]?.updatedAt || new Date().toISOString()),
+        updatedAt: modules[0]?.updatedAt || new Date().toISOString(),
+        selectedSpecialties: [],
+        progress: {},
+      };
+      assessments.push(draft);
+    }
+
+    draft.hospitalCode = draft.hospitalCode || code;
+    draft.hospitalEmail = draft.hospitalEmail || hospital?.email;
+    draft.hospitalName = draft.hospitalName || hospital?.hospitalName || "Rumah Sakit";
+    draft.picName = draft.picName || hospital?.picName || "";
+
+    modules.forEach((moduleDraft) => {
+      const stage = stageFromModuleType(moduleDraft.type);
+      const specialty = moduleDraft.specialty;
+      if (!stage || !specialty) return;
+      if (!draft.selectedSpecialties.includes(specialty)) draft.selectedSpecialties.push(specialty);
+      if (!draft.progress[specialty]) {
+        draft.progress[specialty] = {
+          rsbk: { completed: false, data: {} },
+          clinicalAudit: { completed: false, data: {} },
+          patientReport: { completed: false, data: {} },
+        };
+      }
+      const moduleUpdatedAt = moduleDraft.updatedAt ? new Date(moduleDraft.updatedAt).getTime() : 0;
+      const draftUpdatedAt = draft.updatedAt ? new Date(draft.updatedAt).getTime() : 0;
+      const stageData = normalizeModuleData(moduleDraft);
+      const existingStage = draft.progress[specialty][stage];
+      const existingHasData = existingStage?.data && Object.keys(existingStage.data).length > 0;
+      if (!existingHasData || moduleUpdatedAt >= draftUpdatedAt) {
+        draft.progress[specialty][stage] = { ...existingStage, ...stageData };
+      }
+      if (moduleUpdatedAt > draftUpdatedAt) draft.updatedAt = moduleDraft.updatedAt;
+    });
+  });
+
+  return assessments;
+}
 
 export function stripLegacyToolVariationFields<T extends Record<string, any>>(data: T = {} as T): T {
   return Object.fromEntries(
@@ -160,6 +292,18 @@ export const draftManager = {
     return draft;
   },
 
+  async createDraftAndSync(
+    hospitalName: string,
+    picName: string,
+    selectedSpecialties: string[],
+    hospitalCode?: string,
+    hospitalEmail?: string
+  ): Promise<DraftData> {
+    const draft = this.createDraft(hospitalName, picName, selectedSpecialties, hospitalCode, hospitalEmail);
+    await saveHospitalDraft(draft);
+    return draft;
+  },
+
   // Update draft
   updateDraft(
     draftId: string,
@@ -208,6 +352,17 @@ export const draftManager = {
 
     // Async push to cloud
     saveHospitalDraft(draft).catch(err => console.error("Cloud draft update failed:", err));
+  },
+
+  async updateDraftAndSync(
+    draftId: string,
+    specialty: string,
+    stage: "rsbk" | "clinicalAudit" | "patientReport",
+    data: Parameters<typeof this.updateDraft>[3]
+  ): Promise<void> {
+    this.updateDraft(draftId, specialty, stage, data);
+    const draft = this.getDraftById(draftId);
+    if (draft) await saveHospitalDraft(draft);
   },
 
   // Delete draft
@@ -294,34 +449,42 @@ export const draftManager = {
   },
 
   // Manual cloud sync reconciliation
-  async syncWithCloud(): Promise<void> {
+  async syncWithCloud(hospital?: { hospitalName?: string; picName?: string; email?: string; hospitalCode?: string }): Promise<void> {
     try {
       const cloudDrafts = await getAllHospitalDrafts();
+      const hospitalCode = hospital?.hospitalCode || deriveHospitalCode(hospital?.email);
+      const moduleDrafts = hospitalCode ? await getHospitalModuleDrafts(hospitalCode) : [];
       const deletedIds = this.getDeletedDraftIds();
-      if (cloudDrafts.length > 0) {
-        const localDrafts = this.getAllDrafts();
-        
-        // Deleted cloud drafts can resolve after a local delete. Tombstones prevent them from being merged back.
-        const mergedDrafts = [...localDrafts];
-        
-        cloudDrafts.forEach(cd => {
-          if (deletedIds.includes(cd.draftId)) {
-            deleteCloudDraft(cd.draftId).catch(err => console.error("Cloud tombstone cleanup failed:", err));
-            return;
+      const localDrafts = this.getAllDrafts();
+      
+      // Deleted cloud drafts can resolve after a local delete. Tombstones prevent them from being merged back.
+      const mergedDrafts = [...localDrafts];
+      
+      cloudDrafts.forEach(cd => {
+        if (deletedIds.includes(cd.draftId)) {
+          deleteCloudDraft(cd.draftId).catch(err => console.error("Cloud tombstone cleanup failed:", err));
+          return;
+        }
+        const index = mergedDrafts.findIndex(ld => ld.draftId === cd.draftId);
+        if (index === -1) {
+          mergedDrafts.push(cd);
+        } else {
+          // Compare updatedAt
+          if (new Date(cd.updatedAt) > new Date(mergedDrafts[index].updatedAt)) {
+            mergedDrafts[index] = cd;
           }
-          const index = mergedDrafts.findIndex(ld => ld.draftId === cd.draftId);
-          if (index === -1) {
-            mergedDrafts.push(cd);
-          } else {
-            // Compare updatedAt
-            if (new Date(cd.updatedAt) > new Date(mergedDrafts[index].updatedAt)) {
-              mergedDrafts[index] = cd;
-            }
-          }
-        });
+        }
+      });
 
-        safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(mergedDrafts));
-      }
+      // Recovery path: old/local-only failures could leave module drafts in cloud without a parent assessment draft.
+      // Rebuilding the parent draft makes progress visible again on any device after login.
+      const recoveredDrafts = mergeModuleDraftsIntoAssessments(mergedDrafts, moduleDrafts, hospital);
+      safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(recoveredDrafts));
+
+      const currentHospitalDrafts = hospital
+        ? recoveredDrafts.filter((draft) => matchesHospitalDraft(draft, hospital))
+        : recoveredDrafts;
+      await Promise.allSettled(currentHospitalDrafts.map((draft) => saveHospitalDraft(draft)));
     } catch (err) {
       console.error("Manual cloud sync failed:", err);
     }

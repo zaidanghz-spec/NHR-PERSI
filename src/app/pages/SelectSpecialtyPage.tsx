@@ -47,7 +47,7 @@ export function SelectSpecialtyPage() {
     loadLocalDrafts();
 
     // Sync with cloud and update state
-    draftManager.syncWithCloud().then(() => {
+    draftManager.syncWithCloud(parsedAuth).then(() => {
       loadLocalDrafts();
     });
     syncWithCloud().catch(console.error);
@@ -110,7 +110,7 @@ export function SelectSpecialtyPage() {
     });
   };
 
-  const handleStartAssessment = () => {
+  const handleStartAssessment = async () => {
     if (selectedSpecialties.length === 0) {
       alert("Pilih minimal 1 pelayanan untuk memulai assessment");
       return;
@@ -119,7 +119,7 @@ export function SelectSpecialtyPage() {
     if (!authData) return;
 
     // Create new draft
-    const draft = draftManager.createDraft(
+    const draft = await draftManager.createDraftAndSync(
       authData.hospitalName,
       authData.picName,
       selectedSpecialties,
@@ -133,7 +133,7 @@ export function SelectSpecialtyPage() {
     navigate(`/siap-persi/rsbk/${selectedSpecialties[0]}`);
   };
 
-  const handleStartSingleAssessment = (specId: string) => {
+  const handleStartSingleAssessment = async (specId: string) => {
     if (!authData) return;
     const spec = specialties.find(s => s.id === specId);
     const submission = spec ? getSpecialtySubmission(spec.name) : null;
@@ -180,9 +180,10 @@ export function SelectSpecialtyPage() {
         localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
       }
       draftManager.beginDraftSession(existingDraft);
+      await draftManager.syncWithCloud(authData);
     } else {
       // Create new draft
-      const draft = draftManager.createDraft(
+      const draft = await draftManager.createDraftAndSync(
         authData.hospitalName,
         authData.picName,
         specs,

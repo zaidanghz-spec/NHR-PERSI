@@ -311,6 +311,11 @@ export async function getAllHospitalDrafts(): Promise<any[]> {
   catch (err) { console.error("Get All Hospital Drafts Error:", err); return []; }
 }
 
+export async function getHospitalModuleDrafts(hospitalCode: string): Promise<any[]> {
+  try { return await rpc<any[]>("getHospitalModuleDrafts", { hospitalCode }); }
+  catch (err) { console.error("Get Hospital Module Drafts Error:", err); return []; }
+}
+
 export async function deleteHospitalDraft(draftId: string): Promise<void> {
   await rpc("deleteHospitalDraft", { draftId });
 }
