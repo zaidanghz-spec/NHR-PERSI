@@ -496,16 +496,21 @@ export function PatientReportPage() {
   };
 
   // Remove registered patient
-  const handleRemovePatient = async (id: string) => {
+  const handleRemovePatient = async (patient: RegisteredPatient & { surveyed?: boolean }) => {
     if (!hasHospitalAuth || !hospitalCode) {
       navigate("/hospital-login");
       return;
     }
+    const warning = patient.surveyed
+      ? `Hapus pasien ${patient.name} (${patient.rm}) beserta jawaban surveinya? Data ini tidak akan dihitung lagi.`
+      : `Hapus pasien ${patient.name} (${patient.rm}) dari daftar?`;
+    if (!window.confirm(warning)) return;
 
     try {
       setAutosaveState("saving");
-      await api.removePatient(hospitalCode, diseaseSpecialtyKey, id);
+      await api.removePatient(hospitalCode, getPatientDiseaseKey(patient), patient.id);
       await loadRegisteredPatients();
+      await loadResponses();
       setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
       setAutosaveState("saved");
     } catch (err) {
@@ -1003,15 +1008,15 @@ export function PatientReportPage() {
                           >
                             <Copy className="w-4 h-4" />
                           </button>
-                          {!p.surveyed && (
-                            <button
-                              onClick={() => handleRemovePatient(p.id)}
-                              className="p-2 rounded-lg hover:bg-red-50 text-red-400 transition-colors"
-                              title="Hapus"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleRemovePatient(p)}
+                            className={`p-2 rounded-lg hover:bg-red-50 transition-colors ${
+                              p.surveyed ? "text-red-600" : "text-red-400"
+                            }`}
+                            title={p.surveyed ? "Hapus pasien dan jawaban survei" : "Hapus pasien"}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

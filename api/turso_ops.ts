@@ -1154,9 +1154,8 @@ async function restoreSurveyRowsFromBackups(client: any, hospitalCode: string) {
     const answers = survey?.answers || {};
     if (!patientRm || Object.keys(answers).length === 0) continue;
 
-    const resolvedSpecialty =
-      await resolveRegisteredPatientSpecialty(client, hospitalCode, backup.specialty, patientRm, patientName) ||
-      backup.specialty;
+    const resolvedSpecialty = await resolveRegisteredPatientSpecialty(client, hospitalCode, backup.specialty, patientRm, patientName);
+    if (!resolvedSpecialty) continue;
     const key = `${resolvedSpecialty}::${normalizePatientCodeKey(patientRm)}`;
     latestByPatient.set(key, {
       specialty: resolvedSpecialty,
@@ -1404,16 +1403,39 @@ async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
   }
 }
 
-async function removePatient({ hospitalCode, patientId }: any) {
+async function removePatient({ hospitalCode, specialty, patientId }: any) {
   await initTursoTables();
   const client = db();
   const info = await client.execute("PRAGMA table_info(patients)");
   const existingCols = info.rows.map((r: any) => r.name);
   const hCol = existingCols.includes("hospital_code") ? "hospital_code" : existingCols.includes("hospitalCode") ? "hospitalCode" : "hospital_code";
+  const sCol = existingCols.find((c: string) => ["specialty", "specialtyname"].includes(c.toLowerCase())) || "specialty";
+  const rmCol = existingCols.find((c: string) => ["rm", "patient_rm", "patientrm", "medical_record_number", "medicalrecordnumber"].includes(c.toLowerCase())) || "rm";
+  const nameCol = existingCols.find((c: string) => ["name", "patient_name", "patientname"].includes(c.toLowerCase())) || "name";
+  const existing = await client.execute({
+    sql: `SELECT ${sCol} as specialty, ${rmCol} as rm, ${nameCol} as name FROM patients WHERE id = ? AND ${hCol} = ? LIMIT 1`,
+    args: [patientId, hospitalCode],
+  });
+  const patient: any = existing.rows[0];
+  const patientSpecialty = patient?.specialty || specialty || "";
+  const patientRm = patient?.rm || "";
+
   await client.execute({
     sql: `DELETE FROM patients WHERE id = ? AND ${hCol} = ?`,
     args: [patientId, hospitalCode],
   });
+
+  if (patientRm) {
+    await client.execute({
+      sql: "DELETE FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
+      args: [hospitalCode, patientSpecialty, patientRm],
+    });
+    await client.execute({
+      sql: "DELETE FROM survey_backups WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
+      args: [hospitalCode, patientSpecialty, patientRm],
+    });
+  }
+  return { success: true };
 }
 
 async function getDraft({ type, hospitalCode, specialty }: any) {
