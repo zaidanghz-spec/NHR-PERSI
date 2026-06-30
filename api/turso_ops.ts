@@ -5,6 +5,7 @@ import path from "node:path";
 import jwt from "jsonwebtoken";
 
 let tablesInitialized = false;
+const surveyBackupRestoreCheckedAt = new Map<string, number>();
 
 function getDatabaseUrl() {
   return (
@@ -1130,9 +1131,75 @@ async function reconcileSurveySpecialties(client: any, hospitalCode: string) {
   }
 }
 
+async function restoreSurveyRowsFromBackups(client: any, hospitalCode: string) {
+  if (!hospitalCode) return;
+  const now = Date.now();
+  const lastChecked = surveyBackupRestoreCheckedAt.get(hospitalCode) || 0;
+  if (now - lastChecked < 60_000) return;
+
+  const backups = await client.execute({
+    sql: `SELECT hospital_code, specialty, patient_name, patient_rm, payload, created_at
+          FROM survey_backups
+          WHERE hospital_code = ?
+          ORDER BY created_at ASC`,
+    args: [hospitalCode],
+  });
+  const latestByPatient = new Map<string, any>();
+
+  for (const backup of backups.rows as any[]) {
+    const payload = parseJson(backup.payload, {});
+    const survey = payload?.response || payload;
+    const patientRm = survey?.medicalRecordNumber || survey?.qRm || backup.patient_rm || "";
+    const patientName = survey?.patientName || survey?.qName || backup.patient_name || "";
+    const answers = survey?.answers || {};
+    if (!patientRm || Object.keys(answers).length === 0) continue;
+
+    const resolvedSpecialty =
+      await resolveRegisteredPatientSpecialty(client, hospitalCode, backup.specialty, patientRm, patientName) ||
+      backup.specialty;
+    const key = `${resolvedSpecialty}::${normalizePatientCodeKey(patientRm)}`;
+    latestByPatient.set(key, {
+      specialty: resolvedSpecialty,
+      patientName,
+      patientRm,
+      premScore: survey?.premScore ?? 0,
+      promScore: survey?.promScore ?? 0,
+      overallScore: survey?.overallScore ?? 0,
+      answers,
+    });
+  }
+
+  for (const item of latestByPatient.values()) {
+    const exists = await client.execute({
+      sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
+      args: [hospitalCode, item.specialty, item.patientRm],
+    });
+    if (exists.rows.length > 0) continue;
+
+    await client.execute({
+      sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        randomId(),
+        hospitalCode,
+        item.specialty,
+        item.patientName,
+        item.patientRm,
+        item.premScore,
+        item.promScore,
+        item.overallScore,
+        JSON.stringify(item.answers || {}),
+      ],
+    });
+  }
+  surveyBackupRestoreCheckedAt.set(hospitalCode, now);
+}
+
 async function getSurveys({ hospitalCode, specialty }: any) {
   await initTursoTables();
   const client = db();
+  await reconcileSurveySpecialties(client, hospitalCode);
+  await restoreSurveyRowsFromBackups(client, hospitalCode);
   await reconcileSurveySpecialties(client, hospitalCode);
   const rs = await client.execute({
     sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? ORDER BY created_at DESC",
@@ -1144,6 +1211,8 @@ async function getSurveys({ hospitalCode, specialty }: any) {
 async function getSurveyByPatient({ hospitalCode, specialty, patientRm }: any) {
   await initTursoTables();
   const client = db();
+  await reconcileSurveySpecialties(client, hospitalCode);
+  await restoreSurveyRowsFromBackups(client, hospitalCode);
   await reconcileSurveySpecialties(client, hospitalCode);
   const rs = await client.execute({
     sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",

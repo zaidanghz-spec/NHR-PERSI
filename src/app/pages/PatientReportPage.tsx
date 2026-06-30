@@ -48,6 +48,25 @@ const normalizePatientCode = (value?: string) =>
 const normalizePatientName = (value?: string) =>
   String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 
+const getSurveyIdentity = (response: any) => {
+  const code = normalizePatientCode(response?.medicalRecordNumber || response?.patientRm || response?.qRm || response?.rm);
+  if (code) return `rm:${code}`;
+  const name = normalizePatientName(response?.patientName || response?.qName || response?.name);
+  return name ? `name:${name}` : `id:${response?.id || JSON.stringify(response || {})}`;
+};
+
+const getUniqueSurveyResponses = (responses: PatientSurveyResponse[]) => {
+  const byPatient = new Map<string, PatientSurveyResponse>();
+  responses.forEach((response) => {
+    const key = getSurveyIdentity(response);
+    const existing = byPatient.get(key);
+    const existingTime = existing ? new Date(existing.submittedAt || (existing as any).timestamp || 0).getTime() : 0;
+    const incomingTime = new Date(response.submittedAt || (response as any).timestamp || 0).getTime();
+    if (!existing || incomingTime >= existingTime) byPatient.set(key, response);
+  });
+  return Array.from(byPatient.values());
+};
+
 export function PatientReportPage() {
   const { specialty } = useParams<{ specialty: string }>();
   const navigate = useNavigate();
@@ -264,7 +283,7 @@ export function PatientReportPage() {
   const loadResponses = useCallback(async () => {
     if (!hasHospitalAuth || !hospitalCode || !specialty) return;
     try {
-      const surveys = await api.getSurveys(hospitalCode, diseaseSpecialtyKey);
+      const surveys = getUniqueSurveyResponses(await api.getSurveys(hospitalCode, diseaseSpecialtyKey));
       setSurveyResponses(surveys);
       
       // Update completion map for ACTIVE disease
@@ -282,7 +301,7 @@ export function PatientReportPage() {
     const progress: Record<number, number> = {};
     for (let i = 0; i < diseases.length; i++) {
       const dKey = `${specialty}-d${i}`;
-      const surveys = await api.getSurveys(hospitalCode, dKey);
+      const surveys = getUniqueSurveyResponses(await api.getSurveys(hospitalCode, dKey));
       
       // Check for PDF upload via API
       const customData = await api.getCustomSurveyMetadata(hospitalCode, dKey);
@@ -298,7 +317,7 @@ export function PatientReportPage() {
     const scores: typeof allDiseaseScores = {};
     for (let i = 0; i < diseases.length; i++) {
       const dKey = `${specialty}-d${i}`;
-      const surveys = await api.getSurveys(hospitalCode, dKey);
+      const surveys = getUniqueSurveyResponses(await api.getSurveys(hospitalCode, dKey));
       const customData = await api.getCustomSurveyMetadata(hospitalCode, dKey);
       const qrCount = surveys.length;
       const pdfCount = customData ? (customData.patientCount || 0) : 0;
@@ -384,17 +403,22 @@ export function PatientReportPage() {
   });
 
   // Calculate aggregated scores for QR/non-PDF responses. PDF scores are reviewed by admin.
-  const qrPatientCount = surveyResponses.length;
+  // The dashboard count follows completed registered patients, not only the raw response row count,
+  // because older retries/backups can temporarily create stale or duplicate response rows.
+  const uniqueSurveyResponses = getUniqueSurveyResponses(surveyResponses);
+  const completedRegisteredPatientCount = patientsWithStatus.filter((patient) => patient.surveyed).length;
+  const qrPatientCount = Math.min(targetPatientCount, Math.max(uniqueSurveyResponses.length, completedRegisteredPatientCount));
   const pdfPatientCount = customSurveyUploaded ? customSurveyPatientCount : 0;
   const patientCount = qrPatientCount + pdfPatientCount;
-  const avgPremScore = qrPatientCount > 0
-    ? Math.round(surveyResponses.reduce((s, r) => s + r.premScore, 0) / qrPatientCount)
+  const scorePatientCount = uniqueSurveyResponses.length;
+  const avgPremScore = scorePatientCount > 0
+    ? Math.round(uniqueSurveyResponses.reduce((s, r) => s + r.premScore, 0) / scorePatientCount)
     : 0;
-  const avgPromScore = qrPatientCount > 0
-    ? Math.round(surveyResponses.reduce((s, r) => s + r.promScore, 0) / qrPatientCount)
+  const avgPromScore = scorePatientCount > 0
+    ? Math.round(uniqueSurveyResponses.reduce((s, r) => s + r.promScore, 0) / scorePatientCount)
     : 0;
-  const overallScore = qrPatientCount > 0
-    ? Math.round(surveyResponses.reduce((s, r) => s + r.overallScore, 0) / qrPatientCount)
+  const overallScore = scorePatientCount > 0
+    ? Math.round(uniqueSurveyResponses.reduce((s, r) => s + r.overallScore, 0) / scorePatientCount)
     : 0;
   const sampleValidityWeight = getSampleValidityWeight(patientCount);
   const qrValidityWeight = getSampleValidityWeight(qrPatientCount);
@@ -542,7 +566,7 @@ export function PatientReportPage() {
     try {
       for (let i = 0; i < diseases.length; i++) {
         const dKey = `${specialty}-d${i}`;  // Must match diseaseSpecialtyKey format
-        const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
+        const diseaseSurveys = getUniqueSurveyResponses(await api.getSurveys(hospitalCode, dKey));
         
         const customDoc = await api.getCustomSurveyMetadata(hospitalCode, dKey);
         const qrCount = diseaseSurveys.length;
@@ -615,7 +639,7 @@ export function PatientReportPage() {
     try {
       for (let i = 0; i < diseases.length; i++) {
         const dKey = `${specialty}-d${i}`;
-        const diseaseSurveys = await api.getSurveys(hospitalCode, dKey);
+        const diseaseSurveys = getUniqueSurveyResponses(await api.getSurveys(hospitalCode, dKey));
         const customData = await api.getCustomSurveyMetadata(hospitalCode, dKey);
         const diseaseCount = diseaseSurveys.length + (customData ? (customData.patientCount || 0) : 0);
         totalPRMPatients += diseaseCount;
