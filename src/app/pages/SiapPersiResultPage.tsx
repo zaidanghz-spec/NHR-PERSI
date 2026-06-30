@@ -809,7 +809,7 @@ export function SiapPersiResultPage() {
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !canSubmitAll}
+              disabled={isSubmitting}
               className="flex-1 h-12 bg-gradient-to-r from-[#0F4C81] to-[#14B8A6] hover:from-[#0d3d66] hover:to-[#0d9488] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting

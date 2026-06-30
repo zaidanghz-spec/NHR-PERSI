@@ -112,7 +112,10 @@ export function PatientPremPromPage() {
 
       try {
         if (!active) return;
-        const resolved = await resolvePatientSurveyDisease(hospitalCode, selectedSpecialty, qName, qRm);
+        const resolved = await Promise.race([
+          resolvePatientSurveyDisease(hospitalCode, selectedSpecialty, qName, qRm),
+          new Promise<{ found: false }>((resolve) => setTimeout(() => resolve({ found: false }), 8000)),
+        ]);
         if (!active) return;
         if (resolved.found && typeof resolved.diseaseIndex === "number") {
           setEffectiveDiseaseIndex(resolved.diseaseIndex);

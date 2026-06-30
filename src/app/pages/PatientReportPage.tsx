@@ -560,6 +560,17 @@ export function PatientReportPage() {
       return;
     }
 
+    const incompleteDiseases = diseases
+      .map((disease, index) => ({
+        name: disease.diseaseName || `Penyakit ${index + 1}`,
+        count: diseaseCompletion[index] || 0,
+      }))
+      .filter((item) => item.count < 1);
+    if (incompleteDiseases.length > 0) {
+      alert(`Patient Report belum bisa dilanjutkan. Isi minimal 1 pasien untuk setiap penyakit:\n- ${incompleteDiseases.map((item) => `${item.name}: ${item.count} pasien`).join("\n- ")}`);
+      return;
+    }
+
     const activeDraftId = draftManager.getCurrentDraftId();
     await handleSaveDraft();
     if (activeDraftId && draftManager.getCurrentDraftId() !== activeDraftId) return;
@@ -1346,8 +1357,7 @@ export function PatientReportPage() {
 
           <Button
             onClick={handleContinue}
-            disabled={Object.values(diseaseCompletion).length < diseases.length || Object.values(diseaseCompletion).some(count => count < 1)}
-            className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 h-12 bg-[#0F4C81] hover:bg-[#0d3d66] font-semibold"
           >
             {Object.values(diseaseCompletion).length < diseases.length || Object.values(diseaseCompletion).some(count => count < 1)
               ? `Mohon isi minimal 1 pasien untuk SETIAP penyakit`
