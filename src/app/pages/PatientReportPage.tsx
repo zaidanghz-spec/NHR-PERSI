@@ -1021,12 +1021,15 @@ export function PatientReportPage() {
                           </button>
                           <button
                             onClick={() => handleRemovePatient(p)}
-                            className={`p-2 rounded-lg hover:bg-red-50 transition-colors ${
-                              p.surveyed ? "text-red-600" : "text-red-400"
+                            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                              p.surveyed
+                                ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                                : "border-red-100 text-red-500 hover:bg-red-50"
                             }`}
                             title={p.surveyed ? "Hapus pasien dan jawaban survei" : "Hapus pasien"}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Hapus
                           </button>
                         </div>
                       </td>
