@@ -1412,7 +1412,7 @@ async function getSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
   await reconcileSurveySpecialties(client, effectiveCode);
   await restoreSurveyRowsFromBackups(client, effectiveCode);
   await reconcileSurveySpecialties(client, effectiveCode);
-  const { hCol, sCol, rmCol } = await getPatientTableSchema(client);
+  const { idCol: pIdCol, hCol, sCol, nameCol, rmCol, tokenCol } = await getPatientTableSchema(client);
   const rs = await client.execute({
     sql: `SELECT s.*
           FROM surveys s
@@ -1423,7 +1423,11 @@ async function getSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
               FROM patients p
               WHERE p.${hCol} = s.hospital_code
                 AND p.${sCol} = s.specialty
-                AND p.${rmCol} = s.patient_rm
+                AND (
+                  (s.patient_id IS NOT NULL AND s.patient_id != '' AND p.${pIdCol} = s.patient_id)
+                  OR (s.patient_token IS NOT NULL AND s.patient_token != '' AND p.${tokenCol} = s.patient_token)
+                  OR (p.${rmCol} = s.patient_rm AND LOWER(TRIM(p.${nameCol})) = LOWER(TRIM(s.patient_name)))
+                )
             )
           ORDER BY s.created_at DESC`,
     args: [effectiveCode, specialty],
@@ -1438,7 +1442,7 @@ async function getSurveyByPatient({ hospitalCode, specialty, patientRm, _hospita
   await reconcileSurveySpecialties(client, effectiveCode);
   await restoreSurveyRowsFromBackups(client, effectiveCode);
   await reconcileSurveySpecialties(client, effectiveCode);
-  const { hCol, sCol, rmCol } = await getPatientTableSchema(client);
+  const { idCol: pIdCol, hCol, sCol, nameCol, rmCol, tokenCol } = await getPatientTableSchema(client);
   const rs = await client.execute({
     sql: `SELECT s.*
           FROM surveys s
@@ -1450,7 +1454,11 @@ async function getSurveyByPatient({ hospitalCode, specialty, patientRm, _hospita
               FROM patients p
               WHERE p.${hCol} = s.hospital_code
                 AND p.${sCol} = s.specialty
-                AND p.${rmCol} = s.patient_rm
+                AND (
+                  (s.patient_id IS NOT NULL AND s.patient_id != '' AND p.${pIdCol} = s.patient_id)
+                  OR (s.patient_token IS NOT NULL AND s.patient_token != '' AND p.${tokenCol} = s.patient_token)
+                  OR (p.${rmCol} = s.patient_rm AND LOWER(TRIM(p.${nameCol})) = LOWER(TRIM(s.patient_name)))
+                )
             )
           LIMIT 1`,
     args: [effectiveCode, specialty, patientRm],
