@@ -458,11 +458,11 @@ export const draftManager = {
       const localDrafts = this.getAllDrafts();
       
       // Deleted cloud drafts can resolve after a local delete. Tombstones prevent them from being merged back.
+      // Keep tombstones local-only: a stale browser/device must not delete a valid cloud draft for the hospital.
       const mergedDrafts = [...localDrafts];
       
       cloudDrafts.forEach(cd => {
         if (deletedIds.includes(cd.draftId)) {
-          deleteCloudDraft(cd.draftId).catch(err => console.error("Cloud tombstone cleanup failed:", err));
           return;
         }
         const index = mergedDrafts.findIndex(ld => ld.draftId === cd.draftId);
