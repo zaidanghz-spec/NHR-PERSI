@@ -77,6 +77,16 @@ function hospitalCodeFromEmail(email: string): string {
   return local.substring(0, 12) || "RS001";
 }
 
+function getSurveyToken(survey: any) {
+  return String(survey?.patientToken || survey?.surveyToken || survey?.token || survey?.qToken || "").trim();
+}
+
+function createHttpError(message: string, statusCode = 409) {
+  const err = new Error(message) as any;
+  err.statusCode = statusCode;
+  return err;
+}
+
 function normalizeAdminId(value: string = "") {
   return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -173,6 +183,8 @@ async function initTursoTables() {
       id TEXT PRIMARY KEY,
       hospital_code TEXT NOT NULL,
       specialty TEXT NOT NULL,
+      patient_id TEXT DEFAULT '',
+      patient_token TEXT DEFAULT '',
       patient_name TEXT DEFAULT '',
       patient_rm TEXT DEFAULT '',
       prem_score REAL DEFAULT 0,
@@ -188,6 +200,7 @@ async function initTursoTables() {
       id TEXT PRIMARY KEY,
       hospital_code TEXT NOT NULL,
       specialty TEXT NOT NULL,
+      patient_token TEXT DEFAULT '',
       patient_name TEXT DEFAULT '',
       patient_rm TEXT DEFAULT '',
       payload TEXT DEFAULT '{}',
@@ -203,6 +216,7 @@ async function initTursoTables() {
       id TEXT PRIMARY KEY,
       hospital_code TEXT NOT NULL,
       specialty TEXT NOT NULL,
+      survey_token TEXT DEFAULT '',
       name TEXT NOT NULL,
       rm TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -332,6 +346,8 @@ async function initTursoTables() {
 
     if (table === "surveys") {
       if (!existingColumns.includes("hospital_code")) await client.execute("ALTER TABLE surveys ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.includes("patient_id")) await client.execute("ALTER TABLE surveys ADD COLUMN patient_id TEXT DEFAULT ''");
+      if (!existingColumns.includes("patient_token")) await client.execute("ALTER TABLE surveys ADD COLUMN patient_token TEXT DEFAULT ''");
       if (!existingColumns.includes("patient_name")) await client.execute("ALTER TABLE surveys ADD COLUMN patient_name TEXT DEFAULT ''");
       if (!existingColumns.includes("patient_rm")) await client.execute("ALTER TABLE surveys ADD COLUMN patient_rm TEXT DEFAULT ''");
       if (!existingColumns.includes("prem_score")) await client.execute("ALTER TABLE surveys ADD COLUMN prem_score REAL DEFAULT 0");
@@ -343,6 +359,7 @@ async function initTursoTables() {
     if (table === "survey_backups") {
       if (!existingColumns.includes("hospital_code")) await client.execute("ALTER TABLE survey_backups ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
       if (!existingColumns.includes("specialty")) await client.execute("ALTER TABLE survey_backups ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.includes("patient_token")) await client.execute("ALTER TABLE survey_backups ADD COLUMN patient_token TEXT DEFAULT ''");
       if (!existingColumns.includes("patient_name")) await client.execute("ALTER TABLE survey_backups ADD COLUMN patient_name TEXT DEFAULT ''");
       if (!existingColumns.includes("patient_rm")) await client.execute("ALTER TABLE survey_backups ADD COLUMN patient_rm TEXT DEFAULT ''");
       if (!existingColumns.includes("payload")) await client.execute("ALTER TABLE survey_backups ADD COLUMN payload TEXT DEFAULT '{}'");
@@ -357,6 +374,7 @@ async function initTursoTables() {
         await client.execute("ALTER TABLE patients ADD COLUMN hospital_code TEXT NOT NULL DEFAULT ''");
       }
       if (!existingColumns.includes("specialty")) await client.execute("ALTER TABLE patients ADD COLUMN specialty TEXT NOT NULL DEFAULT ''");
+      if (!existingColumns.includes("survey_token")) await client.execute("ALTER TABLE patients ADD COLUMN survey_token TEXT DEFAULT ''");
       if (!existingColumns.includes("name")) await client.execute("ALTER TABLE patients ADD COLUMN name TEXT NOT NULL DEFAULT ''");
       if (!existingColumns.includes("rm") && !existingColumns.includes("patient_rm")) {
         await client.execute("ALTER TABLE patients ADD COLUMN rm TEXT NOT NULL DEFAULT ''");
@@ -441,6 +459,24 @@ async function initTursoTables() {
     }
   } catch (e) {
     console.warn("Submissions UNIQUE constraint migration skipped:", e);
+  }
+
+  try {
+    const tokenInfo = await client.execute("PRAGMA table_info(patients)");
+    const patientCols = tokenInfo.rows.map((r: any) => r.name);
+    if (patientCols.includes("survey_token")) {
+      const idCol = patientCols.find((c: string) => c.toLowerCase() === "id") || "id";
+      const missingTokens = await client.execute(`SELECT ${idCol} as id FROM patients WHERE survey_token IS NULL OR survey_token = ''`);
+      for (const row of missingTokens.rows as any[]) {
+        if (!row.id) continue;
+        await client.execute({
+          sql: `UPDATE patients SET survey_token = ? WHERE ${idCol} = ?`,
+          args: [randomId(), row.id],
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Patient survey token backfill skipped:", e);
   }
 
   tablesInitialized = true;
@@ -897,16 +933,134 @@ async function getAllEvents() {
   }));
 }
 
+async function getPatientTableSchema(client: any) {
+  const info = await client.execute("PRAGMA table_info(patients)");
+  const cols = info.rows.map((r: any) => r.name);
+  return {
+    cols,
+    idCol: cols.find((c: string) => c.toLowerCase() === "id") || "id",
+    hCol: cols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code",
+    sCol: cols.find((c: string) => ["specialty", "specialtyname"].includes(c.toLowerCase())) || "specialty",
+    nameCol: cols.find((c: string) => ["name", "patient_name", "patientname"].includes(c.toLowerCase())) || "name",
+    rmCol: cols.find((c: string) => ["rm", "patient_rm", "patientrm", "medical_record_number", "medicalrecordnumber"].includes(c.toLowerCase())) || "rm",
+    tokenCol: cols.find((c: string) => ["survey_token", "surveytoken", "patient_token", "patienttoken"].includes(c.toLowerCase())) || "survey_token",
+  };
+}
+
+async function resolveRegisteredSurveyPatient(
+  client: any,
+  {
+    hospitalCode,
+    specialty,
+    patientRm,
+    patientName,
+    patientToken,
+  }: {
+    hospitalCode: string;
+    specialty: string;
+    patientRm: string;
+    patientName: string;
+    patientToken?: string;
+  }
+) {
+  const { cols, idCol, hCol, sCol, nameCol, rmCol, tokenCol } = await getPatientTableSchema(client);
+  const requestedHospitalCode = String(hospitalCode || "").trim();
+  const requestedSpecialty = String(specialty || "").trim();
+  const requestedRmKey = normalizePatientCodeKey(patientRm);
+  const requestedNameKey = normalizePatientNameKey(patientName);
+  const token = String(patientToken || "").trim();
+
+  if (token && cols.includes(tokenCol)) {
+    const tokenRs = await client.execute({
+      sql: `SELECT ${idCol} as id, ${hCol} as hospitalCode, ${sCol} as specialty, ${nameCol} as name, ${rmCol} as rm, ${tokenCol} as surveyToken
+            FROM patients
+            WHERE ${tokenCol} = ?
+            LIMIT 2`,
+      args: [token],
+    });
+    if (tokenRs.rows.length !== 1) return null;
+    const row: any = tokenRs.rows[0];
+    const rowRmKey = normalizePatientCodeKey(row.rm);
+    const rowNameKey = normalizePatientNameKey(row.name);
+    if (requestedRmKey && rowRmKey && requestedRmKey !== rowRmKey) return null;
+    if (requestedNameKey && rowNameKey && requestedNameKey !== rowNameKey) return null;
+    return {
+      id: String(row.id || ""),
+      hospitalCode: String(row.hospitalCode || ""),
+      specialty: String(row.specialty || ""),
+      name: String(row.name || ""),
+      rm: String(row.rm || ""),
+      surveyToken: String(row.surveyToken || token),
+    };
+  }
+
+  if (!requestedHospitalCode || !requestedRmKey) return null;
+  const baseSpecialty = getSpecialtyBaseKey(requestedSpecialty);
+  const registered = await client.execute({
+    sql: `SELECT ${idCol} as id, ${hCol} as hospitalCode, ${sCol} as specialty, ${nameCol} as name, ${rmCol} as rm, ${cols.includes(tokenCol) ? tokenCol : "''"} as surveyToken
+          FROM patients
+          WHERE ${hCol} = ? ${baseSpecialty ? `AND ${sCol} LIKE ?` : ""}`,
+    args: baseSpecialty ? [requestedHospitalCode, `${baseSpecialty}-d%`] : [requestedHospitalCode],
+  });
+  const candidates = registered.rows
+    .map((row: any) => ({
+      id: String(row.id || ""),
+      hospitalCode: String(row.hospitalCode || ""),
+      specialty: String(row.specialty || ""),
+      name: String(row.name || ""),
+      rm: String(row.rm || ""),
+      surveyToken: String(row.surveyToken || ""),
+      rmKey: normalizePatientCodeKey(row.rm),
+      nameKey: normalizePatientNameKey(row.name),
+    }))
+    .filter((row: any) => row.rmKey && row.rmKey === requestedRmKey);
+  const exactNameMatches = requestedNameKey
+    ? candidates.filter((row: any) => row.nameKey && row.nameKey === requestedNameKey)
+    : candidates;
+
+  if (exactNameMatches.length !== 1) return null;
+  const patient = exactNameMatches[0];
+  return {
+    id: patient.id,
+    hospitalCode: patient.hospitalCode,
+    specialty: patient.specialty,
+    name: patient.name,
+    rm: patient.rm,
+    surveyToken: patient.surveyToken,
+  };
+}
+
 async function saveSurveyBackup({ hospitalCode, specialty, survey, status = "received", error = "", _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  const client = db();
+  const requestedCode = (_hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : String(hospitalCode || "").trim()) || "UNKNOWN";
   const patientRm = survey?.medicalRecordNumber || survey?.qRm || "";
   const patientName = survey?.patientName || survey?.qName || "";
+  const patientToken = getSurveyToken(survey);
+  const registeredPatient = await resolveRegisteredSurveyPatient(client, {
+    hospitalCode: requestedCode,
+    specialty,
+    patientRm,
+    patientName,
+    patientToken,
+  });
+  const effectiveCode = registeredPatient?.hospitalCode || requestedCode;
+  const effectiveSpecialty = registeredPatient?.specialty || specialty || "";
   const id = `survey-backup-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  await db().execute({
-    sql: `INSERT INTO survey_backups (id, hospital_code, specialty, patient_name, patient_rm, payload, status, error)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, effectiveCode, specialty || "", patientName, patientRm, JSON.stringify(survey || {}), status, error || ""],
+  await client.execute({
+    sql: `INSERT INTO survey_backups (id, hospital_code, specialty, patient_token, patient_name, patient_rm, payload, status, error)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      id,
+      effectiveCode,
+      effectiveSpecialty,
+      registeredPatient?.surveyToken || patientToken,
+      registeredPatient?.name || patientName,
+      registeredPatient?.rm || patientRm,
+      JSON.stringify({ ...(survey || {}), patientId: registeredPatient?.id, patientToken: registeredPatient?.surveyToken || patientToken }),
+      status,
+      error || "",
+    ],
   });
   return { success: true, backupId: id };
 }
@@ -940,39 +1094,90 @@ async function getSurveyBackups({ hospitalCode, specialty, limit = 200 }: any) {
 
 async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const patientRm = survey.medicalRecordNumber || survey.qRm || "";
   const patientName = survey.patientName || survey.qName || "";
-  let effectiveSpecialty = specialty;
+  const patientToken = getSurveyToken(survey);
+  const requestedCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : String(hospitalCode || "").trim();
 
-  if (patientRm) {
-    effectiveSpecialty = await resolveRegisteredPatientSpecialty(client, effectiveCode, specialty, patientRm, patientName) || specialty;
+  const registeredPatient = await resolveRegisteredSurveyPatient(client, {
+    hospitalCode: requestedCode,
+    specialty,
+    patientRm,
+    patientName,
+    patientToken,
+  });
+
+  if (!registeredPatient) {
+    await saveSurveyBackup({
+      hospitalCode: requestedCode,
+      specialty,
+      survey,
+      status: "submit-rejected-unmatched-patient",
+      error: "Patient identity did not match a registered PRM patient",
+    });
+    throw createHttpError("Data pasien tidak cocok dengan QR/daftar pasien rumah sakit. Silakan minta petugas RS membuat ulang QR code.", 409);
   }
+
+  const effectiveCode = registeredPatient.hospitalCode;
+  const effectiveSpecialty = registeredPatient.specialty;
+  const effectivePatientName = registeredPatient.name || patientName;
+  const effectivePatientRm = registeredPatient.rm || patientRm;
 
   await saveSurveyBackup({
     hospitalCode: effectiveCode,
     specialty: effectiveSpecialty,
-    survey: { ...survey, resolvedSpecialty: effectiveSpecialty },
+    survey: {
+      ...survey,
+      patientId: registeredPatient.id,
+      patientToken: registeredPatient.surveyToken,
+      patientName: effectivePatientName,
+      medicalRecordNumber: effectivePatientRm,
+      resolvedHospitalCode: effectiveCode,
+      resolvedSpecialty: effectiveSpecialty,
+    },
     status: "submit-received",
   });
 
   const existing = await client.execute({
-    sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
-    args: [effectiveCode, effectiveSpecialty, patientRm],
+    sql: `SELECT id FROM surveys
+          WHERE hospital_code = ?
+            AND specialty = ?
+            AND (patient_id = ? OR patient_rm = ?)
+          LIMIT 1`,
+    args: [effectiveCode, effectiveSpecialty, registeredPatient.id, effectivePatientRm],
   });
   if (existing.rows.length > 0) {
     const existingId = String((existing.rows[0] as any).id);
     await client.execute({
       sql: `UPDATE surveys
-            SET patient_name = ?, prem_score = ?, prom_score = ?, overall_score = ?, answers = ?
+            SET patient_id = ?, patient_token = ?, patient_name = ?, patient_rm = ?, prem_score = ?, prom_score = ?, overall_score = ?, answers = ?
             WHERE id = ?`,
-      args: [patientName, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {}), existingId],
+      args: [
+        registeredPatient.id,
+        registeredPatient.surveyToken,
+        effectivePatientName,
+        effectivePatientRm,
+        survey.premScore ?? 0,
+        survey.promScore ?? 0,
+        survey.overallScore ?? 0,
+        JSON.stringify(survey.answers || {}),
+        existingId,
+      ],
     });
     await saveSurveyBackup({
       hospitalCode: effectiveCode,
       specialty: effectiveSpecialty,
-      survey: { ...survey, surveyId: existingId, resolvedSpecialty: effectiveSpecialty },
+      survey: {
+        ...survey,
+        surveyId: existingId,
+        patientId: registeredPatient.id,
+        patientToken: registeredPatient.surveyToken,
+        patientName: effectivePatientName,
+        medicalRecordNumber: effectivePatientRm,
+        resolvedHospitalCode: effectiveCode,
+        resolvedSpecialty: effectiveSpecialty,
+      },
       status: "submit-updated-existing",
     });
     return { success: true, duplicate: true, updated: true, surveyId: existingId };
@@ -980,14 +1185,35 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
 
   const id = randomId();
   await client.execute({
-    sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, effectiveCode, effectiveSpecialty, patientName, patientRm, survey.premScore ?? 0, survey.promScore ?? 0, survey.overallScore ?? 0, JSON.stringify(survey.answers || {})],
+    sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_id, patient_token, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      id,
+      effectiveCode,
+      effectiveSpecialty,
+      registeredPatient.id,
+      registeredPatient.surveyToken,
+      effectivePatientName,
+      effectivePatientRm,
+      survey.premScore ?? 0,
+      survey.promScore ?? 0,
+      survey.overallScore ?? 0,
+      JSON.stringify(survey.answers || {}),
+    ],
   });
   await saveSurveyBackup({
     hospitalCode: effectiveCode,
     specialty: effectiveSpecialty,
-    survey: { ...survey, surveyId: id, resolvedSpecialty: effectiveSpecialty },
+    survey: {
+      ...survey,
+      surveyId: id,
+      patientId: registeredPatient.id,
+      patientToken: registeredPatient.surveyToken,
+      patientName: effectivePatientName,
+      medicalRecordNumber: effectivePatientRm,
+      resolvedHospitalCode: effectiveCode,
+      resolvedSpecialty: effectiveSpecialty,
+    },
     status: "submit-inserted",
   });
   return { success: true, surveyId: id };
@@ -1023,7 +1249,7 @@ async function resolveRegisteredPatientSpecialty(
     }))
     .filter((row: any) => row.rmKey && row.rmKey === requestedRmKey);
   const nameMatches = candidates.filter((row: any) => row.nameKey && row.nameKey === requestedNameKey);
-  const resolvedCandidates = nameMatches.length > 0 ? nameMatches : candidates;
+  const resolvedCandidates = requestedNameKey ? nameMatches : candidates;
   const uniqueSpecialties = Array.from(new Set(resolvedCandidates.map((row: any) => row.specialty).filter(Boolean)));
   return uniqueSpecialties.length === 1 ? String(uniqueSpecialties[0]) : null;
 }
@@ -1031,6 +1257,7 @@ async function resolveRegisteredPatientSpecialty(
 function mapSurveyRow(r: any) {
   return {
     id: r.id,
+    patientId: r.patient_id,
     patientName: r.patient_name,
     medicalRecordNumber: r.patient_rm,
     specialty: r.specialty,
@@ -1070,33 +1297,6 @@ async function reconcileSurveySpecialties(client: any, hospitalCode: string) {
     args: [hospitalCode],
   });
 
-  await client.execute({
-    sql: `WITH unique_patient AS (
-            SELECT hospital_code, rm, MIN(specialty) AS specialty, COUNT(*) AS cnt
-            FROM patients
-            WHERE hospital_code = ?
-            GROUP BY hospital_code, rm
-          )
-          UPDATE surveys
-          SET specialty = (
-            SELECT specialty
-            FROM unique_patient up
-            WHERE up.hospital_code = surveys.hospital_code
-              AND up.rm = surveys.patient_rm
-              AND up.cnt = 1
-          )
-          WHERE hospital_code = ?
-            AND EXISTS (
-              SELECT 1
-              FROM unique_patient up
-              WHERE up.hospital_code = surveys.hospital_code
-                AND up.rm = surveys.patient_rm
-                AND up.cnt = 1
-                AND up.specialty <> surveys.specialty
-            )`,
-    args: [hospitalCode, hospitalCode],
-  });
-
   const [patientsRs, surveysRs] = await Promise.all([
     client.execute({
       sql: "SELECT hospital_code, specialty, name, rm FROM patients WHERE hospital_code = ?",
@@ -1119,7 +1319,7 @@ async function reconcileSurveySpecialties(client: any, hospitalCode: string) {
     const surveyNameKey = normalizePatientNameKey(survey.patient_name);
     const sameCode = patients.filter((patient: any) => patient.rmKey === surveyRmKey);
     const sameCodeAndName = sameCode.filter((patient: any) => patient.nameKey && patient.nameKey === surveyNameKey);
-    const candidates = sameCodeAndName.length > 0 ? sameCodeAndName : sameCode;
+    const candidates = surveyNameKey ? sameCodeAndName : sameCode;
     const uniqueSpecialties = Array.from(new Set(candidates.map((patient: any) => patient.specialty).filter(Boolean)));
 
     if (uniqueSpecialties.length === 1 && uniqueSpecialties[0] !== survey.specialty) {
@@ -1151,16 +1351,25 @@ async function restoreSurveyRowsFromBackups(client: any, hospitalCode: string) {
     const survey = payload?.response || payload;
     const patientRm = survey?.medicalRecordNumber || survey?.qRm || backup.patient_rm || "";
     const patientName = survey?.patientName || survey?.qName || backup.patient_name || "";
+    const patientToken = getSurveyToken(survey) || String((backup as any).patient_token || "");
     const answers = survey?.answers || {};
     if (!patientRm || Object.keys(answers).length === 0) continue;
 
-    const resolvedSpecialty = await resolveRegisteredPatientSpecialty(client, hospitalCode, backup.specialty, patientRm, patientName);
-    if (!resolvedSpecialty) continue;
-    const key = `${resolvedSpecialty}::${normalizePatientCodeKey(patientRm)}`;
-    latestByPatient.set(key, {
-      specialty: resolvedSpecialty,
-      patientName,
+    const patient = await resolveRegisteredSurveyPatient(client, {
+      hospitalCode,
+      specialty: backup.specialty,
       patientRm,
+      patientName,
+      patientToken,
+    });
+    if (!patient || patient.hospitalCode !== hospitalCode) continue;
+    const key = `${patient.id || patient.specialty}::${normalizePatientCodeKey(patient.rm || patientRm)}`;
+    latestByPatient.set(key, {
+      patientId: patient.id,
+      patientToken: patient.surveyToken,
+      specialty: patient.specialty,
+      patientName: patient.name || patientName,
+      patientRm: patient.rm || patientRm,
       premScore: survey?.premScore ?? 0,
       promScore: survey?.promScore ?? 0,
       overallScore: survey?.overallScore ?? 0,
@@ -1176,12 +1385,14 @@ async function restoreSurveyRowsFromBackups(client: any, hospitalCode: string) {
     if (exists.rows.length > 0) continue;
 
     await client.execute({
-      sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO surveys (id, hospital_code, specialty, patient_id, patient_token, patient_name, patient_rm, prem_score, prom_score, overall_score, answers)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         randomId(),
         hospitalCode,
         item.specialty,
+        item.patientId,
+        item.patientToken,
         item.patientName,
         item.patientRm,
         item.premScore,
@@ -1194,39 +1405,67 @@ async function restoreSurveyRowsFromBackups(client: any, hospitalCode: string) {
   surveyBackupRestoreCheckedAt.set(hospitalCode, now);
 }
 
-async function getSurveys({ hospitalCode, specialty }: any) {
+async function getSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  await reconcileSurveySpecialties(client, hospitalCode);
-  await restoreSurveyRowsFromBackups(client, hospitalCode);
-  await reconcileSurveySpecialties(client, hospitalCode);
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  await reconcileSurveySpecialties(client, effectiveCode);
+  await restoreSurveyRowsFromBackups(client, effectiveCode);
+  await reconcileSurveySpecialties(client, effectiveCode);
+  const { hCol, sCol, rmCol } = await getPatientTableSchema(client);
   const rs = await client.execute({
-    sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? ORDER BY created_at DESC",
-    args: [hospitalCode, specialty],
+    sql: `SELECT s.*
+          FROM surveys s
+          WHERE s.hospital_code = ?
+            AND s.specialty = ?
+            AND EXISTS (
+              SELECT 1
+              FROM patients p
+              WHERE p.${hCol} = s.hospital_code
+                AND p.${sCol} = s.specialty
+                AND p.${rmCol} = s.patient_rm
+            )
+          ORDER BY s.created_at DESC`,
+    args: [effectiveCode, specialty],
   });
   return rs.rows.map(mapSurveyRow);
 }
 
-async function getSurveyByPatient({ hospitalCode, specialty, patientRm }: any) {
+async function getSurveyByPatient({ hospitalCode, specialty, patientRm, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  await reconcileSurveySpecialties(client, hospitalCode);
-  await restoreSurveyRowsFromBackups(client, hospitalCode);
-  await reconcileSurveySpecialties(client, hospitalCode);
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  await reconcileSurveySpecialties(client, effectiveCode);
+  await restoreSurveyRowsFromBackups(client, effectiveCode);
+  await reconcileSurveySpecialties(client, effectiveCode);
+  const { hCol, sCol, rmCol } = await getPatientTableSchema(client);
   const rs = await client.execute({
-    sql: "SELECT * FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
-    args: [hospitalCode, specialty, patientRm],
+    sql: `SELECT s.*
+          FROM surveys s
+          WHERE s.hospital_code = ?
+            AND s.specialty = ?
+            AND s.patient_rm = ?
+            AND EXISTS (
+              SELECT 1
+              FROM patients p
+              WHERE p.${hCol} = s.hospital_code
+                AND p.${sCol} = s.specialty
+                AND p.${rmCol} = s.patient_rm
+            )
+          LIMIT 1`,
+    args: [effectiveCode, specialty, patientRm],
   });
   const r: any = rs.rows[0];
   if (!r) return null;
   return mapSurveyRow(r);
 }
 
-async function resetSurveys({ hospitalCode, specialty }: any) {
+async function resetSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   await db().execute({
     sql: "DELETE FROM surveys WHERE hospital_code = ? AND specialty = ?",
-    args: [hospitalCode, specialty],
+    args: [effectiveCode, specialty],
   });
 }
 
@@ -1241,6 +1480,7 @@ async function registerPatient({ hospitalCode, specialty, patient, _hospitalEmai
   const nCols = existingCols.filter((c: string) => ["name", "patient_name", "patientname"].includes(c.toLowerCase()));
   const rCols = existingCols.filter((c: string) => ["rm", "patient_rm", "patientrm", "medical_record_number", "medicalrecordnumber"].includes(c.toLowerCase()));
   const sCols = existingCols.filter((c: string) => ["specialty", "specialty_name", "specialtyname"].includes(c.toLowerCase()));
+  const tokenCols = existingCols.filter((c: string) => ["survey_token", "surveytoken", "patient_token", "patienttoken"].includes(c.toLowerCase()));
 
   if (hCols.length === 0 || nCols.length === 0 || rCols.length === 0 || sCols.length === 0) {
     return { success: false, error: "Schema tabel pasien belum lengkap. Muat ulang halaman admin untuk menjalankan migrasi tabel." };
@@ -1261,19 +1501,23 @@ async function registerPatient({ hospitalCode, specialty, patient, _hospitalEmai
   nCols.forEach(() => args.push(patient.name));
   rCols.forEach(() => args.push(patient.rm || ""));
   sCols.forEach(() => args.push(specialty));
+  const surveyToken = randomId();
+  tokenCols.forEach(() => args.push(surveyToken));
+  columns.push(...tokenCols);
   if (existingCols.includes("created_at")) { columns.push("created_at"); args.push(new Date().toISOString()); }
 
   await client.execute({
     sql: `INSERT INTO patients (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
     args,
   });
-  return { success: true, patient: { id, name: patient.name, rm: patient.rm } };
+  return { success: true, patient: { id, name: patient.name, rm: patient.rm, surveyToken } };
 }
 
-async function getPatients({ hospitalCode, specialty }: any) {
+async function getPatients({ hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  await reconcileSurveySpecialties(client, hospitalCode);
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  await reconcileSurveySpecialties(client, effectiveCode);
   const info = await client.execute("PRAGMA table_info(patients)");
   const cols = info.rows.map((r: any) => r.name);
   const hCol = cols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
@@ -1281,11 +1525,12 @@ async function getPatients({ hospitalCode, specialty }: any) {
   const nameCol = cols.find((c: string) => ["name", "patient_name"].includes(c.toLowerCase())) || "name";
   const rmCol = cols.find((c: string) => ["rm", "patient_rm"].includes(c.toLowerCase())) || "rm";
   const idCol = cols.find((c: string) => c.toLowerCase() === "id") || "id";
+  const tokenCol = cols.find((c: string) => ["survey_token", "surveytoken", "patient_token", "patienttoken"].includes(c.toLowerCase())) || "survey_token";
   const orderCol = cols.includes("created_at") ? "created_at" : "id";
 
   const rs = await client.execute({
-    sql: `SELECT ${idCol} as id, ${nameCol} as name, ${rmCol} as rm, ${sCol} as specialty FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY ${orderCol} DESC`,
-    args: [hospitalCode, specialty],
+    sql: `SELECT ${idCol} as id, ${nameCol} as name, ${rmCol} as rm, ${sCol} as specialty, ${tokenCol} as surveyToken FROM patients WHERE ${hCol} = ? AND ${sCol} = ? ORDER BY ${orderCol} DESC`,
+    args: [effectiveCode, specialty],
   });
   return rs.rows.map((r: any) => ({
     diseaseIndex: Number(String(r.specialty || "").match(/-d(\d+)$/)?.[1] ?? 0),
@@ -1294,12 +1539,28 @@ async function getPatients({ hospitalCode, specialty }: any) {
     name: r.name,
     rm: r.rm,
     specialty: r.specialty,
+    surveyToken: r.surveyToken,
   }));
 }
 
-async function resolvePatientSurveyDisease({ hospitalCode, specialty, patientName, patientRm }: any) {
+async function resolvePatientSurveyDisease({ hospitalCode, specialty, patientName, patientRm, patientToken }: any) {
   await initTursoTables();
   const client = db();
+  const patient = await resolveRegisteredSurveyPatient(client, {
+    hospitalCode,
+    specialty,
+    patientName,
+    patientRm,
+    patientToken,
+  });
+  if (patient) {
+    const diseaseIndex = Number(String(patient.specialty).match(/-d(\d+)$/)?.[1] ?? 0);
+    return {
+      found: true,
+      diseaseIndex,
+      diseaseKey: patient.specialty,
+    };
+  }
   const info = await client.execute("PRAGMA table_info(patients)");
   const cols = info.rows.map((r: any) => r.name);
   const hCol = cols.find((c: string) => ["hospital_code", "hospitalcode"].includes(c.toLowerCase())) || "hospital_code";
@@ -1327,7 +1588,7 @@ async function resolvePatientSurveyDisease({ hospitalCode, specialty, patientNam
     }))
     .filter((row: any) => row.rmKey && row.rmKey === requestedRmKey);
   const nameMatches = candidates.filter((row: any) => row.nameKey && row.nameKey === requestedNameKey);
-  const resolvedCandidates = nameMatches.length > 0 ? nameMatches : candidates;
+  const resolvedCandidates = requestedNameKey ? nameMatches : candidates;
   const uniqueSpecialties = Array.from(new Set(resolvedCandidates.map((row: any) => row.specialty).filter(Boolean)));
 
   if (uniqueSpecialties.length !== 1) return { found: false };
@@ -1339,39 +1600,42 @@ async function resolvePatientSurveyDisease({ hospitalCode, specialty, patientNam
   };
 }
 
-async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data }: any) {
+async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
-  const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
+  const draftId = `custom-survey-${effectiveCode}-${specialtyKey}`;
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
-  const dataJson = JSON.stringify(data);
+  const dataJson = JSON.stringify({ ...(data || {}), hospitalCode: effectiveCode });
   if (existing.rows.length > 0) {
     await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [dataJson, draftId] });
   } else {
-    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "custom-survey", hospitalCode, specialtyKey, dataJson] });
+    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "custom-survey", effectiveCode, specialtyKey, dataJson] });
   }
 }
 
-async function saveCustomSurveyPdfChunk({ hospitalCode, specialtyKey, index, total, chunk }: any) {
+async function saveCustomSurveyPdfChunk({ hospitalCode, specialtyKey, index, total, chunk, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
-  const draftId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
+  const draftId = `custom-survey-pdf-${effectiveCode}-${specialtyKey}-${index}`;
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   const dataJson = JSON.stringify({ index, total, chunk });
   if (existing.rows.length > 0) {
     await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [dataJson, draftId] });
   } else {
-    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "custom-survey-pdf", hospitalCode, specialtyKey, dataJson] });
+    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, "custom-survey-pdf", effectiveCode, specialtyKey, dataJson] });
   }
 }
 
-async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
+async function getCustomSurveyMetadata({ hospitalCode, specialtyKey, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const { idCol, dataCol } = await getDraftSchema(client);
-  const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
+  const draftId = `custom-survey-${effectiveCode}-${specialtyKey}`;
   const rs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (!rs.rows[0]) return null;
 
@@ -1380,7 +1644,7 @@ async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
 
   const chunks: string[] = [];
   for (let index = 0; index < metadata.pdfChunkCount; index++) {
-    const chunkId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
+    const chunkId = `custom-survey-pdf-${effectiveCode}-${specialtyKey}-${index}`;
     const chunkRs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [chunkId] });
     const parsed = chunkRs.rows[0] ? parseJson((chunkRs.rows[0] as any).data, null) : null;
     chunks.push(parsed?.chunk || "");
@@ -1388,23 +1652,25 @@ async function getCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
   return { ...metadata, base64: chunks.join("") };
 }
 
-async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey }: any) {
+async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const { idCol } = await getDraftSchema(client);
-  const draftId = `custom-survey-${hospitalCode}-${specialtyKey}`;
-  const existing = await getCustomSurveyMetadata({ hospitalCode, specialtyKey });
+  const draftId = `custom-survey-${effectiveCode}-${specialtyKey}`;
+  const existing = await getCustomSurveyMetadata({ hospitalCode: effectiveCode, specialtyKey });
   await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (existing?.pdfChunkCount) {
     for (let index = 0; index < existing.pdfChunkCount; index++) {
-      const chunkId = `custom-survey-pdf-${hospitalCode}-${specialtyKey}-${index}`;
+      const chunkId = `custom-survey-pdf-${effectiveCode}-${specialtyKey}-${index}`;
       await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [chunkId] });
     }
   }
 }
 
-async function removePatient({ hospitalCode, specialty, patientId }: any) {
+async function removePatient({ hospitalCode, specialty, patientId, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const info = await client.execute("PRAGMA table_info(patients)");
   const existingCols = info.rows.map((r: any) => r.name);
@@ -1414,7 +1680,7 @@ async function removePatient({ hospitalCode, specialty, patientId }: any) {
   const nameCol = existingCols.find((c: string) => ["name", "patient_name", "patientname"].includes(c.toLowerCase())) || "name";
   const existing = await client.execute({
     sql: `SELECT ${sCol} as specialty, ${rmCol} as rm, ${nameCol} as name FROM patients WHERE id = ? AND ${hCol} = ? LIMIT 1`,
-    args: [patientId, hospitalCode],
+    args: [patientId, effectiveCode],
   });
   const patient: any = existing.rows[0];
   const patientSpecialty = patient?.specialty || specialty || "";
@@ -1422,17 +1688,17 @@ async function removePatient({ hospitalCode, specialty, patientId }: any) {
 
   await client.execute({
     sql: `DELETE FROM patients WHERE id = ? AND ${hCol} = ?`,
-    args: [patientId, hospitalCode],
+    args: [patientId, effectiveCode],
   });
 
   if (patientRm) {
     await client.execute({
       sql: "DELETE FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
-      args: [hospitalCode, patientSpecialty, patientRm],
+      args: [effectiveCode, patientSpecialty, patientRm],
     });
     await client.execute({
       sql: "DELETE FROM survey_backups WHERE hospital_code = ? AND specialty = ? AND patient_rm = ?",
-      args: [hospitalCode, patientSpecialty, patientRm],
+      args: [effectiveCode, patientSpecialty, patientRm],
     });
   }
   return { success: true };

@@ -40,6 +40,7 @@ interface RegisteredPatient {
   diseaseIndex?: number;
   diseaseKey?: string;
   diseaseName?: string;
+  surveyToken?: string;
 }
 
 const normalizePatientCode = (value?: string) =>
@@ -437,6 +438,7 @@ export function PatientReportPage() {
       disease: String(patientDiseaseIndex),
       diseaseKey: patientDiseaseKey,
     });
+    if (patient.surveyToken) params.set("token", patient.surveyToken);
     return `${window.location.origin}/patient-survey/${hospitalCode}/${specialty}?${params.toString()}`;
   };
 

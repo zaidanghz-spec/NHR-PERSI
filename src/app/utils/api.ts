@@ -212,10 +212,11 @@ export async function resolvePatientSurveyDisease(
   hospitalCode: string,
   specialty: string,
   patientName: string,
-  patientRm: string
+  patientRm: string,
+  patientToken?: string
 ): Promise<{ found: boolean; diseaseIndex?: number; diseaseKey?: string }> {
   try {
-    return await rpc("resolvePatientSurveyDisease", { hospitalCode, specialty, patientName, patientRm });
+    return await rpc("resolvePatientSurveyDisease", { hospitalCode, specialty, patientName, patientRm, patientToken });
   } catch (err) {
     console.error("Resolve Patient Survey Disease Error:", err);
     return { found: false };

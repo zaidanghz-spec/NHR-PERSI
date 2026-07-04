@@ -51,6 +51,7 @@ export interface PatientSurveyResponse {
   patientName: string;
   medicalRecordNumber: string;
   specialty: string;
+  patientToken?: string;
   answers: Record<string, string>; // questionId -> "puas" | "cukup" | "kurang"
   premScore: number;
   promScore: number;
@@ -65,6 +66,7 @@ export function PatientPremPromPage() {
   // Read personalized patient info from URL query params
   const qName = searchParams.get("name") || "";
   const qRm = searchParams.get("rm") || "";
+  const qToken = searchParams.get("token") || "";
   const qDisease = parseInt(searchParams.get("disease") || "0", 10);
   const qDiseaseKey = searchParams.get("diseaseKey") || "";
   const qDiseaseKeyIndex = Number(qDiseaseKey.match(/-d(\d+)$/)?.[1] ?? NaN);
@@ -97,8 +99,9 @@ export function PatientPremPromPage() {
 
   // Use disease-specific specialty key for API
   const diseaseSpecialtyKey = `${selectedSpecialty}-d${effectiveDiseaseIndex}`;
-  const surveyDraftKey = `patient-survey-draft-${hospitalCode || ""}-${diseaseSpecialtyKey}-${qRm || ""}`;
-  const surveyPendingKey = `patient-survey-pending-${hospitalCode || ""}-${diseaseSpecialtyKey}-${qRm || ""}`;
+  const patientStorageKey = qToken || qRm || "";
+  const surveyDraftKey = `patient-survey-draft-${hospitalCode || ""}-${diseaseSpecialtyKey}-${patientStorageKey}`;
+  const surveyPendingKey = `patient-survey-pending-${hospitalCode || ""}-${diseaseSpecialtyKey}-${patientStorageKey}`;
 
   useEffect(() => {
     let active = true;
@@ -113,7 +116,7 @@ export function PatientPremPromPage() {
       try {
         if (!active) return;
         const resolved = await Promise.race([
-          resolvePatientSurveyDisease(hospitalCode, selectedSpecialty, qName, qRm),
+          resolvePatientSurveyDisease(hospitalCode, selectedSpecialty, qName, qRm, qToken),
           new Promise<{ found: false }>((resolve) => setTimeout(() => resolve({ found: false }), 8000)),
         ]);
         if (!active) return;
@@ -131,7 +134,7 @@ export function PatientPremPromPage() {
     return () => {
       active = false;
     };
-  }, [hospitalCode, qName, qRm, requestedDiseaseIndex, selectedSpecialty, specData?.diseases]);
+  }, [hospitalCode, qName, qRm, qToken, requestedDiseaseIndex, selectedSpecialty, specData?.diseases]);
 
   useEffect(() => {
     setFormData({});
@@ -156,6 +159,7 @@ export function PatientPremPromPage() {
         specialty: diseaseSpecialtyKey,
         patientName: qName,
         medicalRecordNumber: qRm,
+        patientToken: qToken,
         answers: formData,
         status: "draft",
         updatedAt: new Date().toISOString(),
@@ -164,7 +168,7 @@ export function PatientPremPromPage() {
       setAutosaveState("saved");
     }, 600);
     return () => clearTimeout(timer);
-  }, [diseaseSpecialtyKey, formData, hospitalCode, isSubmitted, qName, qRm, selectedSpecialty, surveyDraftKey, surveyPendingKey]);
+  }, [diseaseSpecialtyKey, formData, hospitalCode, isSubmitted, qName, qRm, qToken, selectedSpecialty, surveyDraftKey, surveyPendingKey]);
 
   const handleChange = (id: string, value: string) => {
     setSubmitError("");
@@ -209,6 +213,7 @@ export function PatientPremPromPage() {
       patientName: qName,
       medicalRecordNumber: qRm,
       specialty: selectedSpecialty,
+      patientToken: qToken,
       answers: { ...formData },
       premScore: scores.premScore,
       promScore: scores.promScore,
@@ -219,6 +224,7 @@ export function PatientPremPromPage() {
       hospitalCode,
       specialty: diseaseSpecialtyKey,
       response,
+      patientToken: qToken,
       status: "submit-pending",
       updatedAt: new Date().toISOString(),
     }));
@@ -242,6 +248,7 @@ export function PatientPremPromPage() {
         hospitalCode,
         specialty: diseaseSpecialtyKey,
         response,
+        patientToken: qToken,
         status: "submit-failed",
         error: err?.message || String(err || ""),
         updatedAt: new Date().toISOString(),
