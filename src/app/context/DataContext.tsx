@@ -412,7 +412,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setCurrentHospital(account);
     sessionStorage.setItem("persi_hospital_session", JSON.stringify(account));
 
-    const hospitalCode = getHospitalCode(account.email);
+    const hospitalCode = account.hospitalCode || getHospitalCode(account.email);
     sessionStorage.setItem("hospitalAuth", JSON.stringify({
       hospitalName: account.hospitalName,
       picName: account.picName,

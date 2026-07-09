@@ -77,6 +77,80 @@ function hospitalCodeFromEmail(email: string): string {
   return local.substring(0, 12) || "RS001";
 }
 
+function uniqueHospitalCode(baseCode: string, usedCodes: Set<string>) {
+  const base = (baseCode || "RS001").replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 12) || "RS001";
+  let code = base;
+  let suffix = 2;
+  while (usedCodes.has(code)) {
+    const tail = String(suffix++);
+    code = `${base.slice(0, Math.max(1, 12 - tail.length))}${tail}`;
+  }
+  usedCodes.add(code);
+  return code;
+}
+
+async function ensureHospitalAccountCodes(client: any) {
+  const info = await client.execute("PRAGMA table_info(hospital_accounts)");
+  const cols = info.rows.map((r: any) => r.name);
+  if (!cols.includes("hospital_code")) {
+    await client.execute("ALTER TABLE hospital_accounts ADD COLUMN hospital_code TEXT DEFAULT ''");
+  }
+
+  const rs = await client.execute("SELECT email, hospital_code FROM hospital_accounts ORDER BY registered_at ASC, email ASC");
+  const rows = rs.rows as any[];
+  const baseCounts = new Map<string, number>();
+  rows.forEach((row) => {
+    const base = hospitalCodeFromEmail(String(row.email || ""));
+    baseCounts.set(base, (baseCounts.get(base) || 0) + 1);
+  });
+
+  const usedCodes = new Set<string>();
+  const baseOrdinals = new Map<string, number>();
+  for (const row of rows) {
+    const base = hospitalCodeFromEmail(String(row.email || ""));
+    const existingCode = String(row.hospital_code || "").trim().toUpperCase();
+    const duplicateBase = (baseCounts.get(base) || 0) > 1;
+    if (existingCode && !usedCodes.has(existingCode) && !(duplicateBase && existingCode === base)) {
+      usedCodes.add(existingCode);
+      continue;
+    }
+
+    let seed = base;
+    if (duplicateBase) {
+      const ordinal = (baseOrdinals.get(base) || 0) + 1;
+      baseOrdinals.set(base, ordinal);
+      const suffix = String(ordinal);
+      seed = `${base.slice(0, Math.max(1, 12 - suffix.length))}${suffix}`;
+    }
+    const code = uniqueHospitalCode(seed, usedCodes);
+    await client.execute({
+      sql: "UPDATE hospital_accounts SET hospital_code = ? WHERE LOWER(email) = LOWER(?)",
+      args: [code, row.email],
+    });
+  }
+}
+
+async function getHospitalCodeForEmail(client: any, email: string) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return "";
+  try {
+    await ensureHospitalAccountCodes(client);
+    const rs = await client.execute({
+      sql: "SELECT hospital_code FROM hospital_accounts WHERE LOWER(email) = LOWER(?) LIMIT 1",
+      args: [normalizedEmail],
+    });
+    return String((rs.rows[0] as any)?.hospital_code || "").trim() || hospitalCodeFromEmail(normalizedEmail);
+  } catch {
+    return hospitalCodeFromEmail(normalizedEmail);
+  }
+}
+
+async function resolveEffectiveHospitalCode(client: any, { hospitalCode, _hospitalCode, _hospitalEmail }: any = {}) {
+  if (_hospitalCode) return String(_hospitalCode).trim();
+  if (_hospitalEmail) return await getHospitalCodeForEmail(client, _hospitalEmail);
+  return String(hospitalCode || "").trim();
+}
+
 function getSurveyToken(survey: any) {
   return String(survey?.patientToken || survey?.surveyToken || survey?.token || survey?.qToken || "").trim();
 }
@@ -253,6 +327,7 @@ async function initTursoTables() {
   await client.execute(`
     CREATE TABLE IF NOT EXISTS hospital_accounts (
       email TEXT PRIMARY KEY,
+      hospital_code TEXT DEFAULT '',
       password TEXT NOT NULL DEFAULT '',
       password_hash TEXT,
       hospital_name TEXT NOT NULL,
@@ -413,6 +488,7 @@ async function initTursoTables() {
     }
 
     if (table === "hospital_accounts") {
+      if (!existingColumns.includes("hospital_code")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN hospital_code TEXT DEFAULT ''");
       if (!existingColumns.includes("password_hash")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN password_hash TEXT");
       if (!existingColumns.includes("surat_tugas_filename")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN surat_tugas_filename TEXT DEFAULT ''");
       if (!existingColumns.includes("surat_tugas_data")) await client.execute("ALTER TABLE hospital_accounts ADD COLUMN surat_tugas_data TEXT DEFAULT ''");
@@ -425,6 +501,8 @@ async function initTursoTables() {
       if (!existingColumns.includes("deleted_at")) await client.execute("ALTER TABLE rankings ADD COLUMN deleted_at DATETIME DEFAULT NULL");
     }
   }
+
+  await ensureHospitalAccountCodes(client);
 
   // Migration: add UNIQUE(hospital_name, specialty) constraint to submissions
   try {
@@ -484,12 +562,22 @@ async function initTursoTables() {
 
 async function addHospitalAccount({ acc }: any) {
   await initTursoTables();
+  const client = db();
+  await ensureHospitalAccountCodes(client);
+  const codeRows = await client.execute("SELECT email, hospital_code FROM hospital_accounts");
+  const usedCodes = new Set((codeRows.rows as any[]).map((row) => String(row.hospital_code || "").trim().toUpperCase()).filter(Boolean));
+  const baseCode = hospitalCodeFromEmail(acc.email);
+  const existingSameBaseCount = (codeRows.rows as any[]).filter((row) => hospitalCodeFromEmail(String(row.email || "")) === baseCode).length;
+  const suffix = existingSameBaseCount > 0 ? String(existingSameBaseCount + 1) : "";
+  const seedCode = suffix ? `${baseCode.slice(0, Math.max(1, 12 - suffix.length))}${suffix}` : baseCode;
+  const hospitalCode = uniqueHospitalCode(seedCode, usedCodes);
   const passwordHash = await bcrypt.hash(acc.password, 10);
-  await db().execute({
-    sql: `INSERT INTO hospital_accounts (email, password, password_hash, hospital_name, pic_name, province, city, status, surat_tugas_filename, surat_tugas_data, registered_at)
-          VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  await client.execute({
+    sql: `INSERT INTO hospital_accounts (email, hospital_code, password, password_hash, hospital_name, pic_name, province, city, status, surat_tugas_filename, surat_tugas_data, registered_at)
+          VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       acc.email,
+      hospitalCode,
       passwordHash,
       acc.hospitalName,
       acc.picName,
@@ -507,8 +595,10 @@ async function loginHospital({ email, password }: any) {
   await initTursoTables();
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedPassword = String(password || "").trim();
-  const rs = await db().execute({
-    sql: "SELECT email, password, password_hash, hospital_name, pic_name, province, city, status FROM hospital_accounts WHERE LOWER(email) = LOWER(?)",
+  const client = db();
+  await ensureHospitalAccountCodes(client);
+  const rs = await client.execute({
+    sql: "SELECT email, hospital_code, password, password_hash, hospital_name, pic_name, province, city, status FROM hospital_accounts WHERE LOWER(email) = LOWER(?)",
     args: [normalizedEmail],
   });
 
@@ -547,6 +637,7 @@ async function loginHospital({ email, password }: any) {
 
   const account = {
     email: row.email,
+    hospitalCode: row.hospital_code || hospitalCodeFromEmail(row.email),
     hospitalName: row.hospital_name,
     picName: row.pic_name,
     province: row.province || "",
@@ -554,7 +645,7 @@ async function loginHospital({ email, password }: any) {
     status: "activated" as const,
   };
 
-  const token = signToken({ email: row.email, role: "hospital" });
+  const token = signToken({ email: row.email, hospitalCode: account.hospitalCode, role: "hospital" });
   return { success: true, token, account };
 }
 
@@ -585,10 +676,11 @@ async function loginAdmin({ username, password }: any) {
 async function getAllHospitalAccounts() {
   await initTursoTables();
   const rs = await db().execute(
-    "SELECT email, hospital_name, pic_name, province, city, status, surat_tugas_filename, registered_at FROM hospital_accounts ORDER BY registered_at DESC"
+    "SELECT email, hospital_code, hospital_name, pic_name, province, city, status, surat_tugas_filename, registered_at FROM hospital_accounts ORDER BY registered_at DESC"
   );
   return rs.rows.map((r: any) => ({
     email: r.email,
+    hospitalCode: r.hospital_code || hospitalCodeFromEmail(r.email),
     hospitalName: r.hospital_name,
     picName: r.pic_name,
     province: r.province || "",
@@ -673,9 +765,10 @@ async function resetHospitalPassword({ email, password, _authRole }: any) {
 async function addSubmission({ submission, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  const hospitalCode = _hospitalEmail
-    ? hospitalCodeFromEmail(_hospitalEmail)
-    : (submission.hospitalCode || submission.details?.hospitalCode || "");
+  const hospitalCode = await resolveEffectiveHospitalCode(client, {
+    hospitalCode: submission.hospitalCode || submission.details?.hospitalCode || "",
+    _hospitalEmail,
+  });
   const details = {
     ...(submission.details || {}),
     hospitalCode,
@@ -1033,7 +1126,7 @@ async function resolveRegisteredSurveyPatient(
 async function saveSurveyBackup({ hospitalCode, specialty, survey, status = "received", error = "", _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  const requestedCode = (_hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : String(hospitalCode || "").trim()) || "UNKNOWN";
+  const requestedCode = (await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail })) || "UNKNOWN";
   const patientRm = survey?.medicalRecordNumber || survey?.qRm || "";
   const patientName = survey?.patientName || survey?.qName || "";
   const patientToken = getSurveyToken(survey);
@@ -1098,7 +1191,7 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
   const patientRm = survey.medicalRecordNumber || survey.qRm || "";
   const patientName = survey.patientName || survey.qName || "";
   const patientToken = getSurveyToken(survey);
-  const requestedCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : String(hospitalCode || "").trim();
+  const requestedCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
 
   const registeredPatient = await resolveRegisteredSurveyPatient(client, {
     hospitalCode: requestedCode,
@@ -1408,7 +1501,7 @@ async function restoreSurveyRowsFromBackups(client: any, hospitalCode: string) {
 async function getSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   await reconcileSurveySpecialties(client, effectiveCode);
   await restoreSurveyRowsFromBackups(client, effectiveCode);
   await reconcileSurveySpecialties(client, effectiveCode);
@@ -1438,7 +1531,7 @@ async function getSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
 async function getSurveyByPatient({ hospitalCode, specialty, patientRm, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   await reconcileSurveySpecialties(client, effectiveCode);
   await restoreSurveyRowsFromBackups(client, effectiveCode);
   await reconcileSurveySpecialties(client, effectiveCode);
@@ -1470,8 +1563,9 @@ async function getSurveyByPatient({ hospitalCode, specialty, patientRm, _hospita
 
 async function resetSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
-  await db().execute({
+  const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
+  await client.execute({
     sql: "DELETE FROM surveys WHERE hospital_code = ? AND specialty = ?",
     args: [effectiveCode, specialty],
   });
@@ -1479,8 +1573,8 @@ async function resetSurveys({ hospitalCode, specialty, _hospitalEmail }: any) {
 
 async function registerPatient({ hospitalCode, specialty, patient, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const id = randomId();
   const info = await client.execute("PRAGMA table_info(patients)");
   const existingCols = info.rows.map((r: any) => r.name);
@@ -1524,7 +1618,7 @@ async function registerPatient({ hospitalCode, specialty, patient, _hospitalEmai
 async function getPatients({ hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   await reconcileSurveySpecialties(client, effectiveCode);
   const info = await client.execute("PRAGMA table_info(patients)");
   const cols = info.rows.map((r: any) => r.name);
@@ -1610,8 +1704,8 @@ async function resolvePatientSurveyDisease({ hospitalCode, specialty, patientNam
 
 async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const draftId = `custom-survey-${effectiveCode}-${specialtyKey}`;
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
@@ -1625,8 +1719,8 @@ async function saveCustomSurveyMetadata({ hospitalCode, specialtyKey, data, _hos
 
 async function saveCustomSurveyPdfChunk({ hospitalCode, specialtyKey, index, total, chunk, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const draftId = `custom-survey-pdf-${effectiveCode}-${specialtyKey}-${index}`;
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
@@ -1640,8 +1734,8 @@ async function saveCustomSurveyPdfChunk({ hospitalCode, specialtyKey, index, tot
 
 async function getCustomSurveyMetadata({ hospitalCode, specialtyKey, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol, dataCol } = await getDraftSchema(client);
   const draftId = `custom-survey-${effectiveCode}-${specialtyKey}`;
   const rs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
@@ -1662,8 +1756,8 @@ async function getCustomSurveyMetadata({ hospitalCode, specialtyKey, _hospitalEm
 
 async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol } = await getDraftSchema(client);
   const draftId = `custom-survey-${effectiveCode}-${specialtyKey}`;
   const existing = await getCustomSurveyMetadata({ hospitalCode: effectiveCode, specialtyKey });
@@ -1678,8 +1772,8 @@ async function deleteCustomSurveyMetadata({ hospitalCode, specialtyKey, _hospita
 
 async function removePatient({ hospitalCode, specialty, patientId, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const info = await client.execute("PRAGMA table_info(patients)");
   const existingCols = info.rows.map((r: any) => r.name);
   const hCol = existingCols.includes("hospital_code") ? "hospital_code" : existingCols.includes("hospitalCode") ? "hospitalCode" : "hospital_code";
@@ -1714,8 +1808,8 @@ async function removePatient({ hospitalCode, specialty, patientId, _hospitalEmai
 
 async function getDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol, dataCol } = await getDraftSchema(client);
   const draftId = `${type}-${effectiveCode}-${specialty}`;
   const rs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
@@ -1724,8 +1818,8 @@ async function getDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) 
 
 async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = `${type}-${effectiveCode}-${specialty}`;
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
@@ -1738,22 +1832,23 @@ async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail 
 
 async function deleteDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol } = await getDraftSchema(client);
   const draftId = `${type}-${effectiveCode}-${specialty}`;
   await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
 }
 
-async function saveHospitalDraft({ draft, _hospitalEmail }: any) {
+async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) {
   await initTursoTables();
   const client = db();
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = draft.draftId;
-  const effectiveCode =
-    _hospitalEmail
-      ? hospitalCodeFromEmail(_hospitalEmail)
-      : (draft.hospitalCode || (draft.hospitalEmail ? hospitalCodeFromEmail(draft.hospitalEmail) : ""));
+  const effectiveCode = await resolveEffectiveHospitalCode(client, {
+    hospitalCode: draft.hospitalCode,
+    _hospitalCode,
+    _hospitalEmail: _hospitalEmail || draft.hospitalEmail,
+  });
   const normalizedDraft = {
     ...draft,
     hospitalCode: effectiveCode || draft.hospitalCode,
@@ -1774,11 +1869,13 @@ async function saveHospitalDraft({ draft, _hospitalEmail }: any) {
   }
 }
 
-async function getAllHospitalDrafts({ _hospitalEmail, _authRole }: any = {}) {
+async function getAllHospitalDrafts({ _hospitalEmail, _hospitalCode, _authRole }: any = {}) {
   await initTursoTables();
   const client = db();
   const { typeCol, hCol, dataCol, updatedCol } = await getDraftSchema(client);
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : "";
+  const effectiveCode = _authRole === "hospital"
+    ? await resolveEffectiveHospitalCode(client, { _hospitalEmail, _hospitalCode })
+    : "";
   const shouldScopeToHospital = _authRole === "hospital" && Boolean(effectiveCode);
   const rs = shouldScopeToHospital
     ? await client.execute({
@@ -1789,11 +1886,11 @@ async function getAllHospitalDrafts({ _hospitalEmail, _authRole }: any = {}) {
   return rs.rows.map((r: any) => parseJson(r.data, null)).filter(Boolean);
 }
 
-async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail }: any) {
+async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail, _hospitalCode }: any) {
   await initTursoTables();
-  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
-  if (!effectiveCode) return [];
   const client = db();
+  const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail, _hospitalCode });
+  if (!effectiveCode) return [];
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const rs = await client.execute({
     sql: `SELECT ${idCol} as id, ${typeCol} as type, ${hCol} as hospitalCode, ${sCol} as specialty, ${dataCol} as data, ${updatedCol} as updatedAt
