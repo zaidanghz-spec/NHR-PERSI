@@ -146,8 +146,8 @@ async function getHospitalCodeForEmail(client: any, email: string) {
 }
 
 async function resolveEffectiveHospitalCode(client: any, { hospitalCode, _hospitalCode, _hospitalEmail }: any = {}) {
-  if (_hospitalCode) return String(_hospitalCode).trim();
   if (_hospitalEmail) return await getHospitalCodeForEmail(client, _hospitalEmail);
+  if (_hospitalCode) return String(_hospitalCode).trim();
   return String(hospitalCode || "").trim();
 }
 
