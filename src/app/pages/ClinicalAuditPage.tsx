@@ -81,9 +81,10 @@ export function ClinicalAuditPage() {
     setCurrentPatient(1);
     setActiveDiseaseIndex(0);
     const isStillActiveDraft = () =>
-      Boolean(!cancelled && capturedDraftId && draftManager.getCurrentDraftId() === capturedDraftId);
-    const hydrateClinicalDraft = (draft: any) => {
-      if (!isStillActiveDraft() || draft?.draftId !== capturedDraftId) return false;
+      Boolean(!cancelled && (!capturedDraftId || draftManager.getCurrentDraftId() === capturedDraftId));
+    const hydrateClinicalDraft = (draft: any, requireSameDraftId = false) => {
+      if (!isStillActiveDraft()) return false;
+      if (requireSameDraftId && capturedDraftId && draft?.draftId && draft.draftId !== capturedDraftId) return false;
       if (draft.formData) setFormData(draft.formData);
       if (draft.patientMeta) setPatientMeta(draft.patientMeta);
       if (draft.currentPatient) setCurrentPatient(draft.currentPatient);
@@ -107,6 +108,16 @@ export function ClinicalAuditPage() {
       try {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
         if (serverDraft && serverDraft.formData && hydrateClinicalDraft(serverDraft)) {
+          if (currentDraftId) {
+            draftManager.updateDraft(currentDraftId, specialty!, "clinicalAudit", {
+              data: serverDraft.formData,
+              patientMeta: serverDraft.patientMeta,
+              currentPatient: serverDraft.currentPatient,
+              activeDiseaseIndex: serverDraft.activeDiseaseIndex,
+              score: serverDraft.score,
+              completed: Boolean(serverDraft.completed),
+            });
+          }
           return;
         }
       } catch { /* fallback */ }
@@ -114,7 +125,7 @@ export function ClinicalAuditPage() {
         const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
         if (saved) {
           const draft = JSON.parse(saved);
-          hydrateClinicalDraft(draft);
+          hydrateClinicalDraft(draft, true);
         }
       } catch { /* ignore */ }
     }
@@ -405,12 +416,26 @@ export function ClinicalAuditPage() {
         activeDiseaseIndex,
         completed: allDiseasesHaveData,
       });
+      const cloudDraft = {
+        draftId,
+        formData,
+        patientMeta,
+        currentPatient,
+        activeDiseaseIndex,
+        score: specialtyScore,
+        completed: allDiseasesHaveData,
+        savedAt: new Date().toISOString(),
+      };
+      api.saveDraft("clinical-audit", hospitalCode, specialty, cloudDraft).catch(err => {
+        if (draftManager.getCurrentDraftId() !== draftId) return;
+        console.error("Failed to autosave clinical audit draft to server:", err);
+      });
       setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
       setAutosaveState("saved");
     }, 1000); // 1s debounce to prevent flooding
 
     return () => clearTimeout(timer);
-  }, [formData, patientMeta, currentPatient, activeDiseaseIndex, specialty, specialtyScore, allDiseasesHaveData]);
+  }, [formData, patientMeta, currentPatient, activeDiseaseIndex, specialty, specialtyScore, allDiseasesHaveData, hospitalCode]);
   const activeCategoryScores = calculateActiveDiseaseCategories();
   const activeValidity = getSampleValidityWeight(activeCompletedPatients);
   const currentPatientScoreVal = calculatePatientScore(activeDiseaseIndex, currentPatient);

@@ -1712,11 +1712,12 @@ async function removePatient({ hospitalCode, specialty, patientId, _hospitalEmai
   return { success: true };
 }
 
-async function getDraft({ type, hospitalCode, specialty }: any) {
+async function getDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) {
   await initTursoTables();
+  const effectiveCode = _hospitalEmail ? hospitalCodeFromEmail(_hospitalEmail) : hospitalCode;
   const client = db();
   const { idCol, dataCol } = await getDraftSchema(client);
-  const draftId = `${type}-${hospitalCode}-${specialty}`;
+  const draftId = `${type}-${effectiveCode}-${specialty}`;
   const rs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   return rs.rows[0] ? parseJson((rs.rows[0] as any).data, null) : null;
 }
