@@ -247,6 +247,131 @@ async function getDraftSchema(client: any) {
   return { idCol, typeCol, dataCol, hCol, sCol, updatedCol };
 }
 
+async function normalizeDraftOwnership(client: any, draftId?: string) {
+  const { idCol, typeCol, dataCol, hCol } = await getDraftSchema(client);
+  const oneDraftClause = draftId ? ` AND ${idCol} = ?` : "";
+  const oneDraftArgs = draftId ? [draftId] : [];
+
+  await client.execute({
+    sql: `
+      UPDATE drafts
+      SET ${hCol} = (
+            SELECT h.hospital_code
+            FROM hospital_accounts h
+            WHERE lower(trim(h.email)) = lower(trim(json_extract(drafts.${dataCol}, '$.hospitalEmail')))
+            LIMIT 1
+          ),
+          ${dataCol} = json_set(
+            ${dataCol},
+            '$.hospitalCode',
+            (
+              SELECT h.hospital_code
+              FROM hospital_accounts h
+              WHERE lower(trim(h.email)) = lower(trim(json_extract(drafts.${dataCol}, '$.hospitalEmail')))
+              LIMIT 1
+            )
+          )
+      WHERE ${typeCol} = 'hospital-assessment'
+        ${oneDraftClause}
+        AND json_extract(${dataCol}, '$.hospitalEmail') IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM hospital_accounts h
+          WHERE lower(trim(h.email)) = lower(trim(json_extract(drafts.${dataCol}, '$.hospitalEmail')))
+        )
+        AND ${hCol} <> (
+          SELECT h.hospital_code
+          FROM hospital_accounts h
+          WHERE lower(trim(h.email)) = lower(trim(json_extract(drafts.${dataCol}, '$.hospitalEmail')))
+          LIMIT 1
+        )
+    `,
+    args: oneDraftArgs,
+  });
+
+  await client.execute({
+    sql: `
+      UPDATE drafts
+      SET ${hCol} = (
+            SELECT p.${hCol}
+            FROM drafts p
+            WHERE p.${idCol} = json_extract(drafts.${dataCol}, '$.draftId')
+              AND p.${typeCol} = 'hospital-assessment'
+            LIMIT 1
+          ),
+          ${dataCol} = json_set(
+            ${dataCol},
+            '$.hospitalCode',
+            (
+              SELECT p.${hCol}
+              FROM drafts p
+              WHERE p.${idCol} = json_extract(drafts.${dataCol}, '$.draftId')
+                AND p.${typeCol} = 'hospital-assessment'
+              LIMIT 1
+            )
+          )
+      WHERE ${typeCol} IN ('rsbk', 'clinical-audit', 'patient-report')
+        ${oneDraftClause}
+        AND EXISTS (
+          SELECT 1
+          FROM drafts p
+          WHERE p.${idCol} = json_extract(drafts.${dataCol}, '$.draftId')
+            AND p.${typeCol} = 'hospital-assessment'
+        )
+        AND ${hCol} <> (
+          SELECT p.${hCol}
+          FROM drafts p
+          WHERE p.${idCol} = json_extract(drafts.${dataCol}, '$.draftId')
+            AND p.${typeCol} = 'hospital-assessment'
+          LIMIT 1
+        )
+    `,
+    args: oneDraftArgs,
+  });
+
+  if (draftId) {
+    await client.execute({
+      sql: `
+        UPDATE drafts
+        SET ${hCol} = (
+              SELECT p.${hCol}
+              FROM drafts p
+              WHERE p.${idCol} = ?
+                AND p.${typeCol} = 'hospital-assessment'
+              LIMIT 1
+            ),
+            ${dataCol} = json_set(
+              ${dataCol},
+              '$.hospitalCode',
+              (
+                SELECT p.${hCol}
+                FROM drafts p
+                WHERE p.${idCol} = ?
+                  AND p.${typeCol} = 'hospital-assessment'
+                LIMIT 1
+              )
+            )
+        WHERE ${typeCol} IN ('rsbk', 'clinical-audit', 'patient-report')
+          AND json_extract(${dataCol}, '$.draftId') = ?
+          AND EXISTS (
+            SELECT 1
+            FROM drafts p
+            WHERE p.${idCol} = ?
+              AND p.${typeCol} = 'hospital-assessment'
+          )
+          AND ${hCol} <> (
+            SELECT p.${hCol}
+            FROM drafts p
+            WHERE p.${idCol} = ?
+              AND p.${typeCol} = 'hospital-assessment'
+            LIMIT 1
+          )
+      `,
+      args: [draftId, draftId, draftId, draftId, draftId],
+    });
+  }
+}
+
 async function initTursoTables() {
   if (tablesInitialized) return;
   const client = db();
@@ -564,6 +689,12 @@ async function initTursoTables() {
     }
   } catch (e) {
     console.warn("Patient survey token backfill skipped:", e);
+  }
+
+  try {
+    await normalizeDraftOwnership(client);
+  } catch (e) {
+    console.warn("Draft ownership normalization skipped:", e);
   }
 
   tablesInitialized = true;
@@ -1837,6 +1968,7 @@ async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail 
   } else {
     await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, type, effectiveCode, specialty, JSON.stringify(draft)] });
   }
+  await normalizeDraftOwnership(client, draftId);
 }
 
 async function deleteDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) {
@@ -1876,6 +2008,7 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) 
       args: [draftId, "hospital-assessment", hospitalKey, "Multiple", JSON.stringify(normalizedDraft)],
     });
   }
+  await normalizeDraftOwnership(client, draftId);
 }
 
 async function getAllHospitalDrafts({ _hospitalEmail, _hospitalCode, _authRole }: any = {}) {
