@@ -99,19 +99,28 @@ async function ensureHospitalAccountCodes(client: any) {
   const rs = await client.execute("SELECT email, hospital_code FROM hospital_accounts ORDER BY registered_at ASC, email ASC");
   const rows = rs.rows as any[];
   const baseCounts = new Map<string, number>();
+  const codeCounts = new Map<string, number>();
   rows.forEach((row) => {
     const base = hospitalCodeFromEmail(String(row.email || ""));
     baseCounts.set(base, (baseCounts.get(base) || 0) + 1);
+    const existingCode = String(row.hospital_code || "").trim().toUpperCase();
+    if (existingCode) codeCounts.set(existingCode, (codeCounts.get(existingCode) || 0) + 1);
   });
 
   const usedCodes = new Set<string>();
+  rows.forEach((row) => {
+    const existingCode = String(row.hospital_code || "").trim().toUpperCase();
+    if (existingCode && codeCounts.get(existingCode) === 1) usedCodes.add(existingCode);
+  });
+
   const baseOrdinals = new Map<string, number>();
   for (const row of rows) {
     const base = hospitalCodeFromEmail(String(row.email || ""));
     const existingCode = String(row.hospital_code || "").trim().toUpperCase();
     const duplicateBase = (baseCounts.get(base) || 0) > 1;
-    if (existingCode && !usedCodes.has(existingCode) && !(duplicateBase && existingCode === base)) {
-      usedCodes.add(existingCode);
+    // Once an account has a unique persistent code, never rotate it on startup.
+    // Rotating these codes is what can make old drafts look like they belong to another RS.
+    if (existingCode && codeCounts.get(existingCode) === 1) {
       continue;
     }
 
