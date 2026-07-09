@@ -37,11 +37,12 @@ export function RsbkFormPage() {
   const hospitalCode = authData.hospitalCode || getHospitalCode(authData.email || "");
 
   const matchesCurrentHospitalDraft = (draft: any) => {
-    return (
-      normalize(draft?.hospitalName) === normalize(authData.hospitalName) ||
-      Boolean(hospitalCode && draft?.hospitalCode && normalize(draft.hospitalCode) === normalize(hospitalCode)) ||
-      Boolean(authData.email && draft?.hospitalEmail && normalize(draft.hospitalEmail) === normalize(authData.email))
-    );
+    const emailMatch = Boolean(authData.email && draft?.hospitalEmail && normalize(draft.hospitalEmail) === normalize(authData.email));
+    const codeMatch = Boolean(hospitalCode && draft?.hospitalCode && normalize(draft.hospitalCode) === normalize(hospitalCode));
+    if (hospitalCode || authData.email || draft?.hospitalCode || draft?.hospitalEmail) {
+      return emailMatch || codeMatch;
+    }
+    return normalize(draft?.hospitalName) === normalize(authData.hospitalName);
   };
 
   const ensureRsbkDraftSession = () => {
@@ -109,16 +110,26 @@ export function RsbkFormPage() {
     async function loadRsbkDraft() {
       const draftId = capturedDraftId;
       const draft = draftId ? draftManager.getDraftById(draftId) : null;
-      if (draft && draft.progress[specialty]?.rsbk?.data) {
-        hydrate(draft.progress[specialty].rsbk.data);
-        return;
-      }
 
       try {
         const serverDraft = await api.getDraft("rsbk", hospitalCode, specialty);
         const serverData = serverDraft?.formData || serverDraft?.data;
-        if (serverData && Object.keys(serverData).length > 0 && hydrate(serverData)) return;
+        if (serverData && Object.keys(serverData).length > 0 && hydrate(serverData)) {
+          if (draftId && draft && matchesCurrentHospitalDraft(draft)) {
+            draftManager.updateDraft(draftId, specialty, "rsbk", {
+              data: stripLegacyToolVariationFields(serverData),
+              score: serverDraft?.score,
+              completed: Boolean(serverDraft?.completed),
+            });
+          }
+          return;
+        }
       } catch { /* fallback */ }
+
+      if (draft && matchesCurrentHospitalDraft(draft) && draft.progress[specialty]?.rsbk?.data) {
+        hydrate(draft.progress[specialty].rsbk.data);
+        return;
+      }
 
       try {
         const saved = localStorage.getItem(getRsbkDraftKey(specialty, hospitalCode));

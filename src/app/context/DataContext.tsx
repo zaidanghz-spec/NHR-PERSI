@@ -408,6 +408,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     const account = normalizeAccount(result.account as HospitalAccount);
+    draftManager.clearDraftRuntimeState();
     setCurrentHospital(account);
     sessionStorage.setItem("persi_hospital_session", JSON.stringify(account));
 
@@ -473,6 +474,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hospitalLogout = useCallback(() => {
+    draftManager.clearDraftRuntimeState();
     setCurrentHospital(null);
     localStorage.removeItem("hospitalToken");
     sessionStorage.removeItem("persi_hospital_session");

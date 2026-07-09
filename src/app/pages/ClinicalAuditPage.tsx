@@ -64,6 +64,16 @@ export function ClinicalAuditPage() {
   const hospitalName = authData.hospitalName || "Unknown Hospital";
   const hospitalCode = authData.hospitalCode || getHospitalCode(authData.email || "");
 
+  const matchesCurrentHospitalDraft = (draft: any) => {
+    const normalize = (value?: string) => (value || "").trim().toLowerCase();
+    const emailMatch = Boolean(authData.email && draft?.hospitalEmail && normalize(draft.hospitalEmail) === normalize(authData.email));
+    const codeMatch = Boolean(hospitalCode && draft?.hospitalCode && normalize(draft.hospitalCode) === normalize(hospitalCode));
+    if (hospitalCode || authData.email || draft?.hospitalCode || draft?.hospitalEmail) {
+      return emailMatch || codeMatch;
+    }
+    return normalize(draft?.hospitalName) === normalize(authData.hospitalName);
+  };
+
   useEffect(() => {
     const auth = sessionStorage.getItem("hospitalAuth");
     if (!auth) { navigate("/hospital-login"); return; }
@@ -96,19 +106,10 @@ export function ClinicalAuditPage() {
       const currentDraft = currentDraftId ? draftManager.getDraftById(currentDraftId) : null;
       const currentClinical = currentDraft?.progress?.[specialty!]?.clinicalAudit;
 
-      if (currentClinical?.data && Object.keys(currentClinical.data).length > 0) {
-        if (!isStillActiveDraft()) return;
-        setFormData(currentClinical.data);
-        if (currentClinical.patientMeta) setPatientMeta(currentClinical.patientMeta);
-        if (currentClinical.currentPatient) setCurrentPatient(currentClinical.currentPatient);
-        if (typeof currentClinical.activeDiseaseIndex === "number") setActiveDiseaseIndex(currentClinical.activeDiseaseIndex);
-        return;
-      }
-
       try {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
         if (serverDraft && serverDraft.formData && hydrateClinicalDraft(serverDraft)) {
-          if (currentDraftId) {
+          if (currentDraftId && currentDraft && matchesCurrentHospitalDraft(currentDraft)) {
             draftManager.updateDraft(currentDraftId, specialty!, "clinicalAudit", {
               data: serverDraft.formData,
               patientMeta: serverDraft.patientMeta,
@@ -121,6 +122,16 @@ export function ClinicalAuditPage() {
           return;
         }
       } catch { /* fallback */ }
+
+      if (currentDraft && matchesCurrentHospitalDraft(currentDraft) && currentClinical?.data && Object.keys(currentClinical.data).length > 0) {
+        if (!isStillActiveDraft()) return;
+        setFormData(currentClinical.data);
+        if (currentClinical.patientMeta) setPatientMeta(currentClinical.patientMeta);
+        if (currentClinical.currentPatient) setCurrentPatient(currentClinical.currentPatient);
+        if (typeof currentClinical.activeDiseaseIndex === "number") setActiveDiseaseIndex(currentClinical.activeDiseaseIndex);
+        return;
+      }
+
       try {
         const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
         if (saved) {

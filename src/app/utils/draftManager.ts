@@ -69,11 +69,17 @@ function getDraftHospitalCode(draft: DraftData) {
 function matchesHospitalDraft(draft: DraftData, hospital?: { hospitalName?: string; email?: string; hospitalCode?: string }) {
   if (!hospital) return true;
   const code = hospital.hospitalCode || deriveHospitalCode(hospital.email);
-  return (
-    normalize(draft.hospitalName) === normalize(hospital.hospitalName) ||
-    Boolean(code && getDraftHospitalCode(draft) && normalize(getDraftHospitalCode(draft)) === normalize(code)) ||
-    Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email))
-  );
+  const draftCode = getDraftHospitalCode(draft);
+  const emailMatch = Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email));
+  const codeMatch = Boolean(code && draftCode && normalize(draftCode) === normalize(code));
+
+  // Hospital names are not unique enough for draft ownership. If either side has
+  // account identity, only email/code matches may bind the draft to this session.
+  if (code || hospital.email || draftCode || draft.hospitalEmail) {
+    return emailMatch || codeMatch;
+  }
+
+  return normalize(draft.hospitalName) === normalize(hospital.hospitalName);
 }
 
 function stageFromModuleType(type: string): "rsbk" | "clinicalAudit" | "patientReport" | null {
