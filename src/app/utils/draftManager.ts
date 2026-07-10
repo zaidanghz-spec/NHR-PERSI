@@ -75,6 +75,14 @@ function matchesHospitalDraft(draft: DraftData, hospital?: { hospitalName?: stri
 
   // Hospital names are not unique enough for draft ownership. If either side has
   // account identity, only email/code matches may bind the draft to this session.
+  if (hospital.email && draft.hospitalEmail) {
+    return emailMatch;
+  }
+
+  if (code && draftCode) {
+    return codeMatch;
+  }
+
   if (code || hospital.email || draftCode || draft.hospitalEmail) {
     return emailMatch || codeMatch;
   }
@@ -243,6 +251,11 @@ export const draftManager = {
     sessionStorage.removeItem("selectedSpecialties");
     sessionStorage.removeItem("currentSpecialty");
     sessionStorage.removeItem("activeRevisionContext");
+  },
+
+  pruneDraftsForHospital(hospital: { hospitalName?: string; email?: string; hospitalCode?: string }): void {
+    const drafts = this.getAllDrafts().filter((draft) => matchesHospitalDraft(draft, hospital));
+    safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(drafts));
   },
 
   beginDraftSession(draft: DraftData): void {
@@ -457,6 +470,10 @@ export const draftManager = {
   // Manual cloud sync reconciliation
   async syncWithCloud(hospital?: { hospitalName?: string; picName?: string; email?: string; hospitalCode?: string }): Promise<void> {
     try {
+      if (!hospital?.email && !hospital?.hospitalCode) {
+        return;
+      }
+
       const cloudDrafts = await getAllHospitalDrafts();
       const hospitalCode = hospital?.hospitalCode || deriveHospitalCode(hospital?.email);
       const moduleDrafts = hospitalCode ? await getHospitalModuleDrafts(hospitalCode) : [];

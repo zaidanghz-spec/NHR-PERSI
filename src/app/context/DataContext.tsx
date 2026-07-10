@@ -420,6 +420,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       email: account.email,
       authenticated: true,
     }));
+    draftManager.pruneDraftsForHospital({ ...account, hospitalCode });
 
     setHospitalAccounts(prev => {
       const merged = mergeHospitalAccounts([account], prev);

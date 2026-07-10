@@ -67,7 +67,9 @@ export function ClinicalAuditPage() {
   const matchesCurrentHospitalDraft = (draft: any) => {
     const normalize = (value?: string) => (value || "").trim().toLowerCase();
     const emailMatch = Boolean(authData.email && draft?.hospitalEmail && normalize(draft.hospitalEmail) === normalize(authData.email));
+    if (authData.email && draft?.hospitalEmail) return emailMatch;
     const codeMatch = Boolean(hospitalCode && draft?.hospitalCode && normalize(draft.hospitalCode) === normalize(hospitalCode));
+    if (hospitalCode && draft?.hospitalCode) return codeMatch;
     if (hospitalCode || authData.email || draft?.hospitalCode || draft?.hospitalEmail) {
       return emailMatch || codeMatch;
     }

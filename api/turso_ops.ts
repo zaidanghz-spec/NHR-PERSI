@@ -1985,15 +1985,18 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) 
   const client = db();
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = draft.draftId;
+  const authoritativeEmail = String(_hospitalEmail || draft.hospitalEmail || "").trim().toLowerCase();
   const effectiveCode = await resolveEffectiveHospitalCode(client, {
     hospitalCode: draft.hospitalCode,
     _hospitalCode,
-    _hospitalEmail: _hospitalEmail || draft.hospitalEmail,
+    _hospitalEmail: authoritativeEmail,
   });
   const normalizedDraft = {
     ...draft,
     hospitalCode: effectiveCode || draft.hospitalCode,
-    hospitalEmail: draft.hospitalEmail || _hospitalEmail,
+    // Authenticated hospital sessions are authoritative. Stale localStorage can
+    // carry another RS email; never let that payload re-own a server draft.
+    hospitalEmail: authoritativeEmail || draft.hospitalEmail,
   };
   const hospitalKey = effectiveCode || normalizedDraft.hospitalCode || normalizedDraft.hospitalEmail || normalizedDraft.hospitalName;
   const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });

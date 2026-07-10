@@ -18,11 +18,12 @@ export function SelectSpecialtyPage() {
     email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
   const matchesHospitalDraft = (draft: DraftData, hospital: { hospitalName: string; email?: string; hospitalCode?: string }) => {
     const code = hospital.hospitalCode || deriveHospitalCode(hospital.email);
-    return (
-      normalize(draft.hospitalName) === normalize(hospital.hospitalName) ||
-      Boolean(code && draft.hospitalCode && normalize(draft.hospitalCode) === normalize(code)) ||
-      Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email))
-    );
+    const emailMatch = Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email));
+    if (hospital.email && draft.hospitalEmail) return emailMatch;
+    const codeMatch = Boolean(code && draft.hospitalCode && normalize(draft.hospitalCode) === normalize(code));
+    if (code && draft.hospitalCode) return codeMatch;
+    if (code || hospital.email || draft.hospitalCode || draft.hospitalEmail) return emailMatch || codeMatch;
+    return normalize(draft.hospitalName) === normalize(hospital.hospitalName);
   };
 
   // Check authentication on mount
