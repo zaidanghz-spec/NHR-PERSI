@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 
 let tablesInitialized = false;
 let tablesInitializing: Promise<void> | null = null;
+let draftWriteQueue: Promise<void> = Promise.resolve();
 const surveyBackupRestoreCheckedAt = new Map<string, number>();
 
 function getDatabaseUrl() {
@@ -46,6 +47,21 @@ function randomId() {
 function parseJson(value: unknown, fallback: any) {
   if (typeof value !== "string" || !value) return fallback;
   try { return JSON.parse(value); } catch { return fallback; }
+}
+
+async function withDraftWriteQueue<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = draftWriteQueue.catch(() => undefined);
+  let release!: () => void;
+  draftWriteQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
 }
 
 function normalizePatientCodeKey(value: unknown) {
@@ -708,12 +724,6 @@ async function initTursoTablesOnce() {
     }
   } catch (e) {
     console.warn("Patient survey token backfill skipped:", e);
-  }
-
-  try {
-    await normalizeDraftOwnership(client);
-  } catch (e) {
-    console.warn("Draft ownership normalization skipped:", e);
   }
 
   tablesInitialized = true;
@@ -1983,15 +1993,21 @@ async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail 
   const draftId = `${type}-${effectiveCode}-${specialty}`;
   const normalizedDraft = { ...(draft || {}), hospitalCode: effectiveCode };
   const dataJson = JSON.stringify(normalizedDraft);
-  const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
-  if (existing.rows.length > 0) {
-    const row = existing.rows[0] as any;
-    if (String(row.hospitalCode || "") === effectiveCode && String(row.data || "") === dataJson) return;
-    await client.execute({ sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [effectiveCode, dataJson, draftId] });
-  } else {
-    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, type, effectiveCode, specialty, dataJson] });
-  }
-  await normalizeDraftOwnership(client, draftId);
+  await withDraftWriteQueue(async () => {
+    const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+    let shouldNormalizeOwnership = false;
+    if (existing.rows.length > 0) {
+      const row = existing.rows[0] as any;
+      const hospitalChanged = String(row.hospitalCode || "") !== effectiveCode;
+      if (!hospitalChanged && String(row.data || "") === dataJson) return;
+      await client.execute({ sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [effectiveCode, dataJson, draftId] });
+      shouldNormalizeOwnership = hospitalChanged;
+    } else {
+      await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, type, effectiveCode, specialty, dataJson] });
+      shouldNormalizeOwnership = true;
+    }
+    if (shouldNormalizeOwnership) await normalizeDraftOwnership(client, draftId);
+  });
 }
 
 async function deleteDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) {
@@ -2023,21 +2039,27 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) 
   };
   const hospitalKey = effectiveCode || normalizedDraft.hospitalCode || normalizedDraft.hospitalEmail || normalizedDraft.hospitalName;
   const dataJson = JSON.stringify(normalizedDraft);
-  const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
-  if (existing.rows.length > 0) {
-    const row = existing.rows[0] as any;
-    if (String(row.hospitalCode || "") === hospitalKey && String(row.data || "") === dataJson) return;
-    await client.execute({
-      sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
-      args: [hospitalKey, dataJson, draftId],
-    });
-  } else {
-    await client.execute({
-      sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
-      args: [draftId, "hospital-assessment", hospitalKey, "Multiple", dataJson],
-    });
-  }
-  await normalizeDraftOwnership(client, draftId);
+  await withDraftWriteQueue(async () => {
+    const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+    let shouldNormalizeOwnership = false;
+    if (existing.rows.length > 0) {
+      const row = existing.rows[0] as any;
+      const hospitalChanged = String(row.hospitalCode || "") !== hospitalKey;
+      if (!hospitalChanged && String(row.data || "") === dataJson) return;
+      await client.execute({
+        sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
+        args: [hospitalKey, dataJson, draftId],
+      });
+      shouldNormalizeOwnership = hospitalChanged;
+    } else {
+      await client.execute({
+        sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
+        args: [draftId, "hospital-assessment", hospitalKey, "Multiple", dataJson],
+      });
+      shouldNormalizeOwnership = true;
+    }
+    if (shouldNormalizeOwnership) await normalizeDraftOwnership(client, draftId);
+  });
 }
 
 async function getAllHospitalDrafts({ _hospitalEmail, _hospitalCode, _authRole }: any = {}) {
