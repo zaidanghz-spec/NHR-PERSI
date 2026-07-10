@@ -1962,11 +1962,15 @@ async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail 
   const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = `${type}-${effectiveCode}-${specialty}`;
-  const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+  const normalizedDraft = { ...(draft || {}), hospitalCode: effectiveCode };
+  const dataJson = JSON.stringify(normalizedDraft);
+  const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (existing.rows.length > 0) {
-    await client.execute({ sql: `UPDATE drafts SET ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [JSON.stringify(draft), draftId] });
+    const row = existing.rows[0] as any;
+    if (String(row.hospitalCode || "") === effectiveCode && String(row.data || "") === dataJson) return;
+    await client.execute({ sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [effectiveCode, dataJson, draftId] });
   } else {
-    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, type, effectiveCode, specialty, JSON.stringify(draft)] });
+    await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, type, effectiveCode, specialty, dataJson] });
   }
   await normalizeDraftOwnership(client, draftId);
 }
@@ -1999,16 +2003,19 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) 
     hospitalEmail: authoritativeEmail || draft.hospitalEmail,
   };
   const hospitalKey = effectiveCode || normalizedDraft.hospitalCode || normalizedDraft.hospitalEmail || normalizedDraft.hospitalName;
-  const existing = await client.execute({ sql: `SELECT ${idCol} FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+  const dataJson = JSON.stringify(normalizedDraft);
+  const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
   if (existing.rows.length > 0) {
+    const row = existing.rows[0] as any;
+    if (String(row.hospitalCode || "") === hospitalKey && String(row.data || "") === dataJson) return;
     await client.execute({
       sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
-      args: [hospitalKey, JSON.stringify(normalizedDraft), draftId],
+      args: [hospitalKey, dataJson, draftId],
     });
   } else {
     await client.execute({
       sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
-      args: [draftId, "hospital-assessment", hospitalKey, "Multiple", JSON.stringify(normalizedDraft)],
+      args: [draftId, "hospital-assessment", hospitalKey, "Multiple", dataJson],
     });
   }
   await normalizeDraftOwnership(client, draftId);
