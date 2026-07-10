@@ -45,8 +45,18 @@ export function HospitalReviewResultPage() {
   if (!authData) return null;
 
   const normalize = (value?: string) => (value || "").trim().toLowerCase();
-  const deriveHospitalCode = (email?: string) =>
-    email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
+  const deriveHospitalCode = (email?: string) => {
+    if (!email) return "";
+    const cleanEmail = email.trim().toLowerCase();
+    const local = cleanEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8);
+    let hash = 0;
+    for (let i = 0; i < cleanEmail.length; i++) {
+      hash = (hash << 5) - hash + cleanEmail.charCodeAt(i);
+      hash |= 0;
+    }
+    const hashStr = Math.abs(hash).toString(36).toUpperCase().substring(0, 4);
+    return local + hashStr;
+  };
   const authHospitalCode = authData.hospitalCode || deriveHospitalCode(authData.email);
 
   // Get hospital's submissions

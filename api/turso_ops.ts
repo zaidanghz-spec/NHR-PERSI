@@ -90,8 +90,15 @@ function signToken(payload: object): string {
 
 function hospitalCodeFromEmail(email: string): string {
   if (!email) return "UNKNOWN";
-  const local = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return local.substring(0, 12) || "RS001";
+  const cleanEmail = email.trim().toLowerCase();
+  const local = cleanEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8);
+  let hash = 0;
+  for (let i = 0; i < cleanEmail.length; i++) {
+    hash = (hash << 5) - hash + cleanEmail.charCodeAt(i);
+    hash |= 0;
+  }
+  const hashStr = Math.abs(hash).toString(36).toUpperCase().substring(0, 4);
+  return (local + hashStr) || "RS001";
 }
 
 function uniqueHospitalCode(baseCode: string, usedCodes: Set<string>) {
@@ -106,53 +113,60 @@ function uniqueHospitalCode(baseCode: string, usedCodes: Set<string>) {
   return code;
 }
 
+let ensureHospitalAccountCodesRun = false;
 async function ensureHospitalAccountCodes(client: any) {
-  const info = await client.execute("PRAGMA table_info(hospital_accounts)");
-  const cols = info.rows.map((r: any) => r.name);
-  if (!cols.includes("hospital_code")) {
-    await client.execute("ALTER TABLE hospital_accounts ADD COLUMN hospital_code TEXT DEFAULT ''");
-  }
-
-  const rs = await client.execute("SELECT email, hospital_code FROM hospital_accounts ORDER BY registered_at ASC, email ASC");
-  const rows = rs.rows as any[];
-  const baseCounts = new Map<string, number>();
-  const codeCounts = new Map<string, number>();
-  rows.forEach((row) => {
-    const base = hospitalCodeFromEmail(String(row.email || ""));
-    baseCounts.set(base, (baseCounts.get(base) || 0) + 1);
-    const existingCode = String(row.hospital_code || "").trim().toUpperCase();
-    if (existingCode) codeCounts.set(existingCode, (codeCounts.get(existingCode) || 0) + 1);
-  });
-
-  const usedCodes = new Set<string>();
-  rows.forEach((row) => {
-    const existingCode = String(row.hospital_code || "").trim().toUpperCase();
-    if (existingCode && codeCounts.get(existingCode) === 1) usedCodes.add(existingCode);
-  });
-
-  const baseOrdinals = new Map<string, number>();
-  for (const row of rows) {
-    const base = hospitalCodeFromEmail(String(row.email || ""));
-    const existingCode = String(row.hospital_code || "").trim().toUpperCase();
-    const duplicateBase = (baseCounts.get(base) || 0) > 1;
-    // Once an account has a unique persistent code, never rotate it on startup.
-    // Rotating these codes is what can make old drafts look like they belong to another RS.
-    if (existingCode && codeCounts.get(existingCode) === 1) {
-      continue;
+  if (ensureHospitalAccountCodesRun) return;
+  try {
+    const info = await client.execute("PRAGMA table_info(hospital_accounts)");
+    const cols = info.rows.map((r: any) => r.name);
+    if (!cols.includes("hospital_code")) {
+      await client.execute("ALTER TABLE hospital_accounts ADD COLUMN hospital_code TEXT DEFAULT ''");
     }
 
-    let seed = base;
-    if (duplicateBase) {
-      const ordinal = (baseOrdinals.get(base) || 0) + 1;
-      baseOrdinals.set(base, ordinal);
-      const suffix = String(ordinal);
-      seed = `${base.slice(0, Math.max(1, 12 - suffix.length))}${suffix}`;
-    }
-    const code = uniqueHospitalCode(seed, usedCodes);
-    await client.execute({
-      sql: "UPDATE hospital_accounts SET hospital_code = ? WHERE LOWER(email) = LOWER(?)",
-      args: [code, row.email],
+    const rs = await client.execute("SELECT email, hospital_code FROM hospital_accounts ORDER BY registered_at ASC, email ASC");
+    const rows = rs.rows as any[];
+    const baseCounts = new Map<string, number>();
+    const codeCounts = new Map<string, number>();
+    rows.forEach((row) => {
+      const base = hospitalCodeFromEmail(String(row.email || ""));
+      baseCounts.set(base, (baseCounts.get(base) || 0) + 1);
+      const existingCode = String(row.hospital_code || "").trim().toUpperCase();
+      if (existingCode) codeCounts.set(existingCode, (codeCounts.get(existingCode) || 0) + 1);
     });
+
+    const usedCodes = new Set<string>();
+    rows.forEach((row) => {
+      const existingCode = String(row.hospital_code || "").trim().toUpperCase();
+      if (existingCode && codeCounts.get(existingCode) === 1) usedCodes.add(existingCode);
+    });
+
+    const baseOrdinals = new Map<string, number>();
+    for (const row of rows) {
+      const base = hospitalCodeFromEmail(String(row.email || ""));
+      const existingCode = String(row.hospital_code || "").trim().toUpperCase();
+      const duplicateBase = (baseCounts.get(base) || 0) > 1;
+      // Once an account has a unique persistent code, never rotate it on startup.
+      // Rotating these codes is what can make old drafts look like they belong to another RS.
+      if (existingCode && codeCounts.get(existingCode) === 1) {
+        continue;
+      }
+
+      let seed = base;
+      if (duplicateBase) {
+        const ordinal = (baseOrdinals.get(base) || 0) + 1;
+        baseOrdinals.set(base, ordinal);
+        const suffix = String(ordinal);
+        seed = `${base.slice(0, Math.max(1, 12 - suffix.length))}${suffix}`;
+      }
+      const code = uniqueHospitalCode(seed, usedCodes);
+      await client.execute({
+        sql: "UPDATE hospital_accounts SET hospital_code = ? WHERE LOWER(email) = LOWER(?)",
+        args: [code, row.email],
+      });
+    }
+    ensureHospitalAccountCodesRun = true;
+  } catch (err) {
+    console.error("Failed to ensure hospital account codes:", err);
   }
 }
 
@@ -2066,10 +2080,11 @@ async function getAllHospitalDrafts({ _hospitalEmail, _hospitalCode, _authRole }
   await initTursoTables();
   const client = db();
   const { typeCol, hCol, dataCol, updatedCol } = await getDraftSchema(client);
-  const effectiveCode = _authRole === "hospital"
+  const isHospital = _authRole === "hospital" || Boolean(_hospitalEmail);
+  const effectiveCode = isHospital
     ? await resolveEffectiveHospitalCode(client, { _hospitalEmail, _hospitalCode })
     : "";
-  const shouldScopeToHospital = _authRole === "hospital" && Boolean(effectiveCode);
+  const shouldScopeToHospital = isHospital && Boolean(effectiveCode);
   const rs = shouldScopeToHospital
     ? await client.execute({
         sql: `SELECT ${dataCol} as data FROM drafts WHERE ${typeCol} = 'hospital-assessment' AND ${hCol} = ? ORDER BY ${updatedCol} DESC`,

@@ -59,7 +59,16 @@ const DRAFT_SCOPED_SESSION_SUFFIXES = [
 const normalize = (value?: string) => (value || "").trim().toLowerCase();
 
 function deriveHospitalCode(email?: string) {
-  return email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "";
+  if (!email) return "";
+  const cleanEmail = email.trim().toLowerCase();
+  const local = cleanEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 8);
+  let hash = 0;
+  for (let i = 0; i < cleanEmail.length; i++) {
+    hash = (hash << 5) - hash + cleanEmail.charCodeAt(i);
+    hash |= 0;
+  }
+  const hashStr = Math.abs(hash).toString(36).toUpperCase().substring(0, 4);
+  return local + hashStr;
 }
 
 function getDraftHospitalCode(draft: DraftData) {
@@ -502,11 +511,13 @@ export const draftManager = {
       // Recovery path: old/local-only failures could leave module drafts in cloud without a parent assessment draft.
       // Rebuilding the parent draft makes progress visible again on any device after login.
       const recoveredDrafts = mergeModuleDraftsIntoAssessments(mergedDrafts, moduleDrafts, hospital);
-      safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(recoveredDrafts));
-
-      const currentHospitalDrafts = hospital
-        ? recoveredDrafts.filter((draft) => matchesHospitalDraft(draft, hospital))
+      // Clean up local storage by keeping only drafts that belong to the current hospital
+      const cleanedDrafts = hospital 
+        ? recoveredDrafts.filter(draft => matchesHospitalDraft(draft, hospital)) 
         : recoveredDrafts;
+      safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(cleanedDrafts));
+
+      const currentHospitalDrafts = cleanedDrafts;
       await Promise.allSettled(currentHospitalDrafts.map((draft) => saveHospitalDraft(draft)));
     } catch (err) {
       console.error("Manual cloud sync failed:", err);
