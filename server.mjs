@@ -142,7 +142,13 @@ function verifyJwt(req) {
 }
 
 function serveStatic(req, res, url) {
-  const requestedPath = decodeURIComponent(url.pathname);
+  let requestedPath = "/";
+  try {
+    requestedPath = decodeURIComponent(url.pathname);
+  } catch {
+    sendJson(res, 400, { error: "Bad request" });
+    return;
+  }
   const relativePath = requestedPath === "/" ? "index.html" : requestedPath.slice(1);
   const candidate = path.normalize(path.join(distDir, relativePath));
   const safeCandidate = candidate.startsWith(distDir) ? candidate : path.join(distDir, "index.html");
