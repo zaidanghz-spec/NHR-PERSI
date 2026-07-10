@@ -5,6 +5,7 @@ import path from "node:path";
 import jwt from "jsonwebtoken";
 
 let tablesInitialized = false;
+let tablesInitializing: Promise<void> | null = null;
 const surveyBackupRestoreCheckedAt = new Map<string, number>();
 
 function getDatabaseUrl() {
@@ -373,6 +374,24 @@ async function normalizeDraftOwnership(client: any, draftId?: string) {
 }
 
 async function initTursoTables() {
+  if (tablesInitialized) return;
+  if (tablesInitializing) {
+    await tablesInitializing;
+    return;
+  }
+
+  // Several requests can hit a cold process at the same time. Without this
+  // single-flight guard, each request runs migrations and draft normalization
+  // concurrently, which can lock SQLite and make the whole app feel frozen.
+  tablesInitializing = initTursoTablesOnce();
+  try {
+    await tablesInitializing;
+  } finally {
+    tablesInitializing = null;
+  }
+}
+
+async function initTursoTablesOnce() {
   if (tablesInitialized) return;
   const client = db();
 
