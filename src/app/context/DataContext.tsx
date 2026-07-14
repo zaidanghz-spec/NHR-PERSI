@@ -405,6 +405,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     if (result.token) {
       localStorage.setItem("hospitalToken", result.token);
+      sessionStorage.setItem("hospitalToken", result.token);
     }
 
     const account = normalizeAccount(result.account as HospitalAccount);
@@ -478,6 +479,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     draftManager.clearDraftRuntimeState();
     setCurrentHospital(null);
     localStorage.removeItem("hospitalToken");
+    sessionStorage.removeItem("hospitalToken");
     sessionStorage.removeItem("persi_hospital_session");
     sessionStorage.removeItem("hospitalAuth");
   }, []);
@@ -488,6 +490,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!result.success) return false;
     if (result.token) {
       sessionStorage.setItem("auth_token", result.token);
+      localStorage.setItem("auth_token", result.token);
     }
     setIsAdmin(true);
     sessionStorage.setItem("persi_admin", "true");
@@ -498,6 +501,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false);
     sessionStorage.removeItem("persi_admin");
     sessionStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_token");
   }, []);
 
   // Rankings

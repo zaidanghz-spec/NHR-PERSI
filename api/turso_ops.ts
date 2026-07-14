@@ -85,7 +85,7 @@ function getJwtSecret(): string {
 }
 
 function signToken(payload: object): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: "30d" });
 }
 
 function hospitalCodeFromEmail(email: string): string {

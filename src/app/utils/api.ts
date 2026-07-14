@@ -4,7 +4,11 @@ export const PREFIX = "/api";
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = sessionStorage.getItem("auth_token") || localStorage.getItem("hospitalToken");
+  const token =
+    sessionStorage.getItem("auth_token") ||
+    sessionStorage.getItem("hospitalToken") ||
+    localStorage.getItem("auth_token") ||
+    localStorage.getItem("hospitalToken");
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -45,7 +49,9 @@ async function rpcOnce<T>(operation: string, payload: Record<string, any> = {}):
   try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
 
   if (!response.ok) {
-    const details = body.error || raw || response.statusText || "Unknown server error";
+    const details = response.status === 401
+      ? "Sesi login sudah tidak valid. Silakan logout lalu login ulang sebagai RS/Admin."
+      : body.error || raw || response.statusText || "Unknown server error";
     const err: any = new Error(`${operation} failed (${response.status}): ${details}`);
     err.statusCode = response.status;
     throw err;

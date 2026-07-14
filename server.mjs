@@ -67,6 +67,14 @@ function getJwtSecret() {
   return process.env.JWT_SECRET || process.env.VITE_JWT_SECRET || "nhr-persi-session-secret";
 }
 
+function getJwtSecrets() {
+  return Array.from(new Set([
+    getJwtSecret(),
+    process.env.LEGACY_JWT_SECRET || "",
+    "nhr-persi-session-secret",
+  ].filter(Boolean)));
+}
+
 function getDatabaseUrl() {
   return process.env.DATABASE_URL || process.env.LIBSQL_URL || process.env.TURSO_DATABASE_URL || "";
 }
@@ -131,14 +139,18 @@ function verifyJwt(req) {
   const auth = req.headers.authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) return false;
-  try {
-    const decoded = jwt.verify(token, getJwtSecret());
-    req.hospitalEmail = decoded?.email || null;
-    req.authRole = decoded?.role || null;
-    return true;
-  } catch {
-    return false;
+  for (const secret of getJwtSecrets()) {
+    try {
+      const decoded = jwt.verify(token, secret);
+      req.hospitalEmail = decoded?.email || null;
+      req.authRole = decoded?.role || null;
+      return true;
+    } catch {
+      // Try the next configured/legacy secret. This keeps users from being
+      // silently logged-in-but-unauthorized after a VPS/env secret migration.
+    }
   }
+  return false;
 }
 
 function serveStatic(req, res, url) {
