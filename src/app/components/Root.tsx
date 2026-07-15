@@ -561,24 +561,19 @@ export function Root() {
               </ul>
             </div>
             <div>
-              <h4 className="font-[600] text-sm mb-4">Kontak</h4>
+              <h4 className="font-[600] text-sm mb-4">Kontak Tim IT NHR</h4>
               <ul className="space-y-4 text-sm text-gray-400">
                 <li>
                   <div className="flex flex-col gap-1">
                     <span className="text-white font-[500]">Email:</span>
-                    <a href="mailto:persi@pacific.net.id" className="hover:text-white transition-colors">persi@pacific.net.id</a>
-                    <a href="mailto:sekretariat@persi.or.id" className="hover:text-white transition-colors">sekretariat@persi.or.id</a>
+                    <a href="mailto:persirspemeringkatan@gmail.com" className="hover:text-white transition-colors">persirspemeringkatan@gmail.com</a>
                   </div>
                 </li>
                 <li>
                   <div className="flex flex-col gap-1 text-gray-400">
                     <div className="flex items-center gap-1">
-                      <span className="text-white font-[500]">Telp:</span>
-                      <a href="tel:+622183788722" className="hover:text-white transition-colors">(+62-21) 8378 8722</a>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-white font-[500]">Fax:</span>
-                      <span>(+62-21) 8378 8724</span>
+                      <span className="text-white font-[500]">Whatsapp:</span>
+                      <a href="https://wa.me/6281717422524" className="hover:text-white transition-colors">+6281717422524</a>
                     </div>
                   </div>
                 </li>
