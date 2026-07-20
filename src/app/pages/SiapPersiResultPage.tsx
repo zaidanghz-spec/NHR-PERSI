@@ -13,6 +13,14 @@ type PatientCountBreakdown = {
   count: number;
 };
 
+function getSampleValidityWeight(count: number): number {
+  if (count <= 0) return 0;
+  if (count <= 5) return 0.80;
+  if (count <= 10) return 0.85;
+  if (count <= 20) return 0.92;
+  return 1.0;
+}
+
 export function SiapPersiResultPage() {
   const { specialty } = useParams<{ specialty: string }>();
   const navigate = useNavigate();
@@ -143,14 +151,16 @@ export function SiapPersiResultPage() {
     const diseaseCount = info?.diseases.length || 0;
     const completeFromBreakdown = breakdown.length >= diseaseCount && breakdown.every(item => item.count >= 1);
     const sessionCount = parseInt(sessionStorage.getItem(`${spec}_prmPatientCount`) || "0", 10);
+    const draftPatientCount = Number(progress?.patientReport?.patientCount || 0);
     const hasDraftStage = Boolean(progress?.patientReport);
     const complete = hasDraftStage
-      ? Boolean(progress?.patientReport?.completed || completeFromBreakdown)
+      ? Boolean(progress?.patientReport?.completed || completeFromBreakdown || (diseaseCount > 0 && draftPatientCount >= diseaseCount))
       : Boolean(completeFromBreakdown || (diseaseCount > 0 && sessionCount >= diseaseCount));
+    const detailCount = spec === specialty ? prmPatientCount : String(Math.max(sessionCount, draftPatientCount));
     return {
       complete,
       label: complete ? "Lengkap" : "Belum lengkap",
-      detail: spec === specialty ? `${prmPatientCount} pasien terisi` : `${sessionCount} pasien terisi`,
+      detail: `${detailCount} pasien terisi`,
     };
   };
 
@@ -210,27 +220,82 @@ export function SiapPersiResultPage() {
       const hospitalAuth = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
       const hCode = hospitalAuth.hospitalCode || hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) || "RS001";
 
-      // 1. Recover PRM Count
-      let totalPRM = 0;
-      const prmBreakdown: PatientCountBreakdown[] = [];
-      if (specialtyInfo) {
-        for (let i = 0; i < specialtyInfo.diseases.length; i++) {
-          const dKey = `${specialty}-d${i}`;
+      async function recoverPrmForSpecialty(spec: string) {
+        const info = specialtyAuditData[spec as keyof typeof specialtyAuditData];
+        if (!info) return { total: 0, breakdown: [] as PatientCountBreakdown[], score: 0, summary: {}, complete: false };
+
+        let total = 0;
+        let finalScore = 0;
+        const breakdown: PatientCountBreakdown[] = [];
+        const summary: Record<string, string> = {};
+
+        for (let i = 0; i < info.diseases.length; i++) {
+          const disease = info.diseases[i];
+          const dKey = `${spec}-d${i}`;
           try {
             const surveys = await api.getSurveys(hCode, dKey);
             const customData = await api.getCustomSurveyMetadata(hCode, dKey);
-            const count = surveys.length + (customData ? (customData.patientCount || 0) : 0);
-            totalPRM += count;
-            prmBreakdown.push({
-              diseaseName: specialtyInfo.diseases[i]?.diseaseName || `Penyakit ${i + 1}`,
-              count,
-            });
+            const qrCount = surveys.length;
+            const pdfCount = customData ? (customData.patientCount || 0) : 0;
+            const qrAvg = qrCount > 0
+              ? surveys.reduce((sum: number, survey: any) => sum + (Number(survey.overallScore) || 0), 0) / qrCount
+              : 0;
+            const adminPrem = typeof customData?.adminPremScore === "number" ? customData.adminPremScore : null;
+            const adminProm = typeof customData?.adminPromScore === "number" ? customData.adminPromScore : null;
+            const pdfHasScore = adminPrem !== null && adminProm !== null;
+            const pdfAvg = pdfHasScore ? (adminPrem * 0.6 + adminProm * 0.4) : 0;
+            const scoredPatientCount = qrCount + (pdfHasScore ? pdfCount : 0);
+            const count = qrCount + pdfCount;
+            const diseaseAvg = scoredPatientCount > 0
+              ? Number((((qrAvg * qrCount) + (pdfAvg * (pdfHasScore ? pdfCount : 0))) / scoredPatientCount).toFixed(1))
+              : 0;
+            const weightMatch = String((disease as any).weight || "").match(/(\d+)%/);
+            const diseaseWeight = weightMatch ? parseInt(weightMatch[1], 10) / 100 : 1 / Math.max(1, info.diseases.length);
+            const validity = getSampleValidityWeight(scoredPatientCount);
+            const adjustedDiseaseScore = Number((diseaseAvg * validity).toFixed(1));
+
+            total += count;
+            finalScore += adjustedDiseaseScore * diseaseWeight;
+            breakdown.push({ diseaseName: disease?.diseaseName || `Penyakit ${i + 1}`, count });
+            summary[`${dKey}_qrPatientCount`] = qrCount.toString();
+            summary[`${dKey}_pdfPatientCount`] = pdfCount.toString();
+            summary[`${dKey}_patientCount`] = count.toString();
+            summary[`${dKey}_scoredPatientCount`] = scoredPatientCount.toString();
+            summary[`${dKey}_rawScore`] = diseaseAvg.toString();
+            summary[`${dKey}_validity`] = Math.round(validity * 100).toString();
+            summary[`${dKey}_adjustedScore`] = adjustedDiseaseScore.toString();
+            summary[`${dKey}_diseaseWeight`] = Math.round(diseaseWeight * 100).toString();
+            if (qrCount > 0) summary[`${dKey}_qrScore`] = Math.round(qrAvg).toString();
           } catch {}
         }
+
+        const complete = info.diseases.length > 0 && breakdown.length >= info.diseases.length && breakdown.every(item => item.count >= 1);
+        return { total, breakdown, score: Math.round(finalScore), summary, complete };
       }
-      setPrmPatientBreakdown(prmBreakdown);
-      setPrmPatientCount(totalPRM.toString());
-      sessionStorage.setItem(`${specialty}_prmPatientCount`, totalPRM.toString());
+
+      // 1. Recover PRM count and score from the server for every selected specialty.
+      for (const spec of selectedSpecialties) {
+        const recovered = await recoverPrmForSpecialty(spec);
+        if (spec === specialty) {
+          setPrmPatientBreakdown(recovered.breakdown);
+          setPrmPatientCount(recovered.total.toString());
+        }
+        sessionStorage.setItem(`${spec}_prmPatientCount`, recovered.total.toString());
+        if (recovered.total > 0) {
+          sessionStorage.setItem(`${spec}_patientReportScore`, recovered.score.toString());
+          sessionStorage.setItem(`${spec}_prmSummary`, JSON.stringify(recovered.summary));
+          if (draftId) {
+            // Server PRM data is written back to this draft so logout/login or another device cannot make submit see 0 patients.
+            draftManager.updateDraft(draftId, spec, "patientReport", {
+              data: recovered.summary,
+              score: recovered.score,
+              patientCount: recovered.total,
+              completed: recovered.complete,
+              confirmed: recovered.complete,
+            });
+          }
+        }
+      }
 
       // 2. Recover Audit Count (from Draft)
       let totalAudit = 0;
@@ -291,7 +356,7 @@ export function SiapPersiResultPage() {
       sessionStorage.setItem(`${specialty}_auditPatientCount`, totalAudit.toString());
     }
     recoverCounts();
-  }, [specialty, specialtyInfo, draftId]);
+  }, [specialty, specialtyInfo, draftId, selectedSpecialties.join("|")]);
 
   const handleContinueToNext = () => {
     if (nextSpecialty) {
@@ -325,8 +390,8 @@ export function SiapPersiResultPage() {
       // Load summaries prepared by ClinicalAuditPage and PatientReportPage
       const auditSummaryStr = sessionStorage.getItem(`${spec}_auditSummary`);
       const prmSummaryStr = sessionStorage.getItem(`${spec}_prmSummary`);
-      const auditSummary = auditSummaryStr ? JSON.parse(auditSummaryStr) : {};
-      const prmSummary = prmSummaryStr ? JSON.parse(prmSummaryStr) : {};
+      const auditSummary = auditSummaryStr ? JSON.parse(auditSummaryStr) : (specProgress?.clinicalAudit?.data || {});
+      const prmSummary = prmSummaryStr ? JSON.parse(prmSummaryStr) : (specProgress?.patientReport?.data || {});
 
       // EXPANDED DATA FOR ADMIN: Detailed per-patient clinical audit breakdown
       let auditDetails: any[] = [];
