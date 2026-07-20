@@ -48,6 +48,7 @@ export function getPatientSurveyKey(hospitalCode: string, specialty: string) {
 
 export interface PatientSurveyResponse {
   id: string;
+  patientId?: string;
   patientName: string;
   medicalRecordNumber: string;
   specialty: string;

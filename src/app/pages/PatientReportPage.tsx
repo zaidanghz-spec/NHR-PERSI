@@ -50,6 +50,10 @@ const normalizePatientName = (value?: string) =>
   String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 
 const getSurveyIdentity = (response: any) => {
+  const patientId = String(response?.patientId || response?.patient_id || "").trim();
+  if (patientId) return `id:${patientId}`;
+  const token = String(response?.patientToken || response?.patient_token || "").trim();
+  if (token) return `token:${token}`;
   const code = normalizePatientCode(response?.medicalRecordNumber || response?.patientRm || response?.qRm || response?.rm);
   if (code) return `rm:${code}`;
   const name = normalizePatientName(response?.patientName || response?.qName || response?.name);
@@ -381,16 +385,23 @@ export function PatientReportPage() {
   // Mark registered patients that already have surveys
   const getPatientResponse = (patient: RegisteredPatient) => {
     const patientCode = normalizePatientCode(patient.rm);
-    const patientName = normalizePatientName(patient.name);
+    const patientToken = String(patient.surveyToken || "").trim();
 
     return surveyResponses.find((response: any) => {
+      const responsePatientId = String(response.patientId || response.patient_id || "").trim();
+      if (patient.id && responsePatientId && patient.id === responsePatientId) return true;
+
+      const responseToken = String(response.patientToken || response.patient_token || "").trim();
+      if (patientToken && responseToken && patientToken === responseToken) return true;
+
       const responseCode = normalizePatientCode(
         response.medicalRecordNumber || response.patientRm || response.qRm || response.rm
       );
       if (patientCode && responseCode && patientCode === responseCode) return true;
 
-      const responseName = normalizePatientName(response.patientName || response.qName || response.name);
-      return Boolean(patientName && responseName && patientName === responseName);
+      // Initials are not unique. A name-only fallback would make patients such
+      // as S/S/S/S or J/J/J look like a single respondent.
+      return false;
     });
   };
 

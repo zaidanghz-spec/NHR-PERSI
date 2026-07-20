@@ -1415,14 +1415,27 @@ async function submitSurvey({ hospitalCode, specialty, survey, _hospitalEmail }:
     status: "submit-received",
   });
 
-  const existing = await client.execute({
+  let existing = await client.execute({
     sql: `SELECT id FROM surveys
           WHERE hospital_code = ?
             AND specialty = ?
-            AND (patient_id = ? OR patient_rm = ?)
+            AND patient_id = ?
+            AND patient_id != ''
           LIMIT 1`,
-    args: [effectiveCode, effectiveSpecialty, registeredPatient.id, effectivePatientRm],
+    args: [effectiveCode, effectiveSpecialty, registeredPatient.id],
   });
+  if (existing.rows.length === 0) {
+    existing = await client.execute({
+      sql: `SELECT id FROM surveys
+            WHERE hospital_code = ?
+              AND specialty = ?
+              AND patient_rm = ?
+              AND LOWER(TRIM(patient_name)) = LOWER(TRIM(?))
+              AND (patient_id IS NULL OR patient_id = '')
+            LIMIT 1`,
+      args: [effectiveCode, effectiveSpecialty, effectivePatientRm, effectivePatientName],
+    });
+  }
   if (existing.rows.length > 0) {
     const existingId = String((existing.rows[0] as any).id);
     await client.execute({
@@ -1534,6 +1547,7 @@ function mapSurveyRow(r: any) {
   return {
     id: r.id,
     patientId: r.patient_id,
+    patientToken: r.patient_token,
     patientName: r.patient_name,
     medicalRecordNumber: r.patient_rm,
     specialty: r.specialty,
@@ -1654,10 +1668,16 @@ async function restoreSurveyRowsFromBackups(client: any, hospitalCode: string) {
   }
 
   for (const item of latestByPatient.values()) {
-    const exists = await client.execute({
-      sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? LIMIT 1",
-      args: [hospitalCode, item.specialty, item.patientRm],
+    let exists = await client.execute({
+      sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_id = ? AND patient_id != '' LIMIT 1",
+      args: [hospitalCode, item.specialty, item.patientId],
     });
+    if (exists.rows.length === 0) {
+      exists = await client.execute({
+        sql: "SELECT id FROM surveys WHERE hospital_code = ? AND specialty = ? AND patient_rm = ? AND LOWER(TRIM(patient_name)) = LOWER(TRIM(?)) AND (patient_id IS NULL OR patient_id = '') LIMIT 1",
+        args: [hospitalCode, item.specialty, item.patientRm, item.patientName],
+      });
+    }
     if (exists.rows.length > 0) continue;
 
     await client.execute({
