@@ -529,7 +529,26 @@ export const draftManager = {
       safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(cleanedDrafts));
 
       const currentHospitalDrafts = cleanedDrafts;
-      await Promise.allSettled(currentHospitalDrafts.map((draft) => saveHospitalDraft(draft)));
+      const syncResults = await Promise.allSettled(
+        currentHospitalDrafts.map((draft) => saveHospitalDraft(draft))
+      );
+      const tombstonedDraftIds = new Set(
+        syncResults.flatMap((result, index) =>
+          result.status === "rejected" && /telah dihapus.*cache lama/i.test(result.reason?.message || "")
+            ? [currentHospitalDrafts[index].draftId]
+            : []
+        )
+      );
+      if (tombstonedDraftIds.size > 0) {
+        const survivingDrafts = currentHospitalDrafts.filter(
+          (draft) => !tombstonedDraftIds.has(draft.draftId)
+        );
+        safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(survivingDrafts));
+        const currentDraftId = this.getCurrentDraftId();
+        if (currentDraftId && tombstonedDraftIds.has(currentDraftId)) {
+          this.clearDraftRuntimeState(null);
+        }
+      }
     } catch (err) {
       console.error("Manual cloud sync failed:", err);
     }

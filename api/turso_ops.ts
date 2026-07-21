@@ -2074,7 +2074,7 @@ async function deleteDraft({ type, hospitalCode, specialty, _hospitalEmail }: an
   await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
 }
 
-async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) {
+async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode, _authRole }: any) {
   await initTursoTables();
   const client = db();
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
@@ -2109,14 +2109,17 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) 
   const hospitalKey = effectiveCode || normalizedDraft.hospitalCode || normalizedDraft.hospitalEmail || normalizedDraft.hospitalName;
   const dataJson = JSON.stringify(normalizedDraft);
   await withDraftWriteQueue(async () => {
-    const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+    const existing = await client.execute({ sql: `SELECT ${idCol}, ${typeCol} as type, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
     let shouldNormalizeOwnership = false;
     if (existing.rows.length > 0) {
       const row = existing.rows[0] as any;
+      if (row.type === "hospital-assessment-deleted" && _authRole !== "admin") {
+        throw createHttpError("Draft ini telah dihapus dan tidak dapat dipulihkan dari cache lama.", 409);
+      }
       const hospitalChanged = String(row.hospitalCode || "") !== hospitalKey;
       if (!hospitalChanged && String(row.data || "") === dataJson) return;
       await client.execute({
-        sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
+        sql: `UPDATE drafts SET ${typeCol} = 'hospital-assessment', ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
         args: [hospitalKey, dataJson, draftId],
       });
       shouldNormalizeOwnership = hospitalChanged;
@@ -2189,11 +2192,39 @@ async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail, _hospital
   });
 }
 
-async function deleteHospitalDraft({ draftId }: any) {
+async function deleteHospitalDraft({ draftId, _hospitalEmail, _authRole }: any) {
   await initTursoTables();
   const client = db();
-  const { idCol } = await getDraftSchema(client);
-  await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+  const { idCol, typeCol, hCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const existing = await client.execute({
+    sql: `SELECT ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ? LIMIT 1`,
+    args: [draftId],
+  });
+  const row = existing.rows[0] as any;
+  if (!row) return;
+
+  if (_authRole !== "admin") {
+    if (!_hospitalEmail) throw createHttpError("Unauthorized", 401);
+    const effectiveCode = await resolveEffectiveHospitalCode(client, { _hospitalEmail });
+    if (String(row.hospitalCode || "") !== effectiveCode) {
+      throw createHttpError("Draft bukan milik rumah sakit yang sedang login.", 403);
+    }
+    const authenticatedHospital = await getHospitalIdentityForEmail(client, _hospitalEmail);
+    const draft = parseJson(row.data, null);
+    if (
+      authenticatedHospital?.hospitalName &&
+      draft?.hospitalName &&
+      normalizeHospitalNameKey(authenticatedHospital.hospitalName) !== normalizeHospitalNameKey(draft.hospitalName)
+    ) {
+      throw createHttpError("Draft bukan milik rumah sakit yang sedang login.", 403);
+    }
+  }
+
+  const tombstone = JSON.stringify({ draftId, deletedAt: new Date().toISOString() });
+  await client.execute({
+    sql: `UPDATE drafts SET ${typeCol} = 'hospital-assessment-deleted', ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`,
+    args: [tombstone, draftId],
+  });
 }
 
 async function bulkAddSurveys({ hospitalCode, specialty, surveys }: any) {
