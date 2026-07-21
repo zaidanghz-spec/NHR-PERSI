@@ -79,6 +79,12 @@ function matchesHospitalDraft(draft: DraftData, hospital?: { hospitalName?: stri
   if (!hospital) return true;
   const code = hospital.hospitalCode || deriveHospitalCode(hospital.email);
   const draftCode = getDraftHospitalCode(draft);
+  const nameMatch = Boolean(
+    hospital.hospitalName &&
+    draft.hospitalName &&
+    normalize(draft.hospitalName) === normalize(hospital.hospitalName)
+  );
+  if (hospital.hospitalName && draft.hospitalName && !nameMatch) return false;
   const emailMatch = Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email));
   const codeMatch = Boolean(code && draftCode && normalize(draftCode) === normalize(code));
 

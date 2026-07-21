@@ -28,6 +28,12 @@ export function SelectSpecialtyPage() {
   };
   const matchesHospitalDraft = (draft: DraftData, hospital: { hospitalName: string; email?: string; hospitalCode?: string }) => {
     const code = hospital.hospitalCode || deriveHospitalCode(hospital.email);
+    const nameMatch = Boolean(
+      hospital.hospitalName &&
+      draft.hospitalName &&
+      normalize(draft.hospitalName) === normalize(hospital.hospitalName)
+    );
+    if (hospital.hospitalName && draft.hospitalName && !nameMatch) return false;
     const emailMatch = Boolean(hospital.email && draft.hospitalEmail && normalize(draft.hospitalEmail) === normalize(hospital.email));
     if (hospital.email && draft.hospitalEmail) return emailMatch;
     const codeMatch = Boolean(code && draft.hospitalCode && normalize(draft.hospitalCode) === normalize(code));

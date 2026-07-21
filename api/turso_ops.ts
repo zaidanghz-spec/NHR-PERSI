@@ -185,6 +185,27 @@ async function getHospitalCodeForEmail(client: any, email: string) {
   }
 }
 
+async function getHospitalIdentityForEmail(client: any, email: string) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return null;
+  await ensureHospitalAccountCodes(client);
+  const rs = await client.execute({
+    sql: "SELECT email, hospital_code, hospital_name FROM hospital_accounts WHERE LOWER(email) = LOWER(?) LIMIT 1",
+    args: [normalizedEmail],
+  });
+  const row = rs.rows[0] as any;
+  if (!row) return null;
+  return {
+    email: String(row.email || "").trim().toLowerCase(),
+    hospitalCode: String(row.hospital_code || "").trim(),
+    hospitalName: String(row.hospital_name || "").trim(),
+  };
+}
+
+function normalizeHospitalNameKey(value: unknown) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 async function resolveEffectiveHospitalCode(client: any, { hospitalCode, _hospitalCode, _hospitalEmail }: any = {}) {
   if (_hospitalEmail) return await getHospitalCodeForEmail(client, _hospitalEmail);
   if (_hospitalCode) return String(_hospitalCode).trim();
@@ -2059,6 +2080,19 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) 
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = draft.draftId;
   const authoritativeEmail = String(_hospitalEmail || draft.hospitalEmail || "").trim().toLowerCase();
+  const authenticatedHospital = _hospitalEmail
+    ? await getHospitalIdentityForEmail(client, _hospitalEmail)
+    : null;
+  if (
+    authenticatedHospital?.hospitalName &&
+    draft.hospitalName &&
+    normalizeHospitalNameKey(authenticatedHospital.hospitalName) !== normalizeHospitalNameKey(draft.hospitalName)
+  ) {
+    // A stale browser once re-owned drafts from other hospitals by submitting
+    // them with the current session email. Reject the payload before any row is
+    // inserted or updated; authenticated account identity is authoritative.
+    throw createHttpError("Draft rumah sakit tidak sesuai dengan akun yang sedang login.", 403);
+  }
   const effectiveCode = await resolveEffectiveHospitalCode(client, {
     hospitalCode: draft.hospitalCode,
     _hospitalCode,
@@ -2070,6 +2104,7 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode }: any) 
     // Authenticated hospital sessions are authoritative. Stale localStorage can
     // carry another RS email; never let that payload re-own a server draft.
     hospitalEmail: authoritativeEmail || draft.hospitalEmail,
+    hospitalName: authenticatedHospital?.hospitalName || draft.hospitalName,
   };
   const hospitalKey = effectiveCode || normalizedDraft.hospitalCode || normalizedDraft.hospitalEmail || normalizedDraft.hospitalName;
   const dataJson = JSON.stringify(normalizedDraft);
@@ -2105,13 +2140,22 @@ async function getAllHospitalDrafts({ _hospitalEmail, _hospitalCode, _authRole }
     ? await resolveEffectiveHospitalCode(client, { _hospitalEmail, _hospitalCode })
     : "";
   const shouldScopeToHospital = isHospital && Boolean(effectiveCode);
+  const authenticatedHospital = shouldScopeToHospital && _hospitalEmail
+    ? await getHospitalIdentityForEmail(client, _hospitalEmail)
+    : null;
   const rs = shouldScopeToHospital
     ? await client.execute({
         sql: `SELECT ${dataCol} as data FROM drafts WHERE ${typeCol} = 'hospital-assessment' AND ${hCol} = ? ORDER BY ${updatedCol} DESC`,
         args: [effectiveCode],
       })
     : await client.execute(`SELECT ${dataCol} as data FROM drafts WHERE ${typeCol} = 'hospital-assessment' ORDER BY ${updatedCol} DESC`);
-  return rs.rows.map((r: any) => parseJson(r.data, null)).filter(Boolean);
+  return rs.rows
+    .map((r: any) => parseJson(r.data, null))
+    .filter(Boolean)
+    .filter((draft: any) => {
+      if (!authenticatedHospital?.hospitalName || !draft.hospitalName) return true;
+      return normalizeHospitalNameKey(draft.hospitalName) === normalizeHospitalNameKey(authenticatedHospital.hospitalName);
+    });
 }
 
 async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail, _hospitalCode }: any) {
