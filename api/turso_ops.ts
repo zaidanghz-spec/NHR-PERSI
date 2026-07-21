@@ -2135,7 +2135,14 @@ async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail, _hospital
     specialty: r.specialty,
     data: parseJson(r.data, null),
     updatedAt: r.updatedAt,
-  })).filter((draft: any) => draft.data);
+  })).filter((draft: any) => {
+    if (!draft.data) return false;
+    // Legacy ownership corruption can leave another hospital's draft row with
+    // this hospital_code. The canonical ID is the authoritative ownership key;
+    // never hydrate a module whose ID does not match the authenticated RS.
+    const canonicalId = `${draft.type}-${effectiveCode}-${draft.specialty}`;
+    return draft.id === canonicalId;
+  });
 }
 
 async function deleteHospitalDraft({ draftId }: any) {

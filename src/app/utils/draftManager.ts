@@ -146,6 +146,11 @@ function mergeModuleDraftsIntoAssessments(
   moduleDrafts.forEach((moduleDraft) => {
     const code = moduleDraft.hospitalCode || hospital?.hospitalCode || deriveHospitalCode(hospital?.email);
     if (!code || !moduleDraft.specialty) return;
+    // Defense in depth for old rows whose hospital_code was overwritten while
+    // their ID still belongs to another RS. Such rows must never add services
+    // or assessment data to the active hospital draft.
+    const canonicalId = `${moduleDraft.type}-${code}-${moduleDraft.specialty}`;
+    if (moduleDraft.id && moduleDraft.id !== canonicalId) return;
     const key = normalize(code);
     modulesByHospital.set(key, [...(modulesByHospital.get(key) || []), moduleDraft]);
   });
