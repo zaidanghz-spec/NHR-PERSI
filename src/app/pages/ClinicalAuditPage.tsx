@@ -110,7 +110,17 @@ export function ClinicalAuditPage() {
 
       try {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
-        if (serverDraft && serverDraft.formData && hydrateClinicalDraft(serverDraft)) {
+        const serverHasAnswers = Boolean(
+          serverDraft?.formData && Object.keys(serverDraft.formData).length > 0
+        );
+        const serverHasPatientMeta = Boolean(
+          serverDraft?.patientMeta && Object.keys(serverDraft.patientMeta).length > 0
+        );
+
+        // An empty server placeholder must not block recovery from the
+        // current draft/localStorage. This is important after a stale tab
+        // saved its initial state while another device still had answers.
+        if (serverDraft && (serverHasAnswers || serverHasPatientMeta) && hydrateClinicalDraft(serverDraft)) {
           if (currentDraftId && currentDraft && matchesCurrentHospitalDraft(currentDraft)) {
             draftManager.updateDraft(currentDraftId, specialty!, "clinicalAudit", {
               data: serverDraft.formData,
