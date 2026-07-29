@@ -2046,10 +2046,66 @@ async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail 
   const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
   const draftId = `${type}-${effectiveCode}-${specialty}`;
-  const normalizedDraft = { ...(draft || {}), hospitalCode: effectiveCode };
-  const dataJson = JSON.stringify(normalizedDraft);
+  let normalizedDraft = { ...(draft || {}), hospitalCode: effectiveCode };
+
+  if (type === "patient-report") {
+    // A PRM page is opened one disease at a time, but the draft key is shared
+    // by the whole service. Rebuild the registry from the server-authoritative
+    // patients table so saving disease B cannot erase disease A from the draft.
+    const patientSchema = await getPatientTableSchema(client);
+    const createdCol = patientSchema.cols.includes("created_at") ? "created_at" : patientSchema.idCol;
+    const patientRows = await client.execute({
+      sql: `SELECT ${patientSchema.idCol} as id, ${patientSchema.sCol} as specialty,
+                   ${patientSchema.nameCol} as name, ${patientSchema.rmCol} as rm,
+                   ${patientSchema.tokenCol} as surveyToken, ${createdCol} as registeredAt
+            FROM patients
+            WHERE ${patientSchema.hCol} = ?
+              AND (${patientSchema.sCol} = ? OR ${patientSchema.sCol} LIKE ?)
+            ORDER BY ${patientSchema.sCol}, ${createdCol}, ${patientSchema.idCol}`,
+      args: [effectiveCode, specialty, `${specialty}-d%`],
+    });
+    const serverPatients = (patientRows.rows as any[]).map((row) => ({
+      diseaseIndex: Number(String(row.specialty || "").match(/-d(\d+)$/)?.[1] ?? 0),
+      diseaseKey: row.specialty,
+      id: row.id,
+      name: row.name,
+      rm: row.rm,
+      specialty: row.specialty,
+      surveyToken: row.surveyToken || "",
+      registeredAt: row.registeredAt || "",
+    }));
+    const incomingPatients = Array.isArray((draft || {}).registeredPatients)
+      ? (draft || {}).registeredPatients
+      : [];
+    const byPatient = new Map<string, any>();
+    [...serverPatients, ...incomingPatients].forEach((patient: any) => {
+      const key = `${patient.id || patient.rm || patient.name}|${patient.diseaseKey || patient.specialty || ""}`;
+      if (!byPatient.has(key)) byPatient.set(key, patient);
+    });
+    normalizedDraft = {
+      ...normalizedDraft,
+      registeredPatients: Array.from(byPatient.values()),
+    };
+  }
+
   await withDraftWriteQueue(async () => {
     const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+    const existingDraft = existing.rows[0] ? parseJson((existing.rows[0] as any).data, {}) : {};
+    const incomingAnswers = type === "clinical-audit" && normalizedDraft.formData && typeof normalizedDraft.formData === "object"
+      ? Object.keys(normalizedDraft.formData)
+      : [];
+    const existingAnswers = type === "clinical-audit" && existingDraft.formData && typeof existingDraft.formData === "object"
+      ? Object.keys(existingDraft.formData)
+      : [];
+
+    // A stale tab can autosave its initial empty state after another device
+    // has already entered the audit. Never let that empty response erase a
+    // non-empty server draft; the next real answer save can still update it.
+    if (type === "clinical-audit" && existingAnswers.length > 0 && incomingAnswers.length === 0) {
+      return;
+    }
+
+    const dataJson = JSON.stringify(normalizedDraft);
     let shouldNormalizeOwnership = false;
     if (existing.rows.length > 0) {
       const row = existing.rows[0] as any;

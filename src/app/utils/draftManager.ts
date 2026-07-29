@@ -133,8 +133,15 @@ function normalizeModuleData(moduleDraft: any) {
   }
   if (moduleDraft?.type === "patient-report") {
     const patients = Array.isArray(data.registeredPatients) ? data.registeredPatients : [];
+    const nestedData = data.data && typeof data.data === "object" ? data.data : null;
+    const hasNestedPatients = Array.isArray(nestedData?.registeredPatients);
     return {
-      data: data.data || { registeredPatients: patients },
+      // Older saves sometimes wrote `data: {}` next to the real root-level
+      // registeredPatients list. Treat an empty nested object as missing so
+      // the patient list is not discarded during draft reconciliation.
+      data: hasNestedPatients || (nestedData && Object.keys(nestedData).length > 0)
+        ? nestedData
+        : { registeredPatients: patients },
       patientCount: data.patientCount ?? patients.length,
       score: data.score,
       completed: Boolean(data.completed),
@@ -207,7 +214,18 @@ function mergeModuleDraftsIntoAssessments(
       const stageData = normalizeModuleData(moduleDraft);
       const existingStage = draft.progress[specialty][stage];
       const existingHasData = existingStage?.data && Object.keys(existingStage.data).length > 0;
-      if (!existingHasData || moduleUpdatedAt >= draftUpdatedAt) {
+      const moduleHasData = Boolean(
+        stageData.completed ||
+        (stageData.data && Object.keys(stageData.data).length > 0) ||
+        (stageData.patientMeta && Object.keys(stageData.patientMeta).length > 0)
+      );
+
+      // Module drafts are the authoritative per-section records. A stale
+      // parent assessment can have a newer timestamp while containing an
+      // older/partial snapshot, so timestamp-only reconciliation can replace
+      // a full PRM or audit section with an empty one. Prefer a non-empty
+      // module; only accept an empty module when there is no existing data.
+      if (moduleHasData || !existingHasData) {
         draft.progress[specialty][stage] = { ...existingStage, ...stageData };
       }
       if (moduleUpdatedAt > draftUpdatedAt) draft.updatedAt = moduleDraft.updatedAt;
