@@ -70,25 +70,29 @@ function clearOperationCache() {
   operationCache.clear();
 }
 
+function getOperationCacheKey(operation, req) {
+  // These lists are identical for every visitor. Do not fragment the cache
+  // by hospital JWT, otherwise every RS re-runs the same public query.
+  const authScope = SHARED_PUBLIC_READS.has(operation)
+    ? "public"
+    : (req.authRole === "admin" ? "admin" : (req.hospitalEmail || "public"));
+  return `${operation}:${authScope}`;
+}
+
 async function runOperation(operation, body, req) {
   if (!CACHEABLE_READS.has(operation)) {
     if (CACHE_INVALIDATING_WRITES.has(operation)) clearOperationCache();
     return handleTursoOperation(operation, body);
   }
 
-  // These lists are identical for every visitor. Do not fragment the cache
-  // by hospital JWT, otherwise every RS re-runs the same public query.
-  const authScope = SHARED_PUBLIC_READS.has(operation)
-    ? "public"
-    : (req.authRole === "admin" ? "admin" : (req.hospitalEmail || "public"));
-  const key = `${operation}:${authScope}`;
+  const key = getOperationCacheKey(operation, req);
   const cached = operationCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
   if (operationInflight.has(key)) return operationInflight.get(key);
   const promise = handleTursoOperation(operation, body)
     .then((value) => {
-      operationCache.set(key, { value, expiresAt: Date.now() + READ_CACHE_TTL_MS });
+      operationCache.set(key, { value, serialized: null, expiresAt: Date.now() + READ_CACHE_TTL_MS });
       return value;
     })
     .finally(() => operationInflight.delete(key));
@@ -161,7 +165,7 @@ function setCors(res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 }
 
-function sendJson(res, status, body) {
+function sendJson(res, status, body, serializedBody) {
   res.statusCode = status;
   setCors(res);
   res.setHeader("Content-Type", "application/json");
@@ -169,7 +173,7 @@ function sendJson(res, status, body) {
     res.end();
     return;
   }
-  res.end(JSON.stringify(body));
+  res.end(serializedBody || JSON.stringify(body));
 }
 
 function parseRequestBody(req) {
@@ -283,7 +287,16 @@ const server = http.createServer(async (req, res) => {
       if (req.hospitalEmail) body._hospitalEmail = req.hospitalEmail;
       if (req.authRole) body._authRole = req.authRole;
       const result = await runOperation(operation, body, req);
-      sendJson(res, 200, { result: result ?? null });
+      let serializedBody;
+      if (CACHEABLE_READS.has(operation)) {
+        const cacheKey = getOperationCacheKey(operation, req);
+        const entry = operationCache.get(cacheKey);
+        if (entry) {
+          entry.serialized ||= JSON.stringify({ result: result ?? null });
+          serializedBody = entry.serialized;
+        }
+      }
+      sendJson(res, 200, { result: result ?? null }, serializedBody);
     } catch (err) {
       console.error("RPC error:", err);
       sendJson(res, err?.statusCode || 500, { error: err?.message || "RPC operation failed" });
