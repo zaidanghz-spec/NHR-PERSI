@@ -410,7 +410,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     const account = normalizeAccount(result.account as HospitalAccount);
-    draftManager.clearDraftRuntimeState();
+    // Preserve assessment local copies until the migration below has uploaded
+    // them. Runtime/session keys are still cleared to avoid binding the new
+    // login to the previous draft session.
+    draftManager.clearDraftRuntimeState(undefined, { preserveLocalAssessment: true });
     setCurrentHospital(account);
     sessionStorage.setItem("persi_hospital_session", JSON.stringify(account));
 
@@ -483,7 +486,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hospitalLogout = useCallback(() => {
-    draftManager.clearDraftRuntimeState();
+    // Do not erase local assessment copies on logout. The next authenticated
+    // login must get a chance to migrate them to the server first.
+    draftManager.clearDraftRuntimeState(undefined, { preserveLocalAssessment: true });
     setCurrentHospital(null);
     localStorage.removeItem("hospitalToken");
     sessionStorage.removeItem("hospitalToken");

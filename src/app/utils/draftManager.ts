@@ -405,7 +405,10 @@ export const draftManager = {
     }
   },
 
-  clearDraftRuntimeState(draft?: DraftData | null): void {
+  clearDraftRuntimeState(
+    draft?: DraftData | null,
+    options: { preserveLocalAssessment?: boolean } = {},
+  ): void {
     const specialties = new Set<string>(draft?.selectedSpecialties || []);
     try {
       const selected = JSON.parse(sessionStorage.getItem("selectedSpecialties") || "[]");
@@ -414,10 +417,12 @@ export const draftManager = {
 
     specialties.forEach((spec) => {
       DRAFT_SCOPED_SESSION_SUFFIXES.forEach((suffix) => sessionStorage.removeItem(`${spec}${suffix}`));
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key?.startsWith("clinical-audit-draft-") && key.endsWith(`-${spec}`)) {
-          localStorage.removeItem(key);
+      if (!options.preserveLocalAssessment) {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key?.startsWith("clinical-audit-draft-") && key.endsWith(`-${spec}`)) {
+            localStorage.removeItem(key);
+          }
         }
       }
     });

@@ -39,10 +39,6 @@ function getSampleLabel(count: number): string {
   return "Sampel Lengkap (100% bobot validitas)";
 }
 
-function getDraftKey(specialty: string, hospitalCode: string) {
-  return `clinical-audit-draft-${hospitalCode}-${specialty}`;
-}
-
 export function ClinicalAuditPage() {
   const { specialty } = useParams<{ specialty: string }>();
   const navigate = useNavigate();
@@ -110,11 +106,6 @@ export function ClinicalAuditPage() {
 
       try {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
-        let localDraft: any = null;
-        try {
-          const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
-          localDraft = saved ? JSON.parse(saved) : null;
-        } catch { /* ignore malformed local draft */ }
 
         const parentSnapshot = currentClinical?.data && Object.keys(currentClinical.data).length > 0
           ? {
@@ -130,23 +121,12 @@ export function ClinicalAuditPage() {
         const preferred = selectMostCompleteDraftSnapshot([
           serverDraft && { snapshot: serverDraft, updatedAt: serverDraft?.savedAt },
           parentSnapshot && { snapshot: parentSnapshot, updatedAt: currentDraft?.updatedAt },
-          localDraft && { snapshot: localDraft, updatedAt: localDraft?.savedAt },
         ].filter(Boolean) as Array<{ snapshot: any; updatedAt?: string }>);
 
         // An empty/older module row must not block recovery from the richer
         // parent or browser snapshot. This keeps the form and Draft Assessment
         // card on the same version of the data after a refresh or relogin.
         if (preferred && hydrateClinicalDraft(preferred)) {
-          if (currentDraftId && currentDraft && matchesCurrentHospitalDraft(currentDraft)) {
-            draftManager.updateDraft(currentDraftId, specialty!, "clinicalAudit", {
-              data: preferred.formData || preferred.data || {},
-              patientMeta: preferred.patientMeta,
-              currentPatient: preferred.currentPatient,
-              activeDiseaseIndex: preferred.activeDiseaseIndex,
-              score: preferred.score,
-              completed: Boolean(preferred.completed),
-            });
-          }
           return;
         }
       } catch { /* fallback */ }
@@ -160,10 +140,8 @@ export function ClinicalAuditPage() {
         return;
       }
 
-      try {
-        const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
-        if (saved) hydrateClinicalDraft(JSON.parse(saved), true);
-      } catch { /* ignore */ }
+      // Legacy local copies are migrated during login. Do not hydrate them as
+      // a second source of truth after server-first storage is enabled.
     }
     loadDraft();
     return () => {
@@ -362,10 +340,11 @@ export function ClinicalAuditPage() {
     return auditPatients;
   };
 
-  const handleSaveDraft = () => {
-    if (!specialty) return;
+  const handleSaveDraft = async (): Promise<boolean> => {
+    if (!specialty) return false;
     const activeDraftId = draftManager.getCurrentDraftId();
-    if (!activeDraftId) return;
+    if (!activeDraftId) return false;
+    setAutosaveState("saving");
     const draft = {
       draftId: activeDraftId,
       formData,
@@ -374,7 +353,6 @@ export function ClinicalAuditPage() {
       activeDiseaseIndex,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(getDraftKey(specialty, hospitalCode), JSON.stringify(draft));
     const score = calculateSpecialtyAuditScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     
@@ -402,29 +380,24 @@ export function ClinicalAuditPage() {
     sessionStorage.setItem(`${specialty}_auditSummary`, JSON.stringify(summary));
     sessionStorage.setItem(`${specialty}_auditPatients`, JSON.stringify(buildAuditPatients()));
 
-    api.saveDraft("clinical-audit", hospitalCode, specialty, draft).catch(err => {
-      if (draftManager.getCurrentDraftId() !== activeDraftId) return;
-      console.error("Failed to save draft to server:", err);
-    });
+    try {
+      await api.saveDraft("clinical-audit", hospitalCode, specialty, draft);
+    } catch (err) {
+      if (draftManager.getCurrentDraftId() === activeDraftId) {
+        console.error("Failed to save draft to server:", err);
+        setAutosaveState("idle");
+        alert("Draft gagal disimpan ke server. Periksa koneksi lalu coba lagi.");
+      }
+      return false;
+    }
     setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     setAutosaveState("saved");
     setDraftSavedMsg(true);
+    return true;
   };
 
-  const handleSubmit = () => {
-    handleSaveDraft();
-    const draftId = draftManager.getCurrentDraftId();
-    if (draftId && specialty) {
-      draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
-        data: formData,
-        patientMeta,
-        score: specialtyScore,
-        currentPatient,
-        activeDiseaseIndex,
-        completed: allDiseasesHaveData,
-        confirmed: true,
-      });
-    }
+  const handleSubmit = async () => {
+    if (!await handleSaveDraft()) return;
     navigate(`/siap-persi/patient-report/${specialty}`);
   };
 
@@ -444,14 +417,6 @@ export function ClinicalAuditPage() {
     setAutosaveState("saving");
     const timer = setTimeout(() => {
       if (draftManager.getCurrentDraftId() !== draftId) return;
-      draftManager.updateDraft(draftId, specialty, "clinicalAudit", {
-        data: formData,
-        patientMeta,
-        score: specialtyScore,
-        currentPatient,
-        activeDiseaseIndex,
-        completed: allDiseasesHaveData,
-      });
       const cloudDraft = {
         draftId,
         formData,
@@ -462,12 +427,17 @@ export function ClinicalAuditPage() {
         completed: allDiseasesHaveData,
         savedAt: new Date().toISOString(),
       };
-      api.saveDraft("clinical-audit", hospitalCode, specialty, cloudDraft).catch(err => {
-        if (draftManager.getCurrentDraftId() !== draftId) return;
-        console.error("Failed to autosave clinical audit draft to server:", err);
-      });
-      setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-      setAutosaveState("saved");
+      api.saveDraft("clinical-audit", hospitalCode, specialty, cloudDraft)
+        .then(() => {
+          if (draftManager.getCurrentDraftId() !== draftId) return;
+          setLastAutosavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+          setAutosaveState("saved");
+        })
+        .catch(err => {
+          if (draftManager.getCurrentDraftId() !== draftId) return;
+          console.error("Failed to autosave clinical audit draft to server:", err);
+          setAutosaveState("idle");
+        });
     }, 1000); // 1s debounce to prevent flooding
 
     return () => clearTimeout(timer);

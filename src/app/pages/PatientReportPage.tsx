@@ -572,6 +572,7 @@ export function PatientReportPage() {
       navigate("/hospital-login");
       return;
     }
+    if (!specialty) return;
 
     const incompleteDiseases = diseases
       .map((disease, index) => ({
@@ -681,15 +682,23 @@ export function PatientReportPage() {
 
     sessionStorage.setItem(`${specialty}_prmSummary`, JSON.stringify(prmSummary));
     sessionStorage.setItem(`${specialty}_patientReportScore`, Math.round(finalScore).toString());
-    const draftId = draftManager.getCurrentDraftId();
-    if (draftId && specialty && (!activeDraftId || draftId === activeDraftId)) {
-      draftManager.updateDraft(draftId, specialty, "patientReport", {
+    try {
+      // Persist the calculated PRM summary directly on the server. The initial
+      // save stores the patient registry; this second save stores the verified
+      // per-disease totals and score used by review pages.
+      await api.saveDraft("patient-report", hospitalCode, specialty, {
+        registeredPatients,
         data: prmSummary,
         score: Math.round(finalScore),
         patientCount: totalPRMPatients,
         completed: allDiseasesHavePRM,
-        confirmed: true,
+        savedAt: new Date().toISOString(),
       });
+    } catch (err) {
+      console.error("Failed to save final PRM summary to server:", err);
+      setAutosaveState("idle");
+      alert("Ringkasan PRM gagal disimpan ke server. Silakan coba lagi.");
+      return;
     }
     navigate(`/siap-persi/result/${specialty}`);
   };

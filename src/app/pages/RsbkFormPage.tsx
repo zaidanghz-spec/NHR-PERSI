@@ -8,10 +8,6 @@ import { draftManager, selectMostCompleteDraftSnapshot, stripLegacyToolVariation
 import * as api from "../utils/api";
 import { getHospitalCode } from "../utils/api";
 
-function getRsbkDraftKey(specialty: string, hospitalCode: string) {
-  return `rsbk-draft-${hospitalCode}-${specialty}`;
-}
-
 function toNumericRsbkData(raw: Record<string, any> = {}) {
   const converted: Record<string, number | null> = {};
   Object.entries(stripLegacyToolVariationFields(raw)).forEach(([k, v]) => {
@@ -71,12 +67,6 @@ export function RsbkFormPage() {
       }
       reusableDraft.hospitalCode = reusableDraft.hospitalCode || hospitalCode;
       reusableDraft.hospitalEmail = reusableDraft.hospitalEmail || authData.email;
-      const allDrafts = draftManager.getAllDrafts();
-      const idx = allDrafts.findIndex(d => d.draftId === reusableDraft.draftId);
-      if (idx !== -1) {
-        allDrafts[idx] = reusableDraft;
-        localStorage.setItem("siap_persi_drafts", JSON.stringify(allDrafts));
-      }
       draftManager.beginDraftSession(reusableDraft);
       return reusableDraft.draftId;
     }
@@ -123,13 +113,6 @@ export function RsbkFormPage() {
           parentStage && { snapshot: { ...parentStage, data: parentStage.data }, updatedAt: draft?.updatedAt },
         ].filter(Boolean) as Array<{ snapshot: any; updatedAt?: string }>);
         if (preferred?.data && Object.keys(preferred.data).length > 0 && hydrate(preferred.data)) {
-          if (draftId && draft && matchesCurrentHospitalDraft(draft)) {
-            draftManager.updateDraft(draftId, activeSpecialty, "rsbk", {
-              data: stripLegacyToolVariationFields(preferred.data),
-              score: preferred.score,
-              completed: Boolean(preferred.completed),
-            });
-          }
           return;
         }
       } catch { /* fallback */ }
@@ -139,14 +122,8 @@ export function RsbkFormPage() {
         return;
       }
 
-      try {
-        const saved = localStorage.getItem(getRsbkDraftKey(activeSpecialty, hospitalCode));
-        if (saved) {
-          const localDraft = JSON.parse(saved);
-          const localData = localDraft?.formData || localDraft?.data;
-          if (localData) hydrate(localData);
-        }
-      } catch { /* ignore */ }
+      // New assessment data is server-first. Legacy local copies are migrated
+      // during authenticated login and are intentionally not hydrated here.
     }
 
     loadRsbkDraft();
@@ -231,14 +208,6 @@ export function RsbkFormPage() {
     const draftId = ensureRsbkDraftSession();
     const cleanFormData = stripLegacyToolVariationFields(formData);
 
-    if (draftId) {
-      draftManager.updateDraft(draftId, specialty, "rsbk", {
-        data: cleanFormData,
-        score: totalRsbkScore,
-        completed: filledItems === totalItems,
-      });
-    }
-
     const draftPayload = {
       draftId,
       formData: cleanFormData,
@@ -246,7 +215,6 @@ export function RsbkFormPage() {
       completed: filledItems === totalItems,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(getRsbkDraftKey(specialty, hospitalCode), JSON.stringify(draftPayload));
     await api.saveDraft("rsbk", hospitalCode, specialty, draftPayload);
     return draftId;
   };
@@ -297,12 +265,6 @@ export function RsbkFormPage() {
     const cleanFormData = stripLegacyToolVariationFields(formData);
     const draftId = await persistRsbkDraft();
     if (!draftId) return;
-    draftManager.updateDraft(draftId, specialty, "rsbk", {
-      data: cleanFormData,
-      score: totalRsbkScore,
-      completed: filledItems === totalItems,
-      confirmed: true,
-    });
     sessionStorage.setItem(`${specialty}_rsbkScore`, totalRsbkScore.toString());
     sessionStorage.setItem("currentSpecialty", specialty || "");
     navigate(`/siap-persi/clinical-audit/${specialty}`);
