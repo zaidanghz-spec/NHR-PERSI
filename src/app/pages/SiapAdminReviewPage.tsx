@@ -77,6 +77,10 @@ export function SiapAdminReviewPage() {
   const [adminScores, setAdminScores] = useState<EditableScores | null>(null);
   const [adminScoreNotes, setAdminScoreNotes] = useState<Record<string, string>>({});
   const [scoreSaved, setScoreSaved] = useState(false);
+  const [livePrmPatients, setLivePrmPatients] = useState<any[] | null>(null);
+  const [livePrmUpdatedAt, setLivePrmUpdatedAt] = useState("");
+  const [livePrmScore, setLivePrmScore] = useState<number | null>(null);
+  const [hasSavedScoreOverride, setHasSavedScoreOverride] = useState(false);
 
   const { isAdmin, submissions, updateSubmissionStatus, publishRanking, unpublishRanking, hospitalAccounts } = useData();
   const actualSubmission = submissions.find(s => s.id === id);
@@ -157,6 +161,72 @@ export function SiapAdminReviewPage() {
     details: {}
   };
 
+  // PRM remains open after submission. Keep the admin review view aligned with
+  // the server's current QR responses instead of the submission-time snapshot.
+  // This intentionally does not reload RSBK or Clinical Audit, which remain
+  // review-locked after submission.
+  useEffect(() => {
+    let cancelled = false;
+    const hospitalCode = String((actualSubmission as any)?.hospitalCode || "").trim();
+    const specialtyKey = String((actualSubmission as any)?.details?.specialtyKey || submissionData.specialtyKey || "");
+    const specData = specialtyAuditData[specialtyKey as keyof typeof specialtyAuditData];
+
+    setLivePrmPatients(null);
+    setLivePrmUpdatedAt("");
+    setLivePrmScore(null);
+    if (!actualSubmission || !hospitalCode || !specData) return () => { cancelled = true; };
+
+    const normalizeCode = (value: any) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const loadLivePrm = async () => {
+      try {
+        const rows = (await Promise.all(specData.diseases.map(async (disease, diseaseIndex) => {
+          const diseaseKey = `${specialtyKey}-d${diseaseIndex}`;
+          const [patients, surveys] = await Promise.all([
+            api.getPatients(hospitalCode, diseaseKey),
+            api.getSurveys(hospitalCode, diseaseKey),
+          ]);
+
+          return patients.map((patient: any) => {
+            const response = surveys.find((survey: any) =>
+              (patient.id && survey.patientId && String(patient.id) === String(survey.patientId)) ||
+              (patient.surveyToken && survey.patientToken && String(patient.surveyToken) === String(survey.patientToken)) ||
+              (normalizeCode(patient.rm) && normalizeCode(patient.rm) === normalizeCode(survey.medicalRecordNumber))
+            );
+            return {
+              rm: patient.rm,
+              name: patient.name,
+              specialty: diseaseKey,
+              diseaseIndex,
+              diseaseKey,
+              diseaseName: disease.diseaseName,
+              hasResponse: Boolean(response),
+              premScore: response?.premScore || 0,
+              promScore: response?.promScore || 0,
+              overallScore: response?.overallScore || 0,
+              answers: response?.answers || {},
+              submittedAt: response?.submittedAt,
+              patientId: patient.id,
+              patientToken: patient.surveyToken,
+            };
+          });
+        }))).flat();
+
+        if (cancelled) return;
+        setLivePrmPatients(rows);
+        setLivePrmUpdatedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      } catch (error) {
+        if (!cancelled) console.error("Failed to refresh live PRM data:", error);
+      }
+    };
+
+    loadLivePrm();
+    const interval = window.setInterval(loadLivePrm, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [actualSubmission?.id, actualSubmission?.hospitalCode, actualSubmission?.specialty, submissionData.specialtyKey]);
+
   // Initialize admin scores from submission
   useEffect(() => {
     if (actualSubmission && !adminScores) {
@@ -167,6 +237,7 @@ export function SiapAdminReviewPage() {
           const parsed = JSON.parse(savedOverride);
           setAdminScores(parsed.scores);
           setAdminScoreNotes(parsed.notes || {});
+          setHasSavedScoreOverride(true);
           return;
         } catch {}
       }
@@ -178,7 +249,12 @@ export function SiapAdminReviewPage() {
     }
   }, [actualSubmission, adminScores, id]);
 
-  const effectiveScores = adminScores || submissionData.scores;
+  const effectiveScores = {
+    ...(adminScores || submissionData.scores),
+    patientReport: !hasSavedScoreOverride && !editingScores && livePrmScore !== null
+      ? livePrmScore
+      : (adminScores || submissionData.scores).patientReport,
+  };
   const effectiveFinal = calcFinal(effectiveScores);
 
   const filteredDocs = customSurveyDocs.filter(d =>
@@ -212,12 +288,14 @@ export function SiapAdminReviewPage() {
     return weightMatch ? parseInt(weightMatch[1]) / 100 : 1 / Math.max(specData.diseases.length, 1);
   };
 
-  const calculateManualPrmTotal = (docs: CustomSurveyDoc[], scores: Record<string, { prem: string; prom: string }>) => {
+  const calculateManualPrmTotal = (
+    docs: CustomSurveyDoc[],
+    scores: Record<string, { prem: string; prom: string }>,
+    patients: any[] = ((submissionData as any).details?.prmPatients || []) as any[],
+  ) => {
     let total = 0;
     const specKey = (submissionData as any).specialtyKey || getSpecialtyKey(submissionData.specialty);
     const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
-    const prmPatients = ((submissionData as any).details?.prmPatients || []) as any[];
-
     specData.diseases.forEach((disease, diseaseIndex) => {
       const doc = docs.find(item => item.diseaseName === disease.diseaseName);
       const qrPatients = prmPatients.filter((patient: any) =>
@@ -276,7 +354,7 @@ export function SiapAdminReviewPage() {
   const clampPercent = (value: any) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
   const getPrmPatientKey = (patient: any) => `${patient.diseaseKey || patient.specialty || "prm"}:${patient.rm}`;
   const auditPatientsForReview = ((submissionData as any).details?.auditPatients || []) as any[];
-  const prmPatientsForReview = ((submissionData as any).details?.prmPatients || []) as any[];
+  const prmPatientsForReview = livePrmPatients ?? (((submissionData as any).details?.prmPatients || []) as any[]);
   const selectedAuditDetail = selectedAuditPatient !== null ? auditPatientsForReview[selectedAuditPatient] : null;
   const selectedPrmDetail = selectedPrmPatient
     ? prmPatientsForReview.find((patient: any) => getPrmPatientKey(patient) === selectedPrmPatient || patient.rm === selectedPrmPatient)
@@ -382,6 +460,14 @@ export function SiapAdminReviewPage() {
     };
   });
 
+  const livePrmBreakdownScore = livePrmPatients
+    ? Number(prmBreakdown.reduce((sum, row) => sum + row.contribution, 0).toFixed(1))
+    : null;
+
+  useEffect(() => {
+    setLivePrmScore(livePrmBreakdownScore);
+  }, [livePrmBreakdownScore]);
+
   const prmUnifiedRows = [
     ...prmPatientsForReview.map((patient: any) => ({
       id: `qr-${getPrmPatientKey(patient)}`,
@@ -463,6 +549,7 @@ export function SiapAdminReviewPage() {
       savedAt: new Date().toISOString(),
     }));
 
+    setHasSavedScoreOverride(true);
     setScoreSaved(true);
     setEditingScores(false);
     setTimeout(() => setScoreSaved(false), 3000);
@@ -509,9 +596,10 @@ export function SiapAdminReviewPage() {
         localStorage.setItem(`custom-survey-${hospitalCode}-${apiKey}`, JSON.stringify(doc));
       }));
 
-      const patientReport = calculateManualPrmTotal(updatedDocs, customSurveyScores);
+      const patientReport = calculateManualPrmTotal(updatedDocs, customSurveyScores, prmPatientsForReview);
       const nextScores = { ...adminScores, patientReport };
       setAdminScores(nextScores);
+      setHasSavedScoreOverride(true);
       localStorage.setItem(`admin-score-override-${id}`, JSON.stringify({
         scores: nextScores,
         notes: {
@@ -544,6 +632,7 @@ export function SiapAdminReviewPage() {
     });
     setAdminScoreNotes({});
     localStorage.removeItem(`admin-score-override-${id}`);
+    setHasSavedScoreOverride(false);
     setEditingScores(false);
   };
 
@@ -1266,6 +1355,12 @@ export function SiapAdminReviewPage() {
               <p className="text-gray-500 text-sm mb-6 font-medium">
                 Skor PRM dihitung per penyakit dari gabungan pasien QR/non-PDF dan PDF internal yang dinilai manual.
               </p>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-800">
+                <span className={`h-2 w-2 rounded-full ${livePrmPatients ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
+                {livePrmPatients
+                  ? `Data QR terbaru dari server${livePrmUpdatedAt ? ` • diperbarui ${livePrmUpdatedAt}` : ""}`
+                  : "Memuat data PRM terbaru dari server..."}
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-teal-700 text-white">
