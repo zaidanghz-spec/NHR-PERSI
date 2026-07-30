@@ -27,6 +27,66 @@ const PUBLIC_OPERATIONS = new Set([
   "initTursoTables",
 ]);
 
+// Read-heavy pages can mount several widgets at once, and multiple hospital
+// devices may request the same public lists together. Keep a very short
+// process-local cache and share in-flight reads so SQLite is not asked to do
+// identical work for every browser request. Writes invalidate the cache.
+const READ_CACHE_TTL_MS = 3000;
+const CACHEABLE_READS = new Set([
+  "getAllRankingsFromDb",
+  "getAllNews",
+  "getAllEvents",
+  "getAllHospitalAccounts",
+  "getAllSubmissions",
+]);
+const CACHE_INVALIDATING_WRITES = new Set([
+  "addHospitalAccount",
+  "updateAccountStatus",
+  "deleteHospitalAccount",
+  "resetHospitalPassword",
+  "addSubmission",
+  "softDeleteSubmission",
+  "restoreSubmission",
+  "updateSubmissionStatus",
+  "updateSubmissionReview",
+  "publishRankingToDb",
+  "unpublishRankingFromDb",
+  "addNewsToDb",
+  "updateNewsInDb",
+  "deleteNewsFromDb",
+  "addEventToDb",
+  "updateEventInDb",
+  "deleteEventFromDb",
+]);
+const operationCache = new Map();
+const operationInflight = new Map();
+
+function clearOperationCache() {
+  operationCache.clear();
+}
+
+async function runOperation(operation, body, req) {
+  if (!CACHEABLE_READS.has(operation)) {
+    if (CACHE_INVALIDATING_WRITES.has(operation)) clearOperationCache();
+    return handleTursoOperation(operation, body);
+  }
+
+  const authScope = req.authRole === "admin" ? "admin" : (req.hospitalEmail || "public");
+  const key = `${operation}:${authScope}`;
+  const cached = operationCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  if (operationInflight.has(key)) return operationInflight.get(key);
+  const promise = handleTursoOperation(operation, body)
+    .then((value) => {
+      operationCache.set(key, { value, expiresAt: Date.now() + READ_CACHE_TTL_MS });
+      return value;
+    })
+    .finally(() => operationInflight.delete(key));
+  operationInflight.set(key, promise);
+  return promise;
+}
+
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -213,7 +273,7 @@ const server = http.createServer(async (req, res) => {
       const body = await parseRequestBody(req);
       if (req.hospitalEmail) body._hospitalEmail = req.hospitalEmail;
       if (req.authRole) body._authRole = req.authRole;
-      const result = await handleTursoOperation(operation, body);
+      const result = await runOperation(operation, body, req);
       sendJson(res, 200, { result: result ?? null });
     } catch (err) {
       console.error("RPC error:", err);

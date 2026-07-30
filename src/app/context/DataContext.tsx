@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import {
   getAllSubmissions,
   addSubmission as addSubmissionToDb,
@@ -187,10 +187,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [approvedRankings, setApprovedRankings] = useState<ApprovedRanking[]>(() => loadFromStorage("persi_rankings", []));
   const [submissions, setSubmissions] = useState<SubmissionType[]>(() => loadFromStorage("persi_submissions", []));
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const cloudSyncInFlightRef = useRef<Promise<void> | null>(null);
 
   // Initial cloud sync
   useEffect(() => {
     async function syncSubmissions() {
+      if (!isAdmin) return;
       setIsCloudSyncing(true);
       try {
         const dbSubs = await getAllSubmissions();
@@ -207,6 +209,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     syncSubmissions();
 
     async function syncAccounts() {
+      if (!isAdmin) return;
       try {
         const dbAccs = await getAllHospitalAccounts();
         if (dbAccs !== null) {
@@ -219,7 +222,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     }
     syncAccounts();
-    draftManager.syncWithCloud();
+    if (currentHospital) draftManager.syncWithCloud(currentHospital);
 
     async function syncRankings() {
       try {
@@ -251,7 +254,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     }
     syncNewsAndEvents();
-  }, []);
+  }, [currentHospital, isAdmin]);
 
   const forcePushToCloud = useCallback(async () => {
     try {
@@ -268,15 +271,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [hospitalAccounts, submissions]);
 
-  const syncWithCloud = useCallback(async () => {
-    try {
-      const [dbSubs, dbAccs, dbRankings, dbNews, dbEvents] = await Promise.all([
-        getAllSubmissions(),
-        getAllHospitalAccounts(),
-        getAllRankingsFromDb(),
-        getAllNews(),
-        getAllEvents()
-      ]);
+  const syncWithCloud = useCallback(() => {
+    // Several pages can ask for a refresh at once (the admin poller, the
+    // 30-second provider poller, and route entry effects). Reuse the same
+    // promise so a slow request cannot create an ever-growing request pile.
+    if (cloudSyncInFlightRef.current) return cloudSyncInFlightRef.current;
+
+    let syncPromise: Promise<void>;
+    syncPromise = (async () => {
+      try {
+        const [dbSubs, dbAccs, dbRankings, dbNews, dbEvents] = await Promise.all([
+          isAdmin ? getAllSubmissions() : Promise.resolve(null),
+          isAdmin ? getAllHospitalAccounts() : Promise.resolve(null),
+          getAllRankingsFromDb(),
+          getAllNews(),
+          getAllEvents()
+        ]);
 
       if (dbSubs !== null) {
         setSubmissions(prev => {
@@ -296,11 +306,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (dbNews !== null) setNews(dbNews);
       if (dbEvents !== null) setEvents(dbEvents);
 
-      draftManager.syncWithCloud();
-    } catch (err) {
-      console.error("Manual sync failed:", err);
-    }
-  }, []);
+        if (currentHospital) await draftManager.syncWithCloud(currentHospital);
+      } catch (err) {
+        console.error("Manual sync failed:", err);
+      }
+    })().finally(() => {
+      if (cloudSyncInFlightRef.current === syncPromise) cloudSyncInFlightRef.current = null;
+    });
+    cloudSyncInFlightRef.current = syncPromise;
+    return syncPromise;
+  }, [currentHospital, isAdmin]);
 
   useEffect(() => {
     const interval = setInterval(() => { syncWithCloud(); }, 30000);
