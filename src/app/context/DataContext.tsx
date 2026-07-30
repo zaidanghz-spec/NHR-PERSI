@@ -427,11 +427,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }));
     draftManager.pruneDraftsForHospital({ ...account, hospitalCode });
 
-    // Before moving assessment storage to server-first, migrate any draft that
-    // still exists in this browser. The migration is scoped to the authenticated
-    // hospital and merges module answers instead of blindly overwriting cloud data.
-    await draftManager.migrateLocalAssessmentDataToCloud({ ...account, hospitalCode });
-    await draftManager.syncWithCloud({ ...account, hospitalCode });
+    // Authentication must not be blocked by draft recovery. A stale local
+    // queue, a deleted draft, or a busy server can fail this best-effort sync;
+    // surfacing that failure as a login error made valid RS credentials look
+    // invalid. The sync remains scoped to this hospital and can retry later.
+    try {
+      await draftManager.migrateLocalAssessmentDataToCloud({ ...account, hospitalCode });
+      await draftManager.syncWithCloud({ ...account, hospitalCode });
+    } catch (syncError) {
+      console.warn("Hospital login succeeded; draft sync will retry later:", syncError);
+    }
 
     setHospitalAccounts(prev => {
       const merged = mergeHospitalAccounts([account], prev);
