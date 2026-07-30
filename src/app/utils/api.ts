@@ -3,6 +3,162 @@ export const PREFIX = "/api";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const DRAFT_SYNC_QUEUE_KEY = "nhr-draft-sync-queue-v1";
+const DRAFT_MAP_FIELDS = ["formData", "patientMeta", "data", "summary"] as const;
+type DraftSyncMapField = (typeof DRAFT_MAP_FIELDS)[number];
+type DraftSyncKey = string;
+type DraftSyncBaseline = { snapshot: Record<string, any>; version: number };
+type PendingDraftSave = {
+  key: DraftSyncKey;
+  type: "rsbk" | "clinical-audit" | "patient-report";
+  hospitalCode: string;
+  specialty: string;
+  patch: Record<string, any>;
+  baseVersion: number;
+  operationId: string;
+  createdAt: string;
+};
+
+const draftBaselines = new Map<DraftSyncKey, DraftSyncBaseline>();
+const draftSaveQueues = new Map<DraftSyncKey, Promise<any>>();
+
+function canUseBrowserStorage() {
+  return typeof window !== "undefined" && typeof localStorage !== "undefined";
+}
+
+function draftSyncKey(type: string, hospitalCode: string, specialty: string): DraftSyncKey {
+  return `${type}|${hospitalCode}|${specialty}`;
+}
+
+function readPendingDraftSaves(): PendingDraftSave[] {
+  if (!canUseBrowserStorage()) return [];
+  try {
+    const raw = localStorage.getItem(DRAFT_SYNC_QUEUE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingDraftSaves(items: PendingDraftSave[]) {
+  if (!canUseBrowserStorage()) return;
+  try {
+    if (items.length === 0) localStorage.removeItem(DRAFT_SYNC_QUEUE_KEY);
+    else localStorage.setItem(DRAFT_SYNC_QUEUE_KEY, JSON.stringify(items));
+  } catch (err) {
+    console.warn("Unable to persist pending draft sync queue:", err);
+  }
+}
+
+function sameValue(left: any, right: any) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function makeDraftPatch(previous: Record<string, any>, next: Record<string, any>) {
+  const maps: Record<string, Record<string, any>> = {};
+  const deletes: Record<string, string[]> = {};
+  const fields: Record<string, any> = {};
+
+  for (const field of DRAFT_MAP_FIELDS) {
+    const before = previous[field] && typeof previous[field] === "object" ? previous[field] : {};
+    const after = next[field] && typeof next[field] === "object" ? next[field] : {};
+    const changed: Record<string, any> = {};
+    Object.keys(after).forEach((key) => {
+      if (!sameValue(before[key], after[key])) changed[key] = after[key];
+    });
+    const removed = Object.keys(before).filter((key) => !(key in after));
+    if (Object.keys(changed).length > 0) maps[field] = changed;
+    if (removed.length > 0) deletes[field] = removed;
+  }
+
+  const ignored = new Set<string>([...DRAFT_MAP_FIELDS, "registeredPatients", "serverVersion"]);
+  Object.keys(next).forEach((key) => {
+    if (!ignored.has(key) && !sameValue(previous[key], next[key])) fields[key] = next[key];
+  });
+
+  const patch: Record<string, any> = { fields };
+  if (Object.keys(maps).length > 0) patch.maps = maps;
+  if (Object.keys(deletes).length > 0) patch.deletes = deletes;
+  if (Array.isArray(next.registeredPatients) && !sameValue(previous.registeredPatients, next.registeredPatients)) {
+    patch.registeredPatients = next.registeredPatients;
+  }
+  return patch;
+}
+
+function applyDraftPatch(snapshot: Record<string, any>, patch: Record<string, any>) {
+  const merged = { ...(snapshot || {}), ...(patch?.fields || {}) };
+  for (const field of DRAFT_MAP_FIELDS) {
+    const changes = patch?.maps?.[field];
+    const removed = Array.isArray(patch?.deletes?.[field]) ? patch.deletes[field] : [];
+    if (!changes && removed.length === 0) continue;
+    const next = { ...((snapshot || {})[field] || {}) };
+    Object.entries(changes || {}).forEach(([key, value]) => { next[key] = value; });
+    removed.forEach((key: string) => delete next[key]);
+    merged[field] = next;
+  }
+  if (Array.isArray(patch?.registeredPatients)) merged.registeredPatients = patch.registeredPatients;
+  return merged;
+}
+
+function appendPendingDraftSave(item: PendingDraftSave) {
+  const queue = readPendingDraftSaves();
+  queue.push(item);
+  writePendingDraftSaves(queue);
+}
+
+function removePendingDraftSave(operationId: string) {
+  writePendingDraftSaves(readPendingDraftSaves().filter((item) => item.operationId !== operationId));
+}
+
+async function flushPendingDraftSavesForKey(key: DraftSyncKey) {
+  const pending = readPendingDraftSaves().filter((item) => item.key === key);
+  for (const item of pending) {
+    let result: any;
+    try {
+      result = await rpc<any>("saveDraft", {
+        type: item.type,
+        hospitalCode: item.hospitalCode,
+        specialty: item.specialty,
+        patch: item.patch,
+        baseVersion: item.baseVersion,
+        operationId: item.operationId,
+      }, { retries: 2, timeoutMs: 15000 });
+    } catch (err) {
+      // Keep the patch on disk. A later edit, refresh, or online event will retry it.
+      throw err;
+    }
+
+    if (result?.conflict) {
+      // Delta patches are mergeable. Rebase the patch on the server version
+      // instead of dropping it or replacing the newer server snapshot.
+      item.baseVersion = Number(result.serverVersion || item.baseVersion || 0);
+      writePendingDraftSaves(readPendingDraftSaves().map((entry) => entry.operationId === item.operationId ? item : entry));
+      continue;
+    }
+
+    removePendingDraftSave(item.operationId);
+    const baseline = draftBaselines.get(key) || { snapshot: {}, version: item.baseVersion };
+    draftBaselines.set(key, {
+      snapshot: applyDraftPatch(baseline.snapshot, item.patch),
+      version: Number(result?.serverVersion || baseline.version + 1),
+    });
+  }
+  return true;
+}
+
+function flushAllPendingDraftSaves() {
+  const keys = Array.from(new Set(readPendingDraftSaves().map((item) => item.key)));
+  return Promise.all(keys.map((key) => flushPendingDraftSavesForKey(key).catch(() => false)));
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => { void flushAllPendingDraftSaves(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void flushAllPendingDraftSaves();
+  });
+}
+
 export function getAuthHeaders(): Record<string, string> {
   const token =
     sessionStorage.getItem("auth_token") ||
@@ -18,31 +174,42 @@ export function getAuthHeaders(): Record<string, string> {
 async function rpc<T>(
   operation: string,
   payload: Record<string, any> = {},
-  options: { retries?: number } = {}
+  options: { retries?: number; timeoutMs?: number } = {}
 ): Promise<T> {
   const maxAttempts = Math.max(1, (options.retries || 0) + 1);
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await rpcOnce<T>(operation, payload);
+      return await rpcOnce<T>(operation, payload, options.timeoutMs || 15000);
     } catch (err: any) {
       lastError = err;
-      const isTransient = /\((429|500|502|503|504)\)|FUNCTION_INVOCATION_FAILED|network|fetch/i.test(err?.message || "");
+      const isTransient = /\((408|429|500|502|503|504)\)|FUNCTION_INVOCATION_FAILED|network|fetch|timeout|aborted/i.test(err?.message || "");
       if (!isTransient || attempt >= maxAttempts) break;
-      await sleep(350 * attempt);
+      await sleep(Math.min(30000, 2000 * (2 ** (attempt - 1))));
     }
   }
 
   throw lastError || new Error(`${operation} failed`);
 }
 
-async function rpcOnce<T>(operation: string, payload: Record<string, any> = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${PREFIX}/rpc/${operation}`, {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(payload),
-  });
+async function rpcOnce<T>(operation: string, payload: Record<string, any> = {}, timeoutMs = 15000): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${PREFIX}/rpc/${operation}`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    const message = err?.name === "AbortError" ? `${operation} request timeout` : (err?.message || "Network request failed");
+    throw new Error(message);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const raw = await response.text();
   let body: any = {};
@@ -296,7 +463,23 @@ export async function getDraft(
   hospitalCode: string,
   specialty: string
 ): Promise<any | null> {
-  try { return await rpc<any | null>("getDraft", { type, hospitalCode, specialty }); }
+  const key = draftSyncKey(type, hospitalCode, specialty);
+  // Flush previously persisted patches when possible, but do not block page
+  // hydration forever if the network is currently unavailable.
+  try { await flushPendingDraftSavesForKey(key); } catch {}
+  try {
+    const serverDraft = await rpc<any | null>("getDraft", { type, hospitalCode, specialty }, { retries: 1, timeoutMs: 15000 });
+    const serverVersion = Number(serverDraft?.serverVersion || 0);
+    const snapshot = serverDraft ? { ...serverDraft } : {};
+    delete snapshot.serverVersion;
+    draftBaselines.set(key, { snapshot, version: serverVersion });
+
+    // If the request was offline, overlay only the persisted unsent patches
+    // for this draft. The server remains the source of truth once acknowledged.
+    const localPending = readPendingDraftSaves().filter((item) => item.key === key);
+    const hydrated = localPending.reduce((current, item) => applyDraftPatch(current, item.patch), snapshot);
+    return serverDraft ? { ...hydrated, serverVersion } : (localPending.length > 0 ? hydrated : null);
+  }
   catch (err) { console.error("Get Draft Error:", err); return null; }
 }
 
@@ -306,7 +489,47 @@ export async function saveDraft(
   specialty: string,
   draft: any
 ): Promise<void> {
-  await rpc("saveDraft", { type, hospitalCode, specialty, draft });
+  const key = draftSyncKey(type, hospitalCode, specialty);
+  const previous = draftBaselines.get(key) || { snapshot: {}, version: 0 };
+  const patch = makeDraftPatch(previous.snapshot, draft || {});
+  const hasChanges = Object.keys(patch.fields || {}).length > 0 ||
+    Object.keys(patch.maps || {}).length > 0 ||
+    Object.keys(patch.deletes || {}).length > 0 ||
+    Array.isArray(patch.registeredPatients);
+  if (!hasChanges) return;
+
+  const item: PendingDraftSave = {
+    key,
+    type,
+    hospitalCode,
+    specialty,
+    patch,
+    baseVersion: previous.version,
+    operationId: typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Optimistically advance only the in-memory baseline so rapid edits produce
+  // small deltas. The durable queue remains pending until the server confirms.
+  draftBaselines.set(key, {
+    snapshot: applyDraftPatch(previous.snapshot, patch),
+    version: previous.version,
+  });
+  appendPendingDraftSave(item);
+
+  const run = (draftSaveQueues.get(key) || Promise.resolve())
+    .catch(() => undefined)
+    .then(async () => {
+      await flushPendingDraftSavesForKey(key);
+    });
+  draftSaveQueues.set(key, run);
+  try {
+    await run;
+  } finally {
+    if (draftSaveQueues.get(key) === run) draftSaveQueues.delete(key);
+  }
 }
 
 export async function saveHospitalDraft(draft: any): Promise<void> {

@@ -296,7 +296,19 @@ async function getDraftSchema(client: any) {
     updatedCol = "updated_at";
   }
 
-  return { idCol, typeCol, dataCol, hCol, sCol, updatedCol };
+  let versionCol = cols.find((c: string) => ["version", "draft_version"].includes(c));
+  if (!versionCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN version INTEGER NOT NULL DEFAULT 0");
+    versionCol = "version";
+  }
+
+  let operationCol = cols.find((c: string) => ["last_operation_id", "lastOperationId"].includes(c));
+  if (!operationCol) {
+    await client.execute("ALTER TABLE drafts ADD COLUMN last_operation_id TEXT DEFAULT ''");
+    operationCol = "last_operation_id";
+  }
+
+  return { idCol, typeCol, dataCol, hCol, sCol, updatedCol, versionCol, operationCol };
 }
 
 async function normalizeDraftOwnership(client: any, draftId?: string) {
@@ -508,7 +520,19 @@ async function initTursoTablesOnce() {
       hospital_code TEXT NOT NULL,
       specialty TEXT NOT NULL,
       data TEXT DEFAULT '{}',
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      version INTEGER NOT NULL DEFAULT 0,
+      last_operation_id TEXT DEFAULT ''
+    )
+  `);
+
+  // Durable idempotency records prevent a retry from being applied twice,
+  // including when the duplicate arrives after a newer autosave.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS draft_sync_operations (
+      operation_id TEXT PRIMARY KEY,
+      draft_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -2034,63 +2058,118 @@ async function getDraft({ type, hospitalCode, specialty, _hospitalEmail }: any) 
   await initTursoTables();
   const client = db();
   const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
-  const { idCol, dataCol } = await getDraftSchema(client);
+  const { idCol, dataCol, versionCol } = await getDraftSchema(client);
   const draftId = `${type}-${effectiveCode}-${specialty}`;
-  const rs = await client.execute({ sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
-  return rs.rows[0] ? parseJson((rs.rows[0] as any).data, null) : null;
+  const rs = await client.execute({ sql: `SELECT ${dataCol} as data, ${versionCol} as version FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+  if (!rs.rows[0]) return null;
+  const snapshot = parseJson((rs.rows[0] as any).data, null);
+  return snapshot ? { ...snapshot, serverVersion: Number((rs.rows[0] as any).version || 0) } : null;
 }
 
-async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail }: any) {
+function mergeDraftPatch(existingDraft: any, patch: any, effectiveCode: string) {
+  const base = existingDraft && typeof existingDraft === "object" ? existingDraft : {};
+  const fields = patch?.fields && typeof patch.fields === "object" ? patch.fields : {};
+  const merged = { ...base, ...fields, hospitalCode: effectiveCode };
+
+  // Map fields are merged by key so a delayed request from another tab cannot
+  // erase answers that were added after it was created.
+  for (const field of ["formData", "patientMeta", "data", "summary"]) {
+    const changes = patch?.maps?.[field];
+    if (!changes || typeof changes !== "object") continue;
+    const current = base[field] && typeof base[field] === "object" ? base[field] : {};
+    const next = { ...current };
+    Object.entries(changes).forEach(([key, value]) => {
+      next[key] = value;
+    });
+    const removed = Array.isArray(patch?.deletes?.[field]) ? patch.deletes[field] : [];
+    removed.forEach((key: string) => delete next[key]);
+    merged[field] = next;
+  }
+
+  if (Array.isArray(patch?.registeredPatients)) {
+    merged.registeredPatients = patch.registeredPatients;
+  }
+
+  return merged;
+}
+
+async function saveDraft({ type, hospitalCode, specialty, draft, patch, baseVersion, operationId, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
   const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
-  const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const { idCol, typeCol, hCol, sCol, dataCol, updatedCol, versionCol, operationCol } = await getDraftSchema(client);
   const draftId = `${type}-${effectiveCode}-${specialty}`;
-  let normalizedDraft = { ...(draft || {}), hospitalCode: effectiveCode };
 
-  if (type === "patient-report") {
-    // A PRM page is opened one disease at a time, but the draft key is shared
-    // by the whole service. Rebuild the registry from the server-authoritative
-    // patients table so saving disease B cannot erase disease A from the draft.
-    const patientSchema = await getPatientTableSchema(client);
-    const createdCol = patientSchema.cols.includes("created_at") ? "created_at" : patientSchema.idCol;
-    const patientRows = await client.execute({
-      sql: `SELECT ${patientSchema.idCol} as id, ${patientSchema.sCol} as specialty,
-                   ${patientSchema.nameCol} as name, ${patientSchema.rmCol} as rm,
-                   ${patientSchema.tokenCol} as surveyToken, ${createdCol} as registeredAt
-            FROM patients
-            WHERE ${patientSchema.hCol} = ?
-              AND (${patientSchema.sCol} = ? OR ${patientSchema.sCol} LIKE ?)
-            ORDER BY ${patientSchema.sCol}, ${createdCol}, ${patientSchema.idCol}`,
-      args: [effectiveCode, specialty, `${specialty}-d%`],
-    });
-    const serverPatients = (patientRows.rows as any[]).map((row) => ({
-      diseaseIndex: Number(String(row.specialty || "").match(/-d(\d+)$/)?.[1] ?? 0),
-      diseaseKey: row.specialty,
-      id: row.id,
-      name: row.name,
-      rm: row.rm,
-      specialty: row.specialty,
-      surveyToken: row.surveyToken || "",
-      registeredAt: row.registeredAt || "",
-    }));
-    const incomingPatients = Array.isArray((draft || {}).registeredPatients)
-      ? (draft || {}).registeredPatients
-      : [];
-    const byPatient = new Map<string, any>();
-    [...serverPatients, ...incomingPatients].forEach((patient: any) => {
-      const key = `${patient.id || patient.rm || patient.name}|${patient.diseaseKey || patient.specialty || ""}`;
-      if (!byPatient.has(key)) byPatient.set(key, patient);
-    });
-    normalizedDraft = {
-      ...normalizedDraft,
-      registeredPatients: Array.from(byPatient.values()),
-    };
-  }
+  return await withDraftWriteQueue(async () => {
+    if (operationId) {
+      const applied = await client.execute({
+        sql: "SELECT operation_id FROM draft_sync_operations WHERE operation_id = ? AND draft_id = ? LIMIT 1",
+        args: [String(operationId), draftId],
+      });
+      if (applied.rows.length > 0) {
+        const current = await client.execute({ sql: `SELECT ${versionCol} as version FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+        return { accepted: true, duplicate: true, serverVersion: Number((current.rows[0] as any)?.version || 0) };
+      }
+    }
 
-  await withDraftWriteQueue(async () => {
-    const existing = await client.execute({ sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
+    const existing = await client.execute({
+      sql: `SELECT ${idCol}, ${hCol} as hospitalCode, ${dataCol} as data, ${versionCol} as version, ${operationCol} as lastOperation FROM drafts WHERE ${idCol} = ?`,
+      args: [draftId],
+    });
     const existingDraft = existing.rows[0] ? parseJson((existing.rows[0] as any).data, {}) : {};
+    const currentVersion = Number((existing.rows[0] as any)?.version || 0);
+
+    if (operationId && String((existing.rows[0] as any)?.lastOperation || "") === String(operationId)) {
+      return { accepted: true, duplicate: true, serverVersion: currentVersion };
+    }
+
+    // Full snapshots are kept for backwards compatibility, but a caller that
+    // supplies a version must not overwrite newer server state with an older
+    // snapshot. Delta patches can safely merge field-by-field instead.
+    if (!patch && baseVersion !== undefined && Number(baseVersion) !== currentVersion) {
+      return { accepted: false, conflict: true, serverVersion: currentVersion };
+    }
+
+    let normalizedDraft = patch
+      ? mergeDraftPatch(existingDraft, patch, effectiveCode)
+      : { ...(draft || {}), hospitalCode: effectiveCode };
+
+    if (type === "patient-report") {
+      // Keep the patient registry server-authoritative while merging the draft
+      // summary. This prevents saving one disease from erasing another.
+      const patientSchema = await getPatientTableSchema(client);
+      const createdCol = patientSchema.cols.includes("created_at") ? "created_at" : patientSchema.idCol;
+      const patientRows = await client.execute({
+        sql: `SELECT ${patientSchema.idCol} as id, ${patientSchema.sCol} as specialty,
+                     ${patientSchema.nameCol} as name, ${patientSchema.rmCol} as rm,
+                     ${patientSchema.tokenCol} as surveyToken, ${createdCol} as registeredAt
+              FROM patients
+              WHERE ${patientSchema.hCol} = ?
+                AND (${patientSchema.sCol} = ? OR ${patientSchema.sCol} LIKE ?)
+              ORDER BY ${patientSchema.sCol}, ${createdCol}, ${patientSchema.idCol}`,
+        args: [effectiveCode, specialty, `${specialty}-d%`],
+      });
+      const serverPatients = (patientRows.rows as any[]).map((row) => ({
+        diseaseIndex: Number(String(row.specialty || "").match(/-d(\d+)$/)?.[1] ?? 0),
+        diseaseKey: row.specialty,
+        id: row.id,
+        name: row.name,
+        rm: row.rm,
+        specialty: row.specialty,
+        surveyToken: row.surveyToken || "",
+        registeredAt: row.registeredAt || "",
+      }));
+      const incomingPatients = Array.isArray(normalizedDraft.registeredPatients)
+        ? normalizedDraft.registeredPatients
+        : [];
+      const byPatient = new Map<string, any>();
+      [...serverPatients, ...incomingPatients].forEach((patient: any) => {
+        const key = `${patient.id || patient.rm || patient.name}|${patient.diseaseKey || patient.specialty || ""}`;
+        if (!byPatient.has(key)) byPatient.set(key, patient);
+      });
+      normalizedDraft = { ...normalizedDraft, registeredPatients: Array.from(byPatient.values()) };
+    }
+
     const incomingAnswers = type === "clinical-audit" && normalizedDraft.formData && typeof normalizedDraft.formData === "object"
       ? Object.keys(normalizedDraft.formData)
       : [];
@@ -2102,7 +2181,13 @@ async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail 
     // has already entered the audit. Never let that empty response erase a
     // non-empty server draft; the next real answer save can still update it.
     if (type === "clinical-audit" && existingAnswers.length > 0 && incomingAnswers.length === 0) {
-      return;
+      if (operationId) {
+        await client.execute({
+          sql: "INSERT OR IGNORE INTO draft_sync_operations (operation_id, draft_id) VALUES (?, ?)",
+          args: [String(operationId), draftId],
+        });
+      }
+      return { accepted: true, preserved: true, serverVersion: currentVersion };
     }
 
     const dataJson = JSON.stringify(normalizedDraft);
@@ -2110,14 +2195,35 @@ async function saveDraft({ type, hospitalCode, specialty, draft, _hospitalEmail 
     if (existing.rows.length > 0) {
       const row = existing.rows[0] as any;
       const hospitalChanged = String(row.hospitalCode || "") !== effectiveCode;
-      if (!hospitalChanged && String(row.data || "") === dataJson) return;
-      await client.execute({ sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP WHERE ${idCol} = ?`, args: [effectiveCode, dataJson, draftId] });
+      if (!hospitalChanged && String(row.data || "") === dataJson) {
+        if (operationId) {
+          await client.execute({
+            sql: "INSERT OR IGNORE INTO draft_sync_operations (operation_id, draft_id) VALUES (?, ?)",
+            args: [String(operationId), draftId],
+          });
+        }
+        return { accepted: true, unchanged: true, serverVersion: currentVersion };
+      }
+      await client.execute({
+        sql: `UPDATE drafts SET ${hCol} = ?, ${dataCol} = ?, ${updatedCol} = CURRENT_TIMESTAMP, ${versionCol} = ?, ${operationCol} = ? WHERE ${idCol} = ?`,
+        args: [effectiveCode, dataJson, currentVersion + 1, operationId || "", draftId],
+      });
       shouldNormalizeOwnership = hospitalChanged;
     } else {
-      await client.execute({ sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`, args: [draftId, type, effectiveCode, specialty, dataJson] });
+      await client.execute({
+        sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}, ${versionCol}, ${operationCol}) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [draftId, type, effectiveCode, specialty, dataJson, 1, operationId || ""],
+      });
       shouldNormalizeOwnership = true;
     }
+    if (operationId) {
+      await client.execute({
+        sql: "INSERT OR IGNORE INTO draft_sync_operations (operation_id, draft_id) VALUES (?, ?)",
+        args: [String(operationId), draftId],
+      });
+    }
     if (shouldNormalizeOwnership) await normalizeDraftOwnership(client, draftId);
+    return { accepted: true, serverVersion: existing.rows.length > 0 ? currentVersion + 1 : 1 };
   });
 }
 
