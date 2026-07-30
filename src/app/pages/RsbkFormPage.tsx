@@ -4,7 +4,7 @@ import { Users, Building2, Stethoscope, ChevronRight, Save, BedDouble, DoorOpen,
 import { Button } from "../components/ui/button";
 import { specialtyAuditData, RsbkItem } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
-import { draftManager, stripLegacyToolVariationFields } from "../utils/draftManager";
+import { draftManager, selectMostCompleteDraftSnapshot, stripLegacyToolVariationFields } from "../utils/draftManager";
 import * as api from "../utils/api";
 import { getHospitalCode } from "../utils/api";
 
@@ -100,6 +100,7 @@ export function RsbkFormPage() {
   useEffect(() => {
     setFormData({});
     if (!specialty || !hospitalCode) return;
+    const activeSpecialty = specialty;
     let cancelled = false;
     const capturedDraftId = draftManager.getCurrentDraftId();
     const canHydrate = () => !cancelled && (!capturedDraftId || draftManager.getCurrentDraftId() === capturedDraftId);
@@ -114,27 +115,32 @@ export function RsbkFormPage() {
       const draft = draftId ? draftManager.getDraftById(draftId) : null;
 
       try {
-        const serverDraft = await api.getDraft("rsbk", hospitalCode, specialty);
+        const serverDraft = await api.getDraft("rsbk", hospitalCode, activeSpecialty);
         const serverData = serverDraft?.formData || serverDraft?.data;
-        if (serverData && Object.keys(serverData).length > 0 && hydrate(serverData)) {
+        const parentStage = draft?.progress?.[activeSpecialty]?.rsbk;
+        const preferred = selectMostCompleteDraftSnapshot([
+          serverData && { snapshot: { ...serverDraft, data: serverData }, updatedAt: serverDraft?.savedAt },
+          parentStage && { snapshot: { ...parentStage, data: parentStage.data }, updatedAt: draft?.updatedAt },
+        ].filter(Boolean) as Array<{ snapshot: any; updatedAt?: string }>);
+        if (preferred?.data && Object.keys(preferred.data).length > 0 && hydrate(preferred.data)) {
           if (draftId && draft && matchesCurrentHospitalDraft(draft)) {
-            draftManager.updateDraft(draftId, specialty, "rsbk", {
-              data: stripLegacyToolVariationFields(serverData),
-              score: serverDraft?.score,
-              completed: Boolean(serverDraft?.completed),
+            draftManager.updateDraft(draftId, activeSpecialty, "rsbk", {
+              data: stripLegacyToolVariationFields(preferred.data),
+              score: preferred.score,
+              completed: Boolean(preferred.completed),
             });
           }
           return;
         }
       } catch { /* fallback */ }
 
-      if (draft && matchesCurrentHospitalDraft(draft) && draft.progress[specialty]?.rsbk?.data) {
-        hydrate(draft.progress[specialty].rsbk.data);
+      if (draft && matchesCurrentHospitalDraft(draft) && draft.progress[activeSpecialty]?.rsbk?.data) {
+        hydrate(draft.progress[activeSpecialty].rsbk.data);
         return;
       }
 
       try {
-        const saved = localStorage.getItem(getRsbkDraftKey(specialty, hospitalCode));
+        const saved = localStorage.getItem(getRsbkDraftKey(activeSpecialty, hospitalCode));
         if (saved) {
           const localDraft = JSON.parse(saved);
           const localData = localDraft?.formData || localDraft?.data;

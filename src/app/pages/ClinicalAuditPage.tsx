@@ -6,7 +6,7 @@ import { specialtyAuditData } from "../data/specialtyAuditData";
 import { SpecialtyProgressTracker } from "../components/SpecialtyProgressTracker";
 import * as api from "../utils/api";
 import { getHospitalCode } from "../utils/api";
-import { draftManager } from "../utils/draftManager";
+import { draftManager, selectMostCompleteDraftSnapshot } from "../utils/draftManager";
 
 // Audit compliance options
 const AUDIT_OPTIONS = [
@@ -110,25 +110,41 @@ export function ClinicalAuditPage() {
 
       try {
         const serverDraft = await api.getDraft("clinical-audit", hospitalCode, specialty!);
-        const serverHasAnswers = Boolean(
-          serverDraft?.formData && Object.keys(serverDraft.formData).length > 0
-        );
-        const serverHasPatientMeta = Boolean(
-          serverDraft?.patientMeta && Object.keys(serverDraft.patientMeta).length > 0
-        );
+        let localDraft: any = null;
+        try {
+          const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
+          localDraft = saved ? JSON.parse(saved) : null;
+        } catch { /* ignore malformed local draft */ }
 
-        // An empty server placeholder must not block recovery from the
-        // current draft/localStorage. This is important after a stale tab
-        // saved its initial state while another device still had answers.
-        if (serverDraft && (serverHasAnswers || serverHasPatientMeta) && hydrateClinicalDraft(serverDraft)) {
+        const parentSnapshot = currentClinical?.data && Object.keys(currentClinical.data).length > 0
+          ? {
+              formData: currentClinical.data,
+              patientMeta: currentClinical.patientMeta || {},
+              currentPatient: currentClinical.currentPatient,
+              activeDiseaseIndex: currentClinical.activeDiseaseIndex,
+              score: currentClinical.score,
+              completed: currentClinical.completed,
+              updatedAt: currentDraft?.updatedAt,
+            }
+          : null;
+        const preferred = selectMostCompleteDraftSnapshot([
+          serverDraft && { snapshot: serverDraft, updatedAt: serverDraft?.savedAt },
+          parentSnapshot && { snapshot: parentSnapshot, updatedAt: currentDraft?.updatedAt },
+          localDraft && { snapshot: localDraft, updatedAt: localDraft?.savedAt },
+        ].filter(Boolean) as Array<{ snapshot: any; updatedAt?: string }>);
+
+        // An empty/older module row must not block recovery from the richer
+        // parent or browser snapshot. This keeps the form and Draft Assessment
+        // card on the same version of the data after a refresh or relogin.
+        if (preferred && hydrateClinicalDraft(preferred)) {
           if (currentDraftId && currentDraft && matchesCurrentHospitalDraft(currentDraft)) {
             draftManager.updateDraft(currentDraftId, specialty!, "clinicalAudit", {
-              data: serverDraft.formData,
-              patientMeta: serverDraft.patientMeta,
-              currentPatient: serverDraft.currentPatient,
-              activeDiseaseIndex: serverDraft.activeDiseaseIndex,
-              score: serverDraft.score,
-              completed: Boolean(serverDraft.completed),
+              data: preferred.formData || preferred.data || {},
+              patientMeta: preferred.patientMeta,
+              currentPatient: preferred.currentPatient,
+              activeDiseaseIndex: preferred.activeDiseaseIndex,
+              score: preferred.score,
+              completed: Boolean(preferred.completed),
             });
           }
           return;
@@ -146,10 +162,7 @@ export function ClinicalAuditPage() {
 
       try {
         const saved = localStorage.getItem(getDraftKey(specialty!, hospitalCode));
-        if (saved) {
-          const draft = JSON.parse(saved);
-          hydrateClinicalDraft(draft, true);
-        }
+        if (saved) hydrateClinicalDraft(JSON.parse(saved), true);
       } catch { /* ignore */ }
     }
     loadDraft();

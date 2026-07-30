@@ -150,6 +150,66 @@ function normalizeModuleData(moduleDraft: any) {
   return { data };
 }
 
+/**
+ * A parent assessment and its module rows can arrive in a different order.
+ * Compare the actual payload before choosing a snapshot so a partial/older
+ * module row cannot make the Draft Assessment card regress after refresh.
+ */
+export function getDraftSnapshotEvidence(snapshot: any): number {
+  if (!snapshot || typeof snapshot !== "object") return 0;
+  const data = snapshot.formData || snapshot.data || {};
+  const patientMeta = snapshot.patientMeta || {};
+  const registeredPatients = Array.isArray(snapshot.registeredPatients)
+    ? snapshot.registeredPatients.length
+    : 0;
+  const dataCount = data && typeof data === "object" ? Object.keys(data).length : 0;
+  const metaCount = patientMeta && typeof patientMeta === "object" ? Object.keys(patientMeta).length : 0;
+  const patientCount = Number(snapshot.patientCount || 0);
+  const completed = snapshot.completed ? 1 : 0;
+  return dataCount + (metaCount * 2) + (registeredPatients * 3) + (patientCount * 3) + completed;
+}
+
+export function selectMostCompleteDraftSnapshot(
+  candidates: Array<{ snapshot: any; updatedAt?: string | null }>,
+): any | null {
+  return candidates
+    .filter((candidate) => candidate?.snapshot)
+    .sort((a, b) => {
+      const evidence = getDraftSnapshotEvidence(b.snapshot) - getDraftSnapshotEvidence(a.snapshot);
+      if (evidence !== 0) return evidence;
+      return new Date(b.updatedAt || b.snapshot.updatedAt || b.snapshot.savedAt || 0).getTime()
+        - new Date(a.updatedAt || a.snapshot.updatedAt || a.snapshot.savedAt || 0).getTime();
+    })[0]?.snapshot || null;
+}
+
+function mergeStageSnapshots(existing: any, incoming: any, existingUpdatedAt = 0, incomingUpdatedAt = 0) {
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+
+  const existingEvidence = getDraftSnapshotEvidence(existing);
+  const incomingEvidence = getDraftSnapshotEvidence(incoming);
+  const incomingIsPreferred = incomingEvidence > existingEvidence || (
+    incomingEvidence === existingEvidence && incomingUpdatedAt >= existingUpdatedAt
+  );
+  const preferred = incomingIsPreferred ? incoming : existing;
+  const other = incomingIsPreferred ? existing : incoming;
+  const preferredData = preferred.data && typeof preferred.data === "object" ? preferred.data : {};
+  const otherData = other.data && typeof other.data === "object" ? other.data : {};
+  const preferredMeta = preferred.patientMeta && typeof preferred.patientMeta === "object" ? preferred.patientMeta : {};
+  const otherMeta = other.patientMeta && typeof other.patientMeta === "object" ? other.patientMeta : {};
+
+  return {
+    ...other,
+    ...preferred,
+    // Preserve distinct fields from both snapshots while allowing the richer
+    // or newer snapshot to win if the same field was edited twice.
+    data: { ...otherData, ...preferredData },
+    ...(Object.keys(otherMeta).length > 0 || Object.keys(preferredMeta).length > 0
+      ? { patientMeta: { ...otherMeta, ...preferredMeta } }
+      : {}),
+  };
+}
+
 function mergeModuleDraftsIntoAssessments(
   assessments: DraftData[],
   moduleDrafts: any[],
@@ -226,7 +286,12 @@ function mergeModuleDraftsIntoAssessments(
       // a full PRM or audit section with an empty one. Prefer a non-empty
       // module; only accept an empty module when there is no existing data.
       if (moduleHasData || !existingHasData) {
-        draft.progress[specialty][stage] = { ...existingStage, ...stageData };
+        draft.progress[specialty][stage] = mergeStageSnapshots(
+          existingStage,
+          stageData,
+          draftUpdatedAt,
+          moduleUpdatedAt,
+        );
       }
       if (moduleUpdatedAt > draftUpdatedAt) draft.updatedAt = moduleDraft.updatedAt;
     });
