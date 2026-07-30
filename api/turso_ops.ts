@@ -936,13 +936,18 @@ async function loginHospital({ email, password }: any) {
 }
 
 async function loginAdmin({ username, password }: any) {
-  await initTursoTables();
   const normalizedUsername = String(username || "").trim();
   const normalizedPassword = String(password || "").trim();
+
+  // The configured administrator must remain available even when SQLite is
+  // busy with assessment traffic. Validate this account before migrations or
+  // database reads so the admin can recover/monitor the system under load.
   if (isConfiguredAdminLogin(normalizedUsername, normalizedPassword)) {
     const token = signToken({ username: getConfiguredAdminUsername() || normalizedUsername, role: "admin" });
     return { success: true, token };
   }
+
+  await initTursoTables();
 
   const rs = await db().execute({
     sql: "SELECT id, username, password_hash, role FROM admins WHERE LOWER(username) = LOWER(?)",
