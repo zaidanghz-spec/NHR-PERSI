@@ -3,6 +3,8 @@ import {
   getAllHospitalDrafts,
   getHospitalModuleDrafts,
   deleteHospitalDraft as deleteCloudDraft,
+  getDraft as getCloudModuleDraft,
+  saveDraft as saveCloudModuleDraft,
 } from "./api";
 import { safeLocalStorageSet } from "./storage";
 
@@ -207,6 +209,76 @@ function mergeStageSnapshots(existing: any, incoming: any, existingUpdatedAt = 0
     ...(Object.keys(otherMeta).length > 0 || Object.keys(preferredMeta).length > 0
       ? { patientMeta: { ...otherMeta, ...preferredMeta } }
       : {}),
+  };
+}
+
+function mergeModuleSnapshots(type: "rsbk" | "clinical-audit", server: any, local: any) {
+  const serverStamp = new Date(server?.savedAt || 0).getTime();
+  const localStamp = new Date(local?.savedAt || 0).getTime();
+  const preferred = localStamp >= serverStamp ? local : server;
+  const secondary = preferred === local ? server : local;
+  const serverData = server?.formData || server?.data || {};
+  const localData = local?.formData || local?.data || {};
+  const preferredData = preferred?.formData || preferred?.data || {};
+  const secondaryData = secondary?.formData || secondary?.data || {};
+
+  const merged: any = {
+    ...(secondary || {}),
+    ...(preferred || {}),
+    // Preserve non-conflicting answers from both copies; the newer snapshot
+    // wins only when both copies contain the same answer key.
+    formData: { ...secondaryData, ...preferredData },
+    savedAt: new Date(Math.max(serverStamp, localStamp, Date.now())).toISOString(),
+  };
+
+  if (type === "clinical-audit") {
+    merged.patientMeta = {
+      ...(secondary?.patientMeta || {}),
+      ...(preferred?.patientMeta || {}),
+    };
+  }
+
+  // An empty browser initialization must never replace calculated values from
+  // a richer server copy.
+  if (Object.keys(serverData).length > Object.keys(localData).length) {
+    merged.score = server?.score;
+    merged.completed = server?.completed;
+  }
+  return merged;
+}
+
+function mergeParentAssessmentSnapshots(server: DraftData | null, local: DraftData): DraftData {
+  if (!server) return local;
+  const serverStamp = new Date(server.updatedAt || 0).getTime();
+  const localStamp = new Date(local.updatedAt || 0).getTime();
+  const preferred = localStamp >= serverStamp ? local : server;
+  const mergedProgress: DraftData["progress"] = { ...(server.progress || {}) };
+  const specialties = new Set([
+    ...(server.selectedSpecialties || []),
+    ...(local.selectedSpecialties || []),
+  ]);
+
+  specialties.forEach((specialty) => {
+    const serverStages = server.progress?.[specialty];
+    const localStages = local.progress?.[specialty];
+    if (!serverStages) {
+      if (localStages) mergedProgress[specialty] = localStages;
+      return;
+    }
+    if (!localStages) return;
+    mergedProgress[specialty] = {
+      rsbk: mergeStageSnapshots(serverStages.rsbk, localStages.rsbk, serverStamp, localStamp),
+      clinicalAudit: mergeStageSnapshots(serverStages.clinicalAudit, localStages.clinicalAudit, serverStamp, localStamp),
+      patientReport: mergeStageSnapshots(serverStages.patientReport, localStages.patientReport, serverStamp, localStamp),
+    };
+  });
+
+  return {
+    ...server,
+    ...preferred,
+    selectedSpecialties: Array.from(specialties),
+    progress: mergedProgress,
+    updatedAt: new Date(Math.max(serverStamp, localStamp, Date.now())).toISOString(),
   };
 }
 
@@ -568,6 +640,85 @@ export const draftManager = {
 
     // All completed, go to result of last specialty
     return null;
+  },
+
+  /**
+   * One-time migration for browsers that still have assessment data locally.
+   * The local copy is intentionally not deleted here. Module snapshots are
+   * merged with the server copy first so server-first storage cannot discard
+   * data entered before the migration.
+   */
+  async migrateLocalAssessmentDataToCloud(
+    hospital: { hospitalName?: string; picName?: string; email?: string; hospitalCode?: string },
+  ): Promise<{ uploaded: number; skipped: number; failed: number }> {
+    const code = hospital.hospitalCode || deriveHospitalCode(hospital.email);
+    if (!code) return { uploaded: 0, skipped: 0, failed: 0 };
+
+    let uploaded = 0;
+    let skipped = 0;
+    let failed = 0;
+    const localDrafts = this.getAllDrafts().filter((draft) => matchesHospitalDraft(draft, hospital));
+    let cloudDrafts: any[] = [];
+    try {
+      cloudDrafts = await getAllHospitalDrafts();
+    } catch (error) {
+      failed += 1;
+      console.error("Cloud draft list unavailable during local migration:", error);
+    }
+    const migratedParents = new Map<string, DraftData>();
+
+    // Upload the parent snapshot first. This preserves PRM and progress data
+    // that older browsers stored only inside the parent draft.
+    for (const draft of localDrafts) {
+      try {
+        const serverDraft = cloudDrafts.find((candidate) => candidate?.draftId === draft.draftId) || null;
+        const mergedDraft = mergeParentAssessmentSnapshots(serverDraft, draft);
+        await saveHospitalDraft(mergedDraft);
+        migratedParents.set(mergedDraft.draftId, mergedDraft);
+        uploaded += 1;
+      } catch (error) {
+        failed += 1;
+        console.error("Local parent draft migration failed:", error);
+      }
+    }
+
+    if (migratedParents.size > 0) {
+      const allDrafts = this.getAllDrafts().map((draft) => migratedParents.get(draft.draftId) || draft);
+      safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(allDrafts));
+    }
+
+    const moduleKeys: Array<{ type: "rsbk" | "clinical-audit"; prefix: string }> = [
+      { type: "rsbk", prefix: `rsbk-draft-${code}-` },
+      { type: "clinical-audit", prefix: `clinical-audit-draft-${code}-` },
+    ];
+    const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter(Boolean) as string[];
+
+    for (const { type, prefix } of moduleKeys) {
+      for (const key of keys.filter((candidate) => candidate.startsWith(prefix))) {
+        const specialty = key.slice(prefix.length);
+        if (!specialty) continue;
+
+        try {
+          const raw = localStorage.getItem(key);
+          const localSnapshot = raw ? JSON.parse(raw) : null;
+          const localData = localSnapshot?.formData || localSnapshot?.data || {};
+          if (!localSnapshot || Object.keys(localData).length === 0) {
+            skipped += 1;
+            continue;
+          }
+
+          const serverSnapshot = await getCloudModuleDraft(type, code, specialty);
+          const merged = mergeModuleSnapshots(type, serverSnapshot, localSnapshot);
+          await saveCloudModuleDraft(type, code, specialty, merged);
+          uploaded += 1;
+        } catch (error) {
+          failed += 1;
+          console.error(`Local ${type} migration failed for ${specialty}:`, error);
+        }
+      }
+    }
+
+    return { uploaded, skipped, failed };
   },
 
   // Manual cloud sync reconciliation

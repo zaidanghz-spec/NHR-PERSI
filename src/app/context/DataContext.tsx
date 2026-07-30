@@ -55,6 +55,7 @@ export interface EventItem {
 
 export interface HospitalAccount {
   email: string;
+  hospitalCode?: string;
   hospitalName: string;
   picName: string;
   province: string;
@@ -422,6 +423,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       authenticated: true,
     }));
     draftManager.pruneDraftsForHospital({ ...account, hospitalCode });
+
+    // Before moving assessment storage to server-first, migrate any draft that
+    // still exists in this browser. The migration is scoped to the authenticated
+    // hospital and merges module answers instead of blindly overwriting cloud data.
+    await draftManager.migrateLocalAssessmentDataToCloud({ ...account, hospitalCode });
+    await draftManager.syncWithCloud({ ...account, hospitalCode });
 
     setHospitalAccounts(prev => {
       const merged = mergeHospitalAccounts([account], prev);
