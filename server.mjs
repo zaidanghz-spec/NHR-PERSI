@@ -39,6 +39,11 @@ const CACHEABLE_READS = new Set([
   "getAllHospitalAccounts",
   "getAllSubmissions",
 ]);
+const SHARED_PUBLIC_READS = new Set([
+  "getAllRankingsFromDb",
+  "getAllNews",
+  "getAllEvents",
+]);
 const CACHE_INVALIDATING_WRITES = new Set([
   "addHospitalAccount",
   "updateAccountStatus",
@@ -71,7 +76,11 @@ async function runOperation(operation, body, req) {
     return handleTursoOperation(operation, body);
   }
 
-  const authScope = req.authRole === "admin" ? "admin" : (req.hospitalEmail || "public");
+  // These lists are identical for every visitor. Do not fragment the cache
+  // by hospital JWT, otherwise every RS re-runs the same public query.
+  const authScope = SHARED_PUBLIC_READS.has(operation)
+    ? "public"
+    : (req.authRole === "admin" ? "admin" : (req.hospitalEmail || "public"));
   const key = `${operation}:${authScope}`;
   const cached = operationCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
