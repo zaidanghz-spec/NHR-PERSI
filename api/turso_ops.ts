@@ -12,6 +12,7 @@ let databaseClientKey = "";
 let localDatabasePragmasReady: Promise<void> | null = null;
 let databaseExecuteQueue: Promise<void> = Promise.resolve();
 const surveyBackupRestoreCheckedAt = new Map<string, number>();
+const surveySpecialtyReconciledAt = new Map<string, number>();
 
 function isDatabaseWrite(statement: any) {
   const sql = typeof statement === "string" ? statement : String(statement?.sql || "");
@@ -1671,10 +1672,20 @@ function mapSurveyRow(r: any) {
 async function reconcileSurveySpecialties(client: any, hospitalCode: string) {
   if (!hospitalCode) return;
 
+  // Patient survey pages can poll concurrently from many devices. Running a
+  // full read plus corrective UPDATE for every request saturated SQLite and
+  // made unrelated pages appear to load forever. Reconcile once per hospital
+  // per minute; new writes are still picked up on the next window.
+  const now = Date.now();
+  const lastReconciled = surveySpecialtyReconciledAt.get(hospitalCode) || 0;
+  if (now - lastReconciled < 60_000) return;
+  surveySpecialtyReconciledAt.set(hospitalCode, now);
+
   // Older QR links could carry a stale disease index, so some surveys landed under
   // the wrong disease key. The patient registry is the source of truth for PRM.
-  await client.execute({
-    sql: `UPDATE surveys
+  try {
+    await client.execute({
+      sql: `UPDATE surveys
           SET specialty = (
             SELECT p.specialty
             FROM patients p
@@ -1692,40 +1703,44 @@ async function reconcileSurveySpecialties(client: any, hospitalCode: string) {
                 AND LOWER(TRIM(p.name)) = LOWER(TRIM(surveys.patient_name))
                 AND p.specialty <> surveys.specialty
             )`,
-    args: [hospitalCode],
-  });
-
-  const [patientsRs, surveysRs] = await Promise.all([
-    client.execute({
-      sql: "SELECT hospital_code, specialty, name, rm FROM patients WHERE hospital_code = ?",
       args: [hospitalCode],
-    }),
-    client.execute({
-      sql: "SELECT id, hospital_code, specialty, patient_name, patient_rm FROM surveys WHERE hospital_code = ?",
-      args: [hospitalCode],
-    }),
-  ]);
-  const patients = patientsRs.rows.map((row: any) => ({
-    specialty: String(row.specialty || ""),
-    nameKey: normalizePatientNameKey(row.name),
-    rmKey: normalizePatientCodeKey(row.rm),
-  }));
+    });
 
-  for (const survey of surveysRs.rows as any[]) {
-    const surveyRmKey = normalizePatientCodeKey(survey.patient_rm);
-    if (!surveyRmKey) continue;
-    const surveyNameKey = normalizePatientNameKey(survey.patient_name);
-    const sameCode = patients.filter((patient: any) => patient.rmKey === surveyRmKey);
-    const sameCodeAndName = sameCode.filter((patient: any) => patient.nameKey && patient.nameKey === surveyNameKey);
-    const candidates = surveyNameKey ? sameCodeAndName : sameCode;
-    const uniqueSpecialties = Array.from(new Set(candidates.map((patient: any) => patient.specialty).filter(Boolean)));
+    const [patientsRs, surveysRs] = await Promise.all([
+      client.execute({
+        sql: "SELECT hospital_code, specialty, name, rm FROM patients WHERE hospital_code = ?",
+        args: [hospitalCode],
+      }),
+      client.execute({
+        sql: "SELECT id, hospital_code, specialty, patient_name, patient_rm FROM surveys WHERE hospital_code = ?",
+        args: [hospitalCode],
+      }),
+    ]);
+    const patients = patientsRs.rows.map((row: any) => ({
+      specialty: String(row.specialty || ""),
+      nameKey: normalizePatientNameKey(row.name),
+      rmKey: normalizePatientCodeKey(row.rm),
+    }));
 
-    if (uniqueSpecialties.length === 1 && uniqueSpecialties[0] !== survey.specialty) {
-      await client.execute({
-        sql: "UPDATE surveys SET specialty = ? WHERE id = ?",
-        args: [uniqueSpecialties[0], survey.id],
-      });
+    for (const survey of surveysRs.rows as any[]) {
+      const surveyRmKey = normalizePatientCodeKey(survey.patient_rm);
+      if (!surveyRmKey) continue;
+      const surveyNameKey = normalizePatientNameKey(survey.patient_name);
+      const sameCode = patients.filter((patient: any) => patient.rmKey === surveyRmKey);
+      const sameCodeAndName = sameCode.filter((patient: any) => patient.nameKey && patient.nameKey === surveyNameKey);
+      const candidates = surveyNameKey ? sameCodeAndName : sameCode;
+      const uniqueSpecialties = Array.from(new Set(candidates.map((patient: any) => patient.specialty).filter(Boolean)));
+
+      if (uniqueSpecialties.length === 1 && uniqueSpecialties[0] !== survey.specialty) {
+        await client.execute({
+          sql: "UPDATE surveys SET specialty = ? WHERE id = ?",
+          args: [uniqueSpecialties[0], survey.id],
+        });
+      }
     }
+  } catch (error) {
+    surveySpecialtyReconciledAt.delete(hospitalCode);
+    throw error;
   }
 }
 
