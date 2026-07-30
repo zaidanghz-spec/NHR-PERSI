@@ -344,6 +344,13 @@ export function ClinicalAuditPage() {
     if (!specialty) return false;
     const activeDraftId = draftManager.getCurrentDraftId();
     if (!activeDraftId) return false;
+
+    // Keep the score metadata in the same snapshot as the answers. Previously
+    // the manual save only sent formData, so the server and Draft Assessment
+    // could keep showing the score from an older save even though answers had
+    // changed.
+    const score = calculateSpecialtyAuditScore();
+    const completed = diseases.every((_, idx) => getCompletedPatientsCount(idx) >= 1);
     setAutosaveState("saving");
     const draft = {
       draftId: activeDraftId,
@@ -351,9 +358,10 @@ export function ClinicalAuditPage() {
       patientMeta,
       currentPatient,
       activeDiseaseIndex,
+      score,
+      completed,
       savedAt: new Date().toISOString(),
     };
-    const score = calculateSpecialtyAuditScore();
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     
     // Count total unique medical record numbers filled
@@ -382,6 +390,18 @@ export function ClinicalAuditPage() {
 
     try {
       await api.saveDraft("clinical-audit", hospitalCode, specialty, draft);
+
+      // The result page reads the parent draft first. Update that local
+      // snapshot immediately and let draftManager sync it in the background,
+      // so the score cannot remain stale between the audit and review pages.
+      draftManager.updateDraft(activeDraftId, specialty, "clinicalAudit", {
+        data: formData,
+        patientMeta,
+        currentPatient,
+        activeDiseaseIndex,
+        score,
+        completed,
+      });
     } catch (err) {
       if (draftManager.getCurrentDraftId() === activeDraftId) {
         console.error("Failed to save draft to server:", err);
