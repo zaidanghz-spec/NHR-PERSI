@@ -10,6 +10,7 @@ let draftWriteQueue: Promise<void> = Promise.resolve();
 let databaseClient: ReturnType<typeof createClient> | null = null;
 let databaseClientKey = "";
 let localDatabasePragmasReady: Promise<void> | null = null;
+let databaseExecuteQueue: Promise<void> = Promise.resolve();
 const surveyBackupRestoreCheckedAt = new Map<string, number>();
 
 function getDatabaseUrl() {
@@ -45,11 +46,33 @@ function db() {
   // under concurrent autosaves that could lock the database and break login.
   if (databaseClient && databaseClientKey === clientKey) return databaseClient;
 
-  databaseClient = isFileDatabaseUrl(url)
+  const rawClient = isFileDatabaseUrl(url)
     ? createClient({ url })
     : createClient({ url, authToken });
+  databaseClient = new Proxy(rawClient, {
+    get(target, property, receiver) {
+      if (property === "execute") {
+        return (...args: any[]) => {
+          // SQLite permits many readers, but only one writer. Serializing the
+          // client calls prevents reconcile/autosave writes from racing and
+          // turning a transient lock into a failed login or lost draft.
+          const previous = databaseExecuteQueue.catch(() => undefined);
+          let release!: () => void;
+          databaseExecuteQueue = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          return previous
+            .then(() => target.execute(...args))
+            .finally(() => release());
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as ReturnType<typeof createClient>;
   databaseClientKey = clientKey;
   localDatabasePragmasReady = null;
+  databaseExecuteQueue = Promise.resolve();
   return databaseClient;
 }
 
