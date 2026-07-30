@@ -7,6 +7,9 @@ import jwt from "jsonwebtoken";
 let tablesInitialized = false;
 let tablesInitializing: Promise<void> | null = null;
 let draftWriteQueue: Promise<void> = Promise.resolve();
+let databaseClient: ReturnType<typeof createClient> | null = null;
+let databaseClientKey = "";
+let localDatabasePragmasReady: Promise<void> | null = null;
 const surveyBackupRestoreCheckedAt = new Map<string, number>();
 
 function getDatabaseUrl() {
@@ -35,8 +38,33 @@ function db() {
   const authToken = process.env.LIBSQL_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || "";
   if (!url) throw new Error("DATABASE_URL is not configured");
   ensureFileDatabaseDirectory(url);
-  if (isFileDatabaseUrl(url) || !authToken) return createClient({ url });
-  return createClient({ url, authToken });
+  const clientKey = `${url}\u0000${authToken}`;
+
+  // Keep one client for the lifetime of the server. Creating a new SQLite
+  // client for every RPC left many handles competing for the same WAL file;
+  // under concurrent autosaves that could lock the database and break login.
+  if (databaseClient && databaseClientKey === clientKey) return databaseClient;
+
+  databaseClient = isFileDatabaseUrl(url)
+    ? createClient({ url })
+    : createClient({ url, authToken });
+  databaseClientKey = clientKey;
+  localDatabasePragmasReady = null;
+  return databaseClient;
+}
+
+async function prepareLocalDatabase(client: ReturnType<typeof createClient>) {
+  if (!isFileDatabaseUrl(getDatabaseUrl())) return;
+  if (!localDatabasePragmasReady) {
+    localDatabasePragmasReady = client
+      .execute("PRAGMA busy_timeout = 15000")
+      .then(() => undefined)
+      .catch((error) => {
+        localDatabasePragmasReady = null;
+        throw error;
+      });
+  }
+  await localDatabasePragmasReady;
 }
 
 function randomId() {
@@ -457,6 +485,7 @@ async function initTursoTables() {
 async function initTursoTablesOnce() {
   if (tablesInitialized) return;
   const client = db();
+  await prepareLocalDatabase(client);
 
   await client.execute(`
     CREATE TABLE IF NOT EXISTS admins (
