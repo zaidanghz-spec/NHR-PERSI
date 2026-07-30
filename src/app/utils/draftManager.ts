@@ -253,10 +253,14 @@ function mergeParentAssessmentSnapshots(server: DraftData | null, local: DraftDa
   const localStamp = new Date(local.updatedAt || 0).getTime();
   const preferred = localStamp >= serverStamp ? local : server;
   const mergedProgress: DraftData["progress"] = { ...(server.progress || {}) };
-  const specialties = new Set([
-    ...(server.selectedSpecialties || []),
-    ...(local.selectedSpecialties || []),
-  ]);
+  // The cloud parent is authoritative for the active service list. Unioning
+  // this array with localStorage lets an old browser resurrect a service that
+  // was deliberately removed from the server.
+  const specialties = new Set(
+    server.selectedSpecialties?.length
+      ? server.selectedSpecialties
+      : (local.selectedSpecialties || []),
+  );
 
   specialties.forEach((specialty) => {
     const serverStages = server.progress?.[specialty];
@@ -333,6 +337,10 @@ function mergeModuleDraftsIntoAssessments(
       const stage = stageFromModuleType(moduleDraft.type);
       const specialty = moduleDraft.specialty;
       if (!stage || !specialty) return;
+      // An orphaned module row must not re-add a service that the parent draft
+      // explicitly removed. This prevents stale cache data from leaking back
+      // into the current assessment during reconciliation.
+      if (draft.selectedSpecialties.length > 0 && !draft.selectedSpecialties.includes(specialty)) return;
       if (!draft.selectedSpecialties.includes(specialty)) draft.selectedSpecialties.push(specialty);
       if (!draft.progress[specialty]) {
         draft.progress[specialty] = {
@@ -692,6 +700,9 @@ export const draftManager = {
       safeLocalStorageSet(DRAFTS_KEY, JSON.stringify(allDrafts));
     }
 
+    const cloudSpecialties = new Set(
+      Array.from(migratedParents.values()).flatMap((draft) => draft.selectedSpecialties || []),
+    );
     const moduleKeys: Array<{ type: "rsbk" | "clinical-audit"; prefix: string }> = [
       { type: "rsbk", prefix: `rsbk-draft-${code}-` },
       { type: "clinical-audit", prefix: `clinical-audit-draft-${code}-` },
@@ -702,6 +713,10 @@ export const draftManager = {
       for (const key of keys.filter((candidate) => candidate.startsWith(prefix))) {
         const specialty = key.slice(prefix.length);
         if (!specialty) continue;
+        if (cloudSpecialties.size > 0 && !cloudSpecialties.has(specialty)) {
+          skipped += 1;
+          continue;
+        }
 
         try {
           const raw = localStorage.getItem(key);
@@ -751,10 +766,10 @@ export const draftManager = {
         if (index === -1) {
           mergedDrafts.push(cd);
         } else {
-          // Compare updatedAt
-          if (new Date(cd.updatedAt) > new Date(mergedDrafts[index].updatedAt)) {
-            mergedDrafts[index] = cd;
-          }
+          // Always reconcile through the cloud-authoritative merge. Choosing
+          // the newer local snapshot wholesale allowed stale service lists to
+          // overwrite a deliberate server-side removal.
+          mergedDrafts[index] = mergeParentAssessmentSnapshots(cd, mergedDrafts[index]);
         }
       });
 
