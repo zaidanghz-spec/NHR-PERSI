@@ -13,6 +13,11 @@ let localDatabasePragmasReady: Promise<void> | null = null;
 let databaseExecuteQueue: Promise<void> = Promise.resolve();
 const surveyBackupRestoreCheckedAt = new Map<string, number>();
 
+function isDatabaseWrite(statement: any) {
+  const sql = typeof statement === "string" ? statement : String(statement?.sql || "");
+  return /^(?:ALTER|BEGIN|COMMIT|CREATE|DELETE|DROP|INSERT|REINDEX|REPLACE|ROLLBACK|UPDATE|VACUUM|WITH)\b/i.test(sql.trim());
+}
+
 function getDatabaseUrl() {
   return (
     process.env.DATABASE_URL ||
@@ -53,9 +58,10 @@ function db() {
     get(target, property, receiver) {
       if (property === "execute") {
         return (...args: any[]) => {
-          // SQLite permits many readers, but only one writer. Serializing the
-          // client calls prevents reconcile/autosave writes from racing and
-          // turning a transient lock into a failed login or lost draft.
+          // SQLite permits concurrent reads, but only one writer. Serialize
+          // writes while leaving reads parallel so a busy dashboard cannot
+          // make login wait behind an unnecessary read queue.
+          if (!isDatabaseWrite(args[0])) return target.execute(...args);
           const previous = databaseExecuteQueue.catch(() => undefined);
           let release!: () => void;
           databaseExecuteQueue = new Promise<void>((resolve) => {
