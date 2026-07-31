@@ -33,6 +33,7 @@ export interface DraftData {
         activeDiseaseIndex?: number;
         currentPatient?: number;
         score?: number;
+        resetAt?: string;
       };
       patientReport: {
         completed: boolean;
@@ -131,6 +132,7 @@ function normalizeModuleData(moduleDraft: any) {
       activeDiseaseIndex: data.activeDiseaseIndex,
       score: data.score,
       completed: Boolean(data.completed),
+      resetAt: data.resetAt,
     };
   }
   if (moduleDraft?.type === "patient-report") {
@@ -187,6 +189,17 @@ export function selectMostCompleteDraftSnapshot(
 function mergeStageSnapshots(existing: any, incoming: any, existingUpdatedAt = 0, incomingUpdatedAt = 0) {
   if (!existing) return incoming;
   if (!incoming) return existing;
+
+  const existingResetAt = new Date(existing.resetAt || 0).getTime();
+  const incomingResetAt = new Date(incoming.resetAt || 0).getTime();
+  if (existingResetAt > 0 || incomingResetAt > 0) {
+    if (existingResetAt >= incomingResetAt && existingResetAt >= incomingUpdatedAt) {
+      return existing;
+    }
+    if (incomingResetAt > existingResetAt && incomingResetAt >= existingUpdatedAt) {
+      return incoming;
+    }
+  }
 
   const existingEvidence = getDraftSnapshotEvidence(existing);
   const incomingEvidence = getDraftSnapshotEvidence(incoming);
@@ -355,6 +368,7 @@ function mergeModuleDraftsIntoAssessments(
       const existingStage = draft.progress[specialty][stage];
       const existingHasData = existingStage?.data && Object.keys(existingStage.data).length > 0;
       const moduleHasData = Boolean(
+        stageData.resetAt ||
         stageData.completed ||
         (stageData.data && Object.keys(stageData.data).length > 0) ||
         (stageData.patientMeta && Object.keys(stageData.patientMeta).length > 0)

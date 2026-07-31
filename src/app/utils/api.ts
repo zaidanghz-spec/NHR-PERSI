@@ -137,6 +137,23 @@ async function flushPendingDraftSavesForKey(key: DraftSyncKey) {
       continue;
     }
 
+    if (result?.resetConflict) {
+      // This patch was created before an administrator reset the audit.
+      // Drop it permanently and hydrate the baseline from the reset snapshot
+      // so a stale offline queue cannot repopulate deleted patient answers.
+      removePendingDraftSave(item.operationId);
+      const serverDraft = await rpc<any | null>("getDraft", {
+        type: item.type,
+        hospitalCode: item.hospitalCode,
+        specialty: item.specialty,
+      }, { retries: 1, timeoutMs: 15000 });
+      const snapshot = serverDraft ? { ...serverDraft } : {};
+      const serverVersion = Number(snapshot.serverVersion || result.serverVersion || 0);
+      delete snapshot.serverVersion;
+      draftBaselines.set(key, { snapshot, version: serverVersion });
+      throw new Error("Draft audit telah direset oleh admin. Muat ulang halaman sebelum mengisi kembali.");
+    }
+
     removePendingDraftSave(item.operationId);
     const baseline = draftBaselines.get(key) || { snapshot: {}, version: item.baseVersion };
     draftBaselines.set(key, {

@@ -2254,6 +2254,33 @@ async function saveDraft({ type, hospitalCode, specialty, draft, patch, baseVers
     const existingAnswers = type === "clinical-audit" && existingDraft.formData && typeof existingDraft.formData === "object"
       ? Object.keys(existingDraft.formData)
       : [];
+    const existingResetAt = type === "clinical-audit"
+      ? new Date(existingDraft.resetAt || 0).getTime()
+      : 0;
+    const incomingSavedAt = type === "clinical-audit"
+      ? new Date((draft || {}).savedAt || (draft || {}).updatedAt || 0).getTime()
+      : 0;
+    const incomingAcknowledgesReset = type === "clinical-audit" && (
+      String((draft || {}).resetAt || "") === String(existingDraft.resetAt || "") ||
+      Number(baseVersion || 0) >= currentVersion
+    );
+
+    // A reset is an explicit server-side boundary. Ignore complete snapshots
+    // from a browser that were saved before the reset, otherwise a stale
+    // localStorage copy can repopulate data that an administrator removed.
+    if (
+      type === "clinical-audit" &&
+      existingResetAt > 0 &&
+      incomingAnswers.length > 0 &&
+      !incomingAcknowledgesReset &&
+      (!incomingSavedAt || incomingSavedAt < existingResetAt || Boolean(patch))
+    ) {
+      return { accepted: false, resetConflict: true, serverVersion: currentVersion };
+    }
+
+    if (type === "clinical-audit" && existingResetAt > 0) {
+      normalizedDraft.resetAt = existingDraft.resetAt;
+    }
 
     // A stale tab can autosave its initial empty state after another device
     // has already entered the audit. Never let that empty response erase a
