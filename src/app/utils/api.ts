@@ -17,6 +17,7 @@ type PendingDraftSave = {
   baseVersion: number;
   operationId: string;
   createdAt: string;
+  resetAt?: string;
 };
 
 const draftBaselines = new Map<DraftSyncKey, DraftSyncBaseline>();
@@ -123,6 +124,7 @@ async function flushPendingDraftSavesForKey(key: DraftSyncKey) {
         patch: item.patch,
         baseVersion: item.baseVersion,
         operationId: item.operationId,
+        resetAt: item.resetAt,
       }, { retries: 2, timeoutMs: 15000 });
     } catch (err) {
       // Keep the patch on disk. A later edit, refresh, or online event will retry it.
@@ -526,6 +528,7 @@ export async function saveDraft(
       ? crypto.randomUUID()
       : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     createdAt: new Date().toISOString(),
+    resetAt: typeof draft?.resetAt === "string" ? draft.resetAt : undefined,
   };
 
   // Optimistically advance only the in-memory baseline so rapid edits produce

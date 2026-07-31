@@ -55,6 +55,7 @@ export function ClinicalAuditPage() {
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
   const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [lastAutosavedAt, setLastAutosavedAt] = useState<string>("");
+  const [resetAt, setResetAt] = useState<string>("");
 
   const authData = JSON.parse(sessionStorage.getItem("hospitalAuth") || "{}");
   const hospitalName = authData.hospitalName || "Unknown Hospital";
@@ -88,6 +89,7 @@ export function ClinicalAuditPage() {
     setPatientMeta({});
     setCurrentPatient(1);
     setActiveDiseaseIndex(0);
+    setResetAt("");
     const isStillActiveDraft = () =>
       Boolean(!cancelled && (!capturedDraftId || draftManager.getCurrentDraftId() === capturedDraftId));
     const hydrateClinicalDraft = (draft: any, requireSameDraftId = false) => {
@@ -97,6 +99,7 @@ export function ClinicalAuditPage() {
       if (draft.patientMeta) setPatientMeta(draft.patientMeta);
       if (draft.currentPatient) setCurrentPatient(draft.currentPatient);
       if (typeof draft.activeDiseaseIndex === "number") setActiveDiseaseIndex(draft.activeDiseaseIndex);
+      if (typeof draft.resetAt === "string") setResetAt(draft.resetAt);
       return true;
     };
     async function loadDraft() {
@@ -115,6 +118,7 @@ export function ClinicalAuditPage() {
               activeDiseaseIndex: currentClinical.activeDiseaseIndex,
               score: currentClinical.score,
               completed: currentClinical.completed,
+              resetAt: currentClinical.resetAt,
               updatedAt: currentDraft?.updatedAt,
             }
           : null;
@@ -137,6 +141,7 @@ export function ClinicalAuditPage() {
         if (currentClinical.patientMeta) setPatientMeta(currentClinical.patientMeta);
         if (currentClinical.currentPatient) setCurrentPatient(currentClinical.currentPatient);
         if (typeof currentClinical.activeDiseaseIndex === "number") setActiveDiseaseIndex(currentClinical.activeDiseaseIndex);
+        if (typeof currentClinical.resetAt === "string") setResetAt(currentClinical.resetAt);
         return;
       }
 
@@ -361,6 +366,7 @@ export function ClinicalAuditPage() {
       score,
       completed,
       savedAt: new Date().toISOString(),
+      ...(resetAt ? { resetAt } : {}),
     };
     sessionStorage.setItem(`${specialty}_clinicalAuditScore`, score.toString());
     
@@ -446,6 +452,7 @@ export function ClinicalAuditPage() {
         score: specialtyScore,
         completed: allDiseasesHaveData,
         savedAt: new Date().toISOString(),
+        ...(resetAt ? { resetAt } : {}),
       };
       api.saveDraft("clinical-audit", hospitalCode, specialty, cloudDraft)
         .then(() => {
@@ -461,7 +468,7 @@ export function ClinicalAuditPage() {
     }, 1000); // 1s debounce to prevent flooding
 
     return () => clearTimeout(timer);
-  }, [formData, patientMeta, currentPatient, activeDiseaseIndex, specialty, specialtyScore, allDiseasesHaveData, hospitalCode]);
+  }, [formData, patientMeta, currentPatient, activeDiseaseIndex, specialty, specialtyScore, allDiseasesHaveData, hospitalCode, resetAt]);
   const activeCategoryScores = calculateActiveDiseaseCategories();
   const activeValidity = getSampleValidityWeight(activeCompletedPatients);
   const currentPatientScoreVal = calculatePatientScore(activeDiseaseIndex, currentPatient);

@@ -2171,7 +2171,7 @@ function mergeDraftPatch(existingDraft: any, patch: any, effectiveCode: string) 
   return merged;
 }
 
-async function saveDraft({ type, hospitalCode, specialty, draft, patch, baseVersion, operationId, _hospitalEmail }: any) {
+async function saveDraft({ type, hospitalCode, specialty, draft, patch, baseVersion, operationId, resetAt, _hospitalEmail }: any) {
   await initTursoTables();
   const client = db();
   const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
@@ -2260,10 +2260,15 @@ async function saveDraft({ type, hospitalCode, specialty, draft, patch, baseVers
     const incomingSavedAt = type === "clinical-audit"
       ? new Date((draft || {}).savedAt || (draft || {}).updatedAt || 0).getTime()
       : 0;
-    const incomingAcknowledgesReset = type === "clinical-audit" && (
-      String((draft || {}).resetAt || "") === String(existingDraft.resetAt || "") ||
-      Number(baseVersion || 0) >= currentVersion
+    const incomingResetAt = String(
+      resetAt ||
+      (draft || {}).resetAt ||
+      patch?.fields?.resetAt ||
+      ""
     );
+    const incomingAcknowledgesReset = type === "clinical-audit" &&
+      Boolean(existingDraft.resetAt) &&
+      incomingResetAt === String(existingDraft.resetAt);
 
     // A reset is an explicit server-side boundary. Ignore complete snapshots
     // from a browser that were saved before the reset, otherwise a stale
