@@ -2341,6 +2341,32 @@ async function deleteDraft({ type, hospitalCode, specialty, _hospitalEmail }: an
   await client.execute({ sql: `DELETE FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
 }
 
+function preserveClinicalAuditResetBoundaries(existingDraft: any, incomingDraft: any) {
+  const existingProgress = existingDraft?.progress;
+  if (!existingProgress || typeof existingProgress !== "object") return incomingDraft;
+
+  let protectedDraft = incomingDraft;
+  for (const [specialty, existingSpecialty] of Object.entries(existingProgress as Record<string, any>)) {
+    const existingStage = (existingSpecialty as any)?.clinicalAudit;
+    const resetAt = String(existingStage?.resetAt || "");
+    if (!resetAt) continue;
+
+    const incomingStage = protectedDraft?.progress?.[specialty]?.clinicalAudit;
+    if (String(incomingStage?.resetAt || "") === resetAt) continue;
+
+    // Parent assessment snapshots are also cached in localStorage. Keep the
+    // server reset stage until a client has hydrated that exact reset marker;
+    // otherwise an old full snapshot can restore all deleted audit answers.
+    if (protectedDraft === incomingDraft) {
+      protectedDraft = parseJson(JSON.stringify(incomingDraft || {}), {});
+    }
+    protectedDraft.progress = protectedDraft.progress || {};
+    protectedDraft.progress[specialty] = protectedDraft.progress[specialty] || {};
+    protectedDraft.progress[specialty].clinicalAudit = existingStage;
+  }
+  return protectedDraft;
+}
+
 async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode, _authRole }: any) {
   await initTursoTables();
   const client = db();
@@ -2374,7 +2400,6 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode, _authRo
     hospitalName: authenticatedHospital?.hospitalName || draft.hospitalName,
   };
   const hospitalKey = effectiveCode || normalizedDraft.hospitalCode || normalizedDraft.hospitalEmail || normalizedDraft.hospitalName;
-  const dataJson = JSON.stringify(normalizedDraft);
   await withDraftWriteQueue(async () => {
     const existing = await client.execute({ sql: `SELECT ${idCol}, ${typeCol} as type, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
     let shouldNormalizeOwnership = false;
@@ -2383,6 +2408,9 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode, _authRo
       if (row.type === "hospital-assessment-deleted" && _authRole !== "admin") {
         throw createHttpError("Draft ini telah dihapus dan tidak dapat dipulihkan dari cache lama.", 409);
       }
+      const existingDraft = parseJson(row.data, {});
+      const protectedDraft = preserveClinicalAuditResetBoundaries(existingDraft, normalizedDraft);
+      const dataJson = JSON.stringify(protectedDraft);
       const hospitalChanged = String(row.hospitalCode || "") !== hospitalKey;
       if (!hospitalChanged && String(row.data || "") === dataJson) return;
       await client.execute({
@@ -2391,6 +2419,7 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode, _authRo
       });
       shouldNormalizeOwnership = hospitalChanged;
     } else {
+      const dataJson = JSON.stringify(normalizedDraft);
       await client.execute({
         sql: `INSERT INTO drafts (${idCol}, ${typeCol}, ${hCol}, ${sCol}, ${dataCol}) VALUES (?, ?, ?, ?, ?)`,
         args: [draftId, "hospital-assessment", hospitalKey, "Multiple", dataJson],
