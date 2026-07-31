@@ -369,6 +369,41 @@ async function getDraftSchema(client: any) {
   return { idCol, typeCol, dataCol, hCol, sCol, updatedCol, versionCol, operationCol };
 }
 
+async function getLockedHospitalSpecialtyScope(
+  client: any,
+  hospitalCode: string,
+  idCol: string,
+  dataCol: string
+) {
+  if (!hospitalCode) return null;
+  const scope = await client.execute({
+    sql: `SELECT ${dataCol} as data FROM drafts WHERE ${idCol} = ? LIMIT 1`,
+    args: [`specialty-scope-${hospitalCode}`],
+  });
+  const parsed = scope.rows[0] ? parseJson((scope.rows[0] as any).data, null) : null;
+  const allowed = Array.isArray(parsed?.allowed)
+    ? parsed.allowed.filter((value: any) => ["cardiology", "oncology", "neurology"].includes(String(value)))
+    : [];
+  return parsed?.lockedAt && allowed.length > 0
+    ? { allowed, lockedAt: String(parsed.lockedAt) }
+    : null;
+}
+
+function applyLockedSpecialtyScope(draft: any, allowed: string[]) {
+  const progress = draft?.progress && typeof draft.progress === "object"
+    ? Object.fromEntries(
+        allowed
+          .filter((specialty) => draft.progress[specialty])
+          .map((specialty) => [specialty, draft.progress[specialty]])
+      )
+    : {};
+  return {
+    ...(draft || {}),
+    selectedSpecialties: [...allowed],
+    progress,
+  };
+}
+
 async function normalizeDraftOwnership(client: any, draftId?: string) {
   const { idCol, typeCol, dataCol, hCol } = await getDraftSchema(client);
   const oneDraftClause = draftId ? ` AND ${idCol} = ?` : "";
@@ -2176,6 +2211,10 @@ async function saveDraft({ type, hospitalCode, specialty, draft, patch, baseVers
   const client = db();
   const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail });
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol, versionCol, operationCol } = await getDraftSchema(client);
+  const specialtyScope = await getLockedHospitalSpecialtyScope(client, effectiveCode, idCol, dataCol);
+  if (specialtyScope && !specialtyScope.allowed.includes(String(specialty))) {
+    throw createHttpError("Pelayanan ini tidak dipilih oleh rumah sakit.", 409);
+  }
   const draftId = `${type}-${effectiveCode}-${specialty}`;
 
   return await withDraftWriteQueue(async () => {
@@ -2396,7 +2435,7 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode, _authRo
     _hospitalCode,
     _hospitalEmail: authoritativeEmail,
   });
-  const normalizedDraft = {
+  let normalizedDraft = {
     ...draft,
     hospitalCode: effectiveCode || draft.hospitalCode,
     // Authenticated hospital sessions are authoritative. Stale localStorage can
@@ -2404,6 +2443,10 @@ async function saveHospitalDraft({ draft, _hospitalEmail, _hospitalCode, _authRo
     hospitalEmail: authoritativeEmail || draft.hospitalEmail,
     hospitalName: authenticatedHospital?.hospitalName || draft.hospitalName,
   };
+  const specialtyScope = await getLockedHospitalSpecialtyScope(client, effectiveCode, idCol, dataCol);
+  if (specialtyScope) {
+    normalizedDraft = applyLockedSpecialtyScope(normalizedDraft, specialtyScope.allowed);
+  }
   const hospitalKey = effectiveCode || normalizedDraft.hospitalCode || normalizedDraft.hospitalEmail || normalizedDraft.hospitalName;
   await withDraftWriteQueue(async () => {
     const existing = await client.execute({ sql: `SELECT ${idCol}, ${typeCol} as type, ${hCol} as hospitalCode, ${dataCol} as data FROM drafts WHERE ${idCol} = ?`, args: [draftId] });
@@ -2468,6 +2511,7 @@ async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail, _hospital
   const effectiveCode = await resolveEffectiveHospitalCode(client, { hospitalCode, _hospitalEmail, _hospitalCode });
   if (!effectiveCode) return [];
   const { idCol, typeCol, hCol, sCol, dataCol, updatedCol } = await getDraftSchema(client);
+  const specialtyScope = await getLockedHospitalSpecialtyScope(client, effectiveCode, idCol, dataCol);
   const rs = await client.execute({
     sql: `SELECT ${idCol} as id, ${typeCol} as type, ${hCol} as hospitalCode, ${sCol} as specialty, ${dataCol} as data, ${updatedCol} as updatedAt
           FROM drafts
@@ -2485,6 +2529,7 @@ async function getHospitalModuleDrafts({ hospitalCode, _hospitalEmail, _hospital
     updatedAt: r.updatedAt,
   })).filter((draft: any) => {
     if (!draft.data) return false;
+    if (specialtyScope && !specialtyScope.allowed.includes(String(draft.specialty))) return false;
     // Legacy ownership corruption can leave another hospital's draft row with
     // this hospital_code. The canonical ID is the authoritative ownership key;
     // never hydrate a module whose ID does not match the authenticated RS.
