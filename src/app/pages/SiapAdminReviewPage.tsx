@@ -298,7 +298,7 @@ export function SiapAdminReviewPage() {
     const specData = specialtyAuditData[specKey] || specialtyAuditData.cardiology;
     specData.diseases.forEach((disease, diseaseIndex) => {
       const doc = docs.find(item => item.diseaseName === disease.diseaseName);
-      const qrPatients = prmPatients.filter((patient: any) =>
+      const qrPatients = patients.filter((patient: any) =>
         (patient.diseaseName === disease.diseaseName || patient.diseaseIndex === diseaseIndex) &&
         patient.hasResponse
       );
