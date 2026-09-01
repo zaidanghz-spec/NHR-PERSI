@@ -251,7 +251,9 @@ export function SiapAdminReviewPage() {
 
   const effectiveScores = {
     ...(adminScores || submissionData.scores),
-    patientReport: !hasSavedScoreOverride && !editingScores && livePrmScore !== null
+    // A PDF-only submission has no QR rows. In that case a live fetch resolves
+    // to zero and must not overwrite the persisted manual PDF review score.
+    patientReport: !hasSavedScoreOverride && !editingScores && livePrmScore !== null && livePrmScore > 0
       ? livePrmScore
       : (adminScores || submissionData.scores).patientReport,
   };
@@ -598,19 +600,38 @@ export function SiapAdminReviewPage() {
 
       const patientReport = calculateManualPrmTotal(updatedDocs, customSurveyScores, prmPatientsForReview);
       const nextScores = { ...adminScores, patientReport };
+      const persistedScores = { ...nextScores, final: calcFinal(nextScores) };
+      const patientReportNote = "PRM digabung dari pasien QR/non-PDF dan dokumen PDF: PREM 60% + PROM 40%, proporsional jumlah pasien, lalu dikalikan validitas sampel per penyakit.";
+
+      // Persist the score with the submission as well as the document metadata.
+      // Local storage is only a UI cache; it must never be the source of truth.
+      await api.updateSubmissionReview(
+        submissionData.id,
+        submissionData.status,
+        {
+          ...(actualSubmission?.details || {}),
+          reviewerNotes: actualSubmission?.details?.reviewerNotes,
+          prmManualReview: {
+            reviewedAt,
+            patientReport,
+            calculation: patientReportNote,
+          },
+        },
+        persistedScores,
+      );
       setAdminScores(nextScores);
       setHasSavedScoreOverride(true);
       localStorage.setItem(`admin-score-override-${id}`, JSON.stringify({
         scores: nextScores,
         notes: {
           ...adminScoreNotes,
-          patientReport: "PRM digabung dari pasien QR/non-PDF dan dokumen PDF: PREM 60% + PROM 40%, proporsional jumlah pasien, lalu dikalikan validitas sampel per penyakit.",
+          patientReport: patientReportNote,
         },
         savedAt: reviewedAt,
       }));
       setAdminScoreNotes(prev => ({
         ...prev,
-        patientReport: "PRM digabung dari pasien QR/non-PDF dan dokumen PDF: PREM 60% + PROM 40%, proporsional jumlah pasien, lalu dikalikan validitas sampel per penyakit.",
+        patientReport: patientReportNote,
       }));
       setCustomSurveyDocs(prev => prev.map(doc => {
         const updated = updatedDocs.find(d => getCustomSurveyDocKey(d) === getCustomSurveyDocKey(doc));

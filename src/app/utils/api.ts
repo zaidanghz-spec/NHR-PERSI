@@ -331,8 +331,8 @@ export async function deleteDraft(
   catch (err) { console.error("Delete Draft Error:", err); }
 }
 
-export async function updateSubmissionReview(id: string, status: string, details: any): Promise<void> {
-  await rpc("updateSubmissionReview", { id, status, details });
+export async function updateSubmissionReview(id: string, status: string, details: any, scores?: any): Promise<void> {
+  await rpc("updateSubmissionReview", { id, status, details, scores });
 }
 
 export async function publishRankingToDb(ranking: any): Promise<void> {

@@ -1203,11 +1203,18 @@ async function updateSubmissionStatus({ id, status, updatedAt }: any) {
   }
 }
 
-async function updateSubmissionReview({ id, status, details }: any) {
+async function updateSubmissionReview({ id, status, details, scores }: any) {
   await initTursoTables();
+  const updates = ["status = ?", "details = ?", "updated_at = CURRENT_TIMESTAMP"];
+  const args: any[] = [status, JSON.stringify(details)];
+  if (scores !== undefined) {
+    updates.splice(2, 0, "scores = ?");
+    args.push(JSON.stringify(scores));
+  }
+  args.push(id);
   await db().execute({
-    sql: "UPDATE submissions SET status = ?, details = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-    args: [status, JSON.stringify(details), id],
+    sql: `UPDATE submissions SET ${updates.join(", ")} WHERE id = ?`,
+    args,
   });
 }
 
