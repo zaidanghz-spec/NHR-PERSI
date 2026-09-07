@@ -60,6 +60,7 @@ function verifyJwt(req: any): boolean {
     req.hospitalEmail = decoded?.email || null;
     req.hospitalCode = decoded?.hospitalCode || null;
     req.authRole = decoded?.role || null;
+    req.authUsername = decoded?.username || null;
     return true;
   } catch {
     return false;
@@ -99,11 +100,12 @@ export default async function handler(req: any, res: any) {
       if (req.hospitalEmail) body._hospitalEmail = req.hospitalEmail;
       if (req.hospitalCode) body._hospitalCode = req.hospitalCode;
       if (req.authRole) body._authRole = req.authRole;
+      if (req.authUsername) body._authUsername = req.authUsername;
       const result = await handleTursoOperation(operation, body);
       sendJson(res, 200, { result: result ?? null });
     } catch (err: any) {
       console.error("RPC error:", err);
-      const statusCode = err?.statusCode === 409 ? 409 : 500;
+      const statusCode = Number.isInteger(err?.statusCode) ? err.statusCode : 500;
       sendJson(res, statusCode, { error: err?.message || "RPC operation failed" });
     }
     return;

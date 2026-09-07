@@ -19,6 +19,8 @@ import { PerformanceSubmissionPage } from "./pages/PerformanceSubmissionPage";
 import { NewsPage, NewsDetailPage } from "./pages/NewsPage";
 import { EventsPage } from "./pages/EventsPage";
 import { HospitalReviewResultPage } from "./pages/HospitalReviewResultPage";
+import { ValidatorDashboardPage } from "./pages/ValidatorDashboardPage";
+import { ValidatorHospitalPage } from "./pages/ValidatorHospitalPage";
 import { Root } from "./components/Root";
 import { DataProvider } from "./context/DataContext";
 
@@ -64,6 +66,8 @@ export const router = createBrowserRouter([
           // Admin
           { path: "admin/login", Component: AdminLoginPage },
           { path: "admin/dashboard", Component: AdminDashboardPage },
+          { path: "validator/dashboard", Component: ValidatorDashboardPage },
+          { path: "validator/hospital/:hospitalCode", Component: ValidatorHospitalPage },
 
           // NHR PERSI Routes
           { path: "siap-persi/select-specialty", Component: SelectSpecialtyPage },

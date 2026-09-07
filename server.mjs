@@ -62,6 +62,9 @@ const CACHE_INVALIDATING_WRITES = new Set([
   "addEventToDb",
   "updateEventInDb",
   "deleteEventFromDb",
+  "saveValidatorValidation",
+  "submitValidatorValidation",
+  "reopenValidatorValidation",
 ]);
 const operationCache = new Map();
 const operationInflight = new Map();
@@ -217,6 +220,7 @@ function verifyJwt(req) {
       const decoded = jwt.verify(token, secret);
       req.hospitalEmail = decoded?.email || null;
       req.authRole = decoded?.role || null;
+      req.authUsername = decoded?.username || null;
       return true;
     } catch {
       // Try the next configured/legacy secret. This keeps users from being
@@ -286,6 +290,7 @@ const server = http.createServer(async (req, res) => {
       const body = await parseRequestBody(req);
       if (req.hospitalEmail) body._hospitalEmail = req.hospitalEmail;
       if (req.authRole) body._authRole = req.authRole;
+      if (req.authUsername) body._authUsername = req.authUsername;
       const result = await runOperation(operation, body, req);
       let serializedBody;
       if (CACHEABLE_READS.has(operation)) {

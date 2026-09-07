@@ -14,6 +14,62 @@ let databaseExecuteQueue: Promise<void> = Promise.resolve();
 const surveyBackupRestoreCheckedAt = new Map<string, number>();
 const surveySpecialtyReconciledAt = new Map<string, number>();
 
+// Assignments are seeded once and then live in the database. Keeping the
+// authorization boundary on the server prevents a validator from seeing a
+// different hospital just by changing a URL in the browser.
+const VALIDATOR_ASSIGNMENTS: Record<string, string[]> = {
+  validator1: ["JOICEGAISC4", "RSUDBLAMBANG", "KONTAKRSUDRS", "RSUDMATARAM", "RSUDORPR"],
+  validator2: ["SEKRETARIAT2", "INFO1", "ADMINDIREKS1", "LEGALSEKXJZM", "TIMKERJAPSL"],
+  validator3: ["KMRSRSDK", "DANIELUTOMO", "SEKR", "INFO2", "INFO2N81"],
+  validator4: ["RATIHSIBUNGZ", "RSUDTARAKAN", "TATAUSAHARSH", "ADMIN2", "TUDIREKSI"],
+  validator5: ["PUBLIC", "RSAPPARIAMAN", "PSLRSJPDHK", "LEGALRSB", "RSUDWONOSARI"],
+};
+
+const VALIDATOR_USERNAMES = Object.keys(VALIDATOR_ASSIGNMENTS);
+
+function normalizeValidatorUsername(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getValidatorSeedPassword(username: string) {
+  const number = username.replace(/\D/g, "");
+  return String(
+    process.env[`VALIDATOR_${number}_PASSWORD`] ||
+    process.env.VALIDATOR_DEFAULT_PASSWORD ||
+    ""
+  ).trim();
+}
+
+async function seedValidatorAccounts(client: any) {
+  // Passwords deliberately come from the deployment environment, never from
+  // source control. Once created the BCrypt hash remains valid if the seed
+  // variable is removed later.
+  for (const username of VALIDATOR_USERNAMES) {
+    const password = getValidatorSeedPassword(username);
+    if (!password) continue;
+    const existing = await client.execute({
+      sql: "SELECT id FROM admins WHERE LOWER(username) = LOWER(?) LIMIT 1",
+      args: [username],
+    });
+    if (existing.rows.length > 0) continue;
+    await client.execute({
+      sql: "INSERT INTO admins (id, username, password_hash, role) VALUES (?, ?, ?, 'validator')",
+      args: [`validator-${username}`, username, await bcrypt.hash(password, 10)],
+    });
+  }
+}
+
+async function seedValidatorAssignments(client: any) {
+  for (const [username, hospitalCodes] of Object.entries(VALIDATOR_ASSIGNMENTS)) {
+    for (const hospitalCode of hospitalCodes) {
+      await client.execute({
+        sql: "INSERT OR IGNORE INTO validator_assignments (id, validator_username, hospital_code) VALUES (?, ?, ?)",
+        args: [`validator-assignment-${username}-${hospitalCode}`, username, hospitalCode],
+      });
+    }
+  }
+}
+
 function isDatabaseWrite(statement: any) {
   const sql = typeof statement === "string" ? statement : String(statement?.sql || "");
   return /^(?:ALTER|BEGIN|COMMIT|CREATE|DELETE|DROP|INSERT|REINDEX|REPLACE|ROLLBACK|UPDATE|VACUUM|WITH)\b/i.test(sql.trim());
@@ -563,6 +619,38 @@ async function initTursoTablesOnce() {
   `);
 
   await client.execute(`
+    CREATE TABLE IF NOT EXISTS validator_assignments (
+      id TEXT PRIMARY KEY,
+      validator_username TEXT NOT NULL,
+      hospital_code TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(validator_username, hospital_code)
+    )
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS validator_validation_sessions (
+      id TEXT PRIMARY KEY,
+      validator_username TEXT NOT NULL,
+      hospital_code TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'in_progress',
+      data TEXT NOT NULL DEFAULT '{}',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      submitted_at DATETIME DEFAULT NULL,
+      UNIQUE(validator_username, hospital_code)
+    )
+  `);
+
+  // Older deployments created the admin table before roles existed.
+  // Migrate it before seeding validators so existing admin access stays intact.
+  const adminInfo = await client.execute("PRAGMA table_info(admins)");
+  const adminColumns = adminInfo.rows.map((row: any) => String(row.name));
+  if (!adminColumns.includes("role")) {
+    await client.execute("ALTER TABLE admins ADD COLUMN role TEXT DEFAULT 'admin'");
+  }
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS surveys (
       id TEXT PRIMARY KEY,
       hospital_code TEXT NOT NULL,
@@ -825,6 +913,8 @@ async function initTursoTablesOnce() {
   }
 
   await ensureHospitalAccountCodes(client);
+  await seedValidatorAssignments(client);
+  await seedValidatorAccounts(client);
 
   // Migration: add UNIQUE(hospital_name, specialty) constraint to submissions
   try {
@@ -980,7 +1070,7 @@ async function loginAdmin({ username, password }: any) {
   // database reads so the admin can recover/monitor the system under load.
   if (isConfiguredAdminLogin(normalizedUsername, normalizedPassword)) {
     const token = signToken({ username: getConfiguredAdminUsername() || normalizedUsername, role: "admin" });
-    return { success: true, token };
+    return { success: true, token, username: getConfiguredAdminUsername() || normalizedUsername, role: "admin" };
   }
 
   await initTursoTables();
@@ -997,7 +1087,7 @@ async function loginAdmin({ username, password }: any) {
   if (!match) return { success: false, error: "invalid_credentials" };
 
   const token = signToken({ username: row.username, role: row.role || "admin" });
-  return { success: true, token };
+  return { success: true, token, username: row.username, role: row.role || "admin" };
 }
 
 async function getAllHospitalAccounts() {
@@ -2586,6 +2676,228 @@ async function bulkAddSurveys({ hospitalCode, specialty, surveys }: any) {
   }
 }
 
+function cleanValidatorNote(value: unknown) {
+  return String(value || "").trim().slice(0, 2000);
+}
+
+function toValidatorNumber(value: unknown): number | null {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function normalizeValidatorValidation(data: any) {
+  const structure = (Array.isArray(data?.structure) ? data.structure : []).slice(0, 60).map((item: any) => {
+    const reportedValue = toValidatorNumber(item?.reportedValue) ?? 0;
+    const validatorValue = toValidatorNumber(item?.validatorValue);
+    return {
+      key: String(item?.key || "").slice(0, 180),
+      specialty: String(item?.specialty || "").slice(0, 60),
+      label: String(item?.label || "").slice(0, 500),
+      unit: String(item?.unit || "").slice(0, 60),
+      reportedValue,
+      validatorValue,
+      status: validatorValue === null ? "Belum dinilai" : validatorValue >= reportedValue ? "Sesuai" : "Tidak Sesuai",
+      notes: cleanValidatorNote(item?.notes),
+    };
+  }).filter((item: any) => item.key && item.label);
+
+  const clinical = (Array.isArray(data?.clinical) ? data.clinical : []).slice(0, 1200).map((item: any) => {
+    const hospitalAnswer = String(item?.hospitalAnswer || "");
+    const validatorAnswer = String(item?.validatorAnswer || "");
+    const exceptionEvidence = item?.exceptionEvidence === "ada" ? "ada" : item?.exceptionEvidence === "tidak-ada" ? "tidak-ada" : "";
+    const sameAnswer = Boolean(hospitalAnswer && validatorAnswer && hospitalAnswer === validatorAnswer);
+    const exceptionVerified = hospitalAnswer !== "tidak-sesuai-pengecualian" || exceptionEvidence === "ada";
+    return {
+      key: String(item?.key || "").slice(0, 180),
+      specialty: String(item?.specialty || "").slice(0, 60),
+      diseaseName: String(item?.diseaseName || "").slice(0, 250),
+      patientInitials: String(item?.patientInitials || "").slice(0, 50),
+      patientCode: String(item?.patientCode || "").slice(0, 100),
+      question: String(item?.question || "").slice(0, 1000),
+      hospitalAnswer,
+      validatorAnswer,
+      exceptionEvidence,
+      status: !validatorAnswer ? "Belum dinilai" : sameAnswer && exceptionVerified ? "Sesuai" : "Tidak Sesuai",
+      notes: cleanValidatorNote(item?.notes),
+    };
+  }).filter((item: any) => item.key && item.question);
+
+  const premProm = {
+    evidenceSent: data?.premProm?.evidenceSent === "ada" ? "ada" : data?.premProm?.evidenceSent === "tidak-ada" ? "tidak-ada" : "",
+    notes: cleanValidatorNote(data?.premProm?.notes),
+  };
+  const structureDone = structure.filter((item: any) => item.validatorValue !== null).length;
+  const clinicalDone = clinical.filter((item: any) => item.validatorAnswer).length;
+  const structureScore = structureDone ? Number((structure.filter((item: any) => item.status === "Sesuai").length / structureDone * 100).toFixed(1)) : null;
+  const clinicalScore = clinicalDone ? Number((clinical.filter((item: any) => item.status === "Sesuai").length / clinicalDone * 100).toFixed(1)) : null;
+  const scores = [structureScore, clinicalScore].filter((score): score is number => score !== null);
+  return {
+    structure,
+    clinical,
+    premProm,
+    summary: {
+      structure: { done: structureDone, total: structure.length, score: structureScore },
+      clinical: { done: clinicalDone, total: clinical.length, score: clinicalScore },
+      premProm: { status: premProm.evidenceSent === "ada" ? "Ada bukti" : premProm.evidenceSent === "tidak-ada" ? "Tidak ada bukti" : "Belum dinilai" },
+      validationScore: scores.length ? Number((scores.reduce((total, score) => total + score, 0) / scores.length).toFixed(1)) : null,
+    },
+  };
+}
+
+async function assertValidatorAssignment(payload: any, requestedHospitalCode?: string) {
+  await initTursoTables();
+  if (payload?._authRole !== "validator") throw createHttpError("Akses validator diperlukan.", 403);
+  const username = normalizeValidatorUsername(payload?._authUsername);
+  if (!username) throw createHttpError("Sesi validator tidak valid. Silakan login kembali.", 401);
+  const client = db();
+  const requested = String(requestedHospitalCode || payload?.hospitalCode || "").trim();
+  if (!requested) throw createHttpError("Kode rumah sakit tidak ditemukan.", 400);
+  const assignment = await client.execute({
+    sql: "SELECT hospital_code FROM validator_assignments WHERE LOWER(validator_username) = LOWER(?) AND hospital_code = ? LIMIT 1",
+    args: [username, requested],
+  });
+  if (!assignment.rows.length) throw createHttpError("Rumah sakit ini tidak ditugaskan kepada validator Anda.", 403);
+  return { client, username, hospitalCode: requested };
+}
+
+async function getValidatorSession(client: any, hospitalCode: string, username?: string) {
+  const sql = username
+    ? "SELECT validator_username, hospital_code, status, data, created_at, updated_at, submitted_at FROM validator_validation_sessions WHERE hospital_code = ? AND LOWER(validator_username) = LOWER(?) LIMIT 1"
+    : "SELECT validator_username, hospital_code, status, data, created_at, updated_at, submitted_at FROM validator_validation_sessions WHERE hospital_code = ? ORDER BY submitted_at DESC, updated_at DESC LIMIT 1";
+  const args = username ? [hospitalCode, username] : [hospitalCode];
+  const rs = await client.execute({ sql, args });
+  const row = rs.rows[0] as any;
+  if (!row) return null;
+  return {
+    validatorUsername: row.validator_username,
+    hospitalCode: row.hospital_code,
+    status: row.status,
+    data: normalizeValidatorValidation(parseJson(row.data, {})),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    submittedAt: row.submitted_at,
+  };
+}
+
+async function getValidatorDashboard(payload: any) {
+  await initTursoTables();
+  if (payload?._authRole !== "validator") throw createHttpError("Akses validator diperlukan.", 403);
+  const username = normalizeValidatorUsername(payload?._authUsername);
+  if (!username) throw createHttpError("Sesi validator tidak valid. Silakan login kembali.", 401);
+  const client = db();
+  // Dashboard has no single hospital code, so fetch only rows attached to this
+  // validator's assignments rather than trusting a client-provided filter.
+  const assignments = await client.execute({
+    sql: "SELECT hospital_code FROM validator_assignments WHERE LOWER(validator_username) = LOWER(?) ORDER BY hospital_code",
+    args: [username],
+  });
+  const hospitalCodes = assignments.rows.map((row: any) => String(row.hospital_code)).filter(Boolean);
+  if (!hospitalCodes.length) return { validatorUsername: username, hospitals: [] };
+  const placeholders = hospitalCodes.map(() => "?").join(", ");
+  const accounts = await client.execute({
+    sql: `SELECT hospital_code, hospital_name, pic_name, province, city FROM hospital_accounts WHERE hospital_code IN (${placeholders}) ORDER BY hospital_name`,
+    args: hospitalCodes,
+  });
+  const sessions = await client.execute({
+    sql: `SELECT validator_username, hospital_code, status, data, updated_at, submitted_at FROM validator_validation_sessions WHERE LOWER(validator_username) = LOWER(?) AND hospital_code IN (${placeholders})`,
+    args: [username, ...hospitalCodes],
+  });
+  const byCode = new Map(sessions.rows.map((row: any) => [String(row.hospital_code), row]));
+  return {
+    validatorUsername: username,
+    hospitals: accounts.rows.map((row: any) => {
+      const session: any = byCode.get(String(row.hospital_code));
+      return {
+        hospitalCode: row.hospital_code,
+        hospitalName: row.hospital_name,
+        picName: row.pic_name || "",
+        province: row.province || "",
+        city: row.city || "",
+        validation: session ? {
+          status: session.status,
+          data: normalizeValidatorValidation(parseJson(session.data, {})),
+          updatedAt: session.updated_at,
+          submittedAt: session.submitted_at,
+        } : null,
+      };
+    }),
+  };
+}
+
+async function getValidatorHospital(payload: any) {
+  const { client, username, hospitalCode } = await assertValidatorAssignment(payload);
+  const account = await client.execute({
+    sql: "SELECT hospital_code, hospital_name, pic_name, province, city FROM hospital_accounts WHERE hospital_code = ? LIMIT 1",
+    args: [hospitalCode],
+  });
+  const row = account.rows[0] as any;
+  if (!row) throw createHttpError("Akun rumah sakit tidak ditemukan.", 404);
+  const [modules, session] = await Promise.all([
+    getHospitalModuleDrafts({ hospitalCode }),
+    getValidatorSession(client, hospitalCode, username),
+  ]);
+  return {
+    hospital: { hospitalCode: row.hospital_code, hospitalName: row.hospital_name, picName: row.pic_name || "", province: row.province || "", city: row.city || "" },
+    modules,
+    validation: session,
+  };
+}
+
+async function saveValidatorValidation(payload: any) {
+  const { client, username, hospitalCode } = await assertValidatorAssignment(payload);
+  const existing = await getValidatorSession(client, hospitalCode, username);
+  if (existing?.status === "completed") throw createHttpError("Validasi sudah dikirim dan terkunci. Minta admin untuk membuka kembali.", 409);
+  const data = normalizeValidatorValidation(payload?.data || {});
+  await client.execute({
+    sql: `INSERT INTO validator_validation_sessions (id, validator_username, hospital_code, status, data, created_at, updated_at)
+          VALUES (?, ?, ?, 'in_progress', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT(validator_username, hospital_code) DO UPDATE SET data = excluded.data, status = 'in_progress', updated_at = CURRENT_TIMESTAMP`,
+    args: [`validator-validation-${username}-${hospitalCode}`, username, hospitalCode, JSON.stringify(data)],
+  });
+  return await getValidatorSession(client, hospitalCode, username);
+}
+
+async function submitValidatorValidation(payload: any) {
+  const { client, username, hospitalCode } = await assertValidatorAssignment(payload);
+  const existing = await getValidatorSession(client, hospitalCode, username);
+  if (existing?.status === "completed") return existing;
+  const data = normalizeValidatorValidation(payload?.data || existing?.data || {});
+  const summary = data.summary;
+  if (!summary.structure.total || summary.structure.done < summary.structure.total) throw createHttpError("Lengkapi seluruh 10 item Hospital Structure sebelum mengirim.", 422);
+  if (!summary.clinical.total || summary.clinical.done < summary.clinical.total) throw createHttpError("Lengkapi seluruh sampel Clinical Audit sebelum mengirim.", 422);
+  if (!data.premProm.evidenceSent) throw createHttpError("Pilih status bukti pengiriman PREM/PROM sebelum mengirim.", 422);
+  await client.execute({
+    sql: `INSERT INTO validator_validation_sessions (id, validator_username, hospital_code, status, data, created_at, updated_at, submitted_at)
+          VALUES (?, ?, ?, 'completed', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT(validator_username, hospital_code) DO UPDATE SET data = excluded.data, status = 'completed', updated_at = CURRENT_TIMESTAMP, submitted_at = CURRENT_TIMESTAMP`,
+    args: [`validator-validation-${username}-${hospitalCode}`, username, hospitalCode, JSON.stringify(data)],
+  });
+  return await getValidatorSession(client, hospitalCode, username);
+}
+
+async function getValidatorValidation(payload: any) {
+  await initTursoTables();
+  const client = db();
+  const hospitalCode = String(payload?.hospitalCode || "").trim();
+  if (!hospitalCode) throw createHttpError("Kode rumah sakit tidak ditemukan.", 400);
+  if (payload?._authRole === "admin") return await getValidatorSession(client, hospitalCode);
+  const { username } = await assertValidatorAssignment(payload, hospitalCode);
+  return await getValidatorSession(client, hospitalCode, username);
+}
+
+async function reopenValidatorValidation(payload: any) {
+  await initTursoTables();
+  if (payload?._authRole !== "admin") throw createHttpError("Hanya admin yang dapat membuka ulang validasi.", 403);
+  const hospitalCode = String(payload?.hospitalCode || "").trim();
+  if (!hospitalCode) throw createHttpError("Kode rumah sakit tidak ditemukan.", 400);
+  await db().execute({
+    sql: "UPDATE validator_validation_sessions SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP, submitted_at = NULL WHERE hospital_code = ?",
+    args: [hospitalCode],
+  });
+  return await getValidatorSession(db(), hospitalCode);
+}
+
 const operations: Record<string, (payload: any) => Promise<any>> = {
   initTursoTables,
   addHospitalAccount,
@@ -2636,6 +2948,12 @@ const operations: Record<string, (payload: any) => Promise<any>> = {
   getHospitalModuleDrafts,
   deleteHospitalDraft,
   bulkAddSurveys,
+  getValidatorDashboard,
+  getValidatorHospital,
+  saveValidatorValidation,
+  submitValidatorValidation,
+  getValidatorValidation,
+  reopenValidatorValidation,
 };
 
 export async function handleTursoOperation(operation: string, payload: any) {

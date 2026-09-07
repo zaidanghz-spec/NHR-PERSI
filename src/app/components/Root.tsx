@@ -27,7 +27,7 @@ export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
   const outlet = useOutlet();
-  const { isAdmin, adminLogout, currentHospital, hospitalLogout } = useData();
+  const { isAdmin, isValidator, adminUsername, adminLogout, currentHospital, hospitalLogout } = useData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_SIDEBAR_WIDTH;
@@ -36,6 +36,7 @@ export function Root() {
   });
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/siap-persi/admin");
+  const isValidatorRoute = location.pathname.startsWith("/validator");
   const isAdminLoginRoute = location.pathname === "/admin/login";
   const isHospitalPortalRoute =
     location.pathname === "/submit" ||
@@ -125,6 +126,39 @@ export function Root() {
     currentHospital?.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) ||
     hospitalAuth.email?.split("@")[0]?.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 12) ||
     "Portal RS";
+
+  if (isValidatorRoute) {
+    if (!isValidator) {
+      navigate("/admin/login");
+      return null;
+    }
+    const validatorLinks = [
+      { label: "Penugasan Saya", to: "/validator/dashboard", icon: ClipboardCheck },
+      { label: "Website Publik", to: "/", icon: ExternalLink },
+    ];
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900">
+        <aside className="fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col" style={workspaceSidebarStyle}>
+          <div className="px-6 py-6 border-b border-white/10">
+            <Link to="/validator/dashboard" className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-white/10 rounded-xl flex items-center justify-center"><Shield className="w-6 h-6 text-teal-300" /></div>
+              <div><div className="font-black leading-tight">NHR PERSI</div><div className="text-xs text-slate-400">Validator Workspace</div></div>
+            </Link>
+          </div>
+          <div className="px-6 py-5 border-b border-white/10"><div className="text-xs font-black uppercase tracking-widest text-teal-300 mb-2">Akun Validator</div><div className="font-bold leading-tight">{adminUsername || "Validator"}</div></div>
+          <nav className="flex-1 px-4 py-5 space-y-1">
+            {validatorLinks.map(link => { const Icon = link.icon; const active = link.to === "/" ? location.pathname === "/" : location.pathname.startsWith(link.to); return <Link key={link.to} to={link.to} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${active ? "bg-white text-slate-950" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}><Icon className="w-4 h-4" />{link.label}</Link>; })}
+          </nav>
+          <div className="p-4 border-t border-white/10"><button onClick={adminShellLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-200 hover:bg-red-500/10 hover:text-red-100 transition-colors"><LogOut className="w-4 h-4" />Logout Validator</button></div>
+          {sidebarResizeHandle}
+        </aside>
+        <div className="min-h-screen flex flex-col lg:pl-[var(--sidebar-width)]" style={workspaceContentStyle}>
+          <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur"><div className="h-16 px-6 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-widest text-teal-600">Validator Workspace</p><p className="font-black text-slate-900">NHR PERSI Validation</p></div><div className="flex items-center gap-3"><Link to="/" className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50"><ExternalLink className="w-4 h-4" />Lihat Public Site</Link><button onClick={adminShellLogout} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-950 text-white text-sm font-bold hover:bg-slate-800"><LogOut className="w-4 h-4" />Logout</button></div></div></header>
+          <AnimatePresence mode="wait"><motion.main key={location.pathname} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 260, damping: 22 }} className="flex-1">{outlet}</motion.main></AnimatePresence>
+        </div>
+      </div>
+    );
+  }
 
   if (isAdminRoute) {
     if (isAdminLoginRoute) {

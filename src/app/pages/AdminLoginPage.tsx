@@ -8,14 +8,14 @@ import { useData } from "../context/DataContext";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
-  const { adminLogin, isAdmin } = useData();
+  const { adminLogin, adminRole } = useData();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (isAdmin) {
-    navigate("/admin/dashboard");
+  if (adminRole) {
+    navigate(adminRole === "validator" ? "/validator/dashboard" : "/admin/dashboard");
     return null;
   }
 
@@ -25,9 +25,9 @@ export function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const success = await adminLogin(username, password);
-      if (success) {
-        navigate("/admin/dashboard");
+      const role = await adminLogin(username, password);
+      if (role) {
+        navigate(role === "validator" ? "/validator/dashboard" : "/admin/dashboard");
       } else {
         setError("Username atau password salah.");
       }
@@ -51,7 +51,7 @@ export function AdminLoginPage() {
               Admin Login
             </h1>
             <p className="text-gray-500 text-sm">
-              Akses khusus administrator PERSI
+              Akses administrator dan validator PERSI
             </p>
           </div>
 

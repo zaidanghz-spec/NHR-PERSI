@@ -266,8 +266,32 @@ export async function loginHospital(
 export async function loginAdmin(
   username: string,
   password: string
-): Promise<{ success: boolean; token?: string; error?: string }> {
+): Promise<{ success: boolean; token?: string; username?: string; role?: "admin" | "validator"; error?: string }> {
   return rpc("loginAdmin", { username, password });
+}
+
+export async function getValidatorDashboard(): Promise<any> {
+  return rpc("getValidatorDashboard", {}, { retries: 1, timeoutMs: 20000 });
+}
+
+export async function getValidatorHospital(hospitalCode: string): Promise<any> {
+  return rpc("getValidatorHospital", { hospitalCode }, { retries: 1, timeoutMs: 20000 });
+}
+
+export async function saveValidatorValidation(hospitalCode: string, data: any): Promise<any> {
+  return rpc("saveValidatorValidation", { hospitalCode, data }, { retries: 1, timeoutMs: 20000 });
+}
+
+export async function submitValidatorValidation(hospitalCode: string, data: any): Promise<any> {
+  return rpc("submitValidatorValidation", { hospitalCode, data }, { timeoutMs: 30000 });
+}
+
+export async function getValidatorValidation(hospitalCode: string): Promise<any | null> {
+  return rpc("getValidatorValidation", { hospitalCode }, { retries: 1, timeoutMs: 20000 });
+}
+
+export async function reopenValidatorValidation(hospitalCode: string): Promise<any> {
+  return rpc("reopenValidatorValidation", { hospitalCode }, { timeoutMs: 20000 });
 }
 
 export async function addHospitalAccount(acc: any): Promise<void> {

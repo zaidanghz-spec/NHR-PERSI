@@ -151,7 +151,10 @@ interface DataContextType {
 
   // Admin Auth
   isAdmin: boolean;
-  adminLogin: (username: string, password: string) => Promise<boolean>;
+  isValidator: boolean;
+  adminRole: "admin" | "validator" | null;
+  adminUsername: string | null;
+  adminLogin: (username: string, password: string) => Promise<"admin" | "validator" | null>;
   adminLogout: () => void;
 
   // Hospital Auth
@@ -178,7 +181,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [hospitalAccounts, setHospitalAccounts] = useState<HospitalAccount[]>([]);
-  const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("persi_admin") === "true");
+  const [adminRole, setAdminRole] = useState<"admin" | "validator" | null>(() => {
+    const persisted = sessionStorage.getItem("persi_admin_role");
+    if (persisted === "admin" || persisted === "validator") return persisted;
+    // Backward compatibility for an existing admin session before role-aware login.
+    return sessionStorage.getItem("persi_admin") === "true" ? "admin" : null;
+  });
+  const [adminUsername, setAdminUsername] = useState<string | null>(() => sessionStorage.getItem("persi_admin_username"));
+  const isAdmin = adminRole === "admin";
+  const isValidator = adminRole === "validator";
   const [currentHospital, setCurrentHospital] = useState<HospitalAccount | null>(() => {
     const stored = sessionStorage.getItem("persi_hospital_session");
     if (!stored) return null;
@@ -517,21 +528,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Admin Auth
-  const adminLogin = useCallback(async (username: string, password: string): Promise<boolean> => {
+  const adminLogin = useCallback(async (username: string, password: string): Promise<"admin" | "validator" | null> => {
     const result = await apiLoginAdmin(username.trim(), password.trim());
-    if (!result.success) return false;
+    if (!result.success) return null;
+    const role = result.role === "validator" ? "validator" : "admin";
     if (result.token) {
       sessionStorage.setItem("auth_token", result.token);
       localStorage.setItem("auth_token", result.token);
     }
-    setIsAdmin(true);
-    sessionStorage.setItem("persi_admin", "true");
-    return true;
+    setAdminRole(role);
+    setAdminUsername(result.username || username.trim());
+    sessionStorage.setItem("persi_admin", role === "admin" ? "true" : "false");
+    sessionStorage.setItem("persi_admin_role", role);
+    sessionStorage.setItem("persi_admin_username", result.username || username.trim());
+    return role;
   }, []);
 
   const adminLogout = useCallback(() => {
-    setIsAdmin(false);
+    setAdminRole(null);
+    setAdminUsername(null);
     sessionStorage.removeItem("persi_admin");
+    sessionStorage.removeItem("persi_admin_role");
+    sessionStorage.removeItem("persi_admin_username");
     sessionStorage.removeItem("auth_token");
     localStorage.removeItem("auth_token");
   }, []);
@@ -625,7 +643,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       news, addNews, updateNews, deleteNews,
       events, addEvent, updateEvent, deleteEvent,
       hospitalAccounts, registerHospitalFull, loginHospital, activateHospital, rejectHospital, deleteHospitalAccount, resetHospitalPassword,
-      isAdmin, adminLogin, adminLogout,
+      isAdmin, isValidator, adminRole, adminUsername, adminLogin, adminLogout,
       currentHospital, hospitalLogout,
       approvedRankings, publishRanking, unpublishRanking,
       submissions, addSubmission, updateSubmissionStatus,

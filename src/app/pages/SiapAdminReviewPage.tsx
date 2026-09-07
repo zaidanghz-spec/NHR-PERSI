@@ -65,7 +65,9 @@ export function SiapAdminReviewPage() {
   const [revisionNotes, setRevisionNotes] = useState({ rsbk: "", clinicalAudit: "", patientReport: "" });
   const [customSurveyDocs, setCustomSurveyDocs] = useState<CustomSurveyDoc[]>([]);
   const [customSurveyScores, setCustomSurveyScores] = useState<Record<string, { prem: string; prom: string }>>({});
-  const [activeTab, setActiveTab] = useState<"summary" | "rsbk" | "audit" | "prm">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "rsbk" | "audit" | "prm" | "validator">("summary");
+  const [validatorValidation, setValidatorValidation] = useState<any | null>(null);
+  const [validatorValidationLoading, setValidatorValidationLoading] = useState(false);
   const [selectedAuditPatient, setSelectedAuditPatient] = useState<number | null>(null);
   const [selectedPrmPatient, setSelectedPrmPatient] = useState<string | null>(null);
   const [prmDiseaseFilter, setPrmDiseaseFilter] = useState("all");
@@ -160,6 +162,19 @@ export function SiapAdminReviewPage() {
     scores: { rsbk: 0, clinicalAudit: 0, patientReport: 0, final: 0 },
     details: {}
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const hospitalCode = String((actualSubmission as any)?.hospitalCode || "").trim();
+    setValidatorValidation(null);
+    if (!hospitalCode) return () => { cancelled = true; };
+    setValidatorValidationLoading(true);
+    api.getValidatorValidation(hospitalCode)
+      .then((validation) => { if (!cancelled) setValidatorValidation(validation); })
+      .catch((error) => { if (!cancelled) console.error("Failed to load validator validation:", error); })
+      .finally(() => { if (!cancelled) setValidatorValidationLoading(false); });
+    return () => { cancelled = true; };
+  }, [actualSubmission?.hospitalCode]);
 
   // PRM remains open after submission. Keep the admin review view aligned with
   // the server's current QR responses instead of the submission-time snapshot.
@@ -856,6 +871,7 @@ export function SiapAdminReviewPage() {
             { key: "rsbk", label: "Hospital Structure" },
             { key: "audit", label: "Clinical Audit" },
             { key: "prm", label: "Patient Report (PRM)" },
+            { key: "validator", label: "Validasi Validator" },
           ].map(tab => (
             <button
               key={tab.key}
@@ -1074,6 +1090,53 @@ export function SiapAdminReviewPage() {
                   </table>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "validator" && (
+          <div className="mb-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">Hasil Validasi Independen</h3>
+                  <p className="mt-1 text-sm text-slate-500">Catatan ini tidak mengubah jawaban RS. Admin dapat menggunakannya sebagai dasar review dan keputusan akhir.</p>
+                </div>
+                {validatorValidation?.status === "completed" && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (!window.confirm("Buka kembali validasi agar validator dapat mengubahnya?")) return;
+                      try {
+                        const updated = await api.reopenValidatorValidation(String((actualSubmission as any)?.hospitalCode || ""));
+                        setValidatorValidation(updated);
+                      } catch (error: any) { alert(error?.message || "Gagal membuka ulang validasi."); }
+                    }}
+                    className="border-amber-300 text-amber-800 hover:bg-amber-50 font-bold"
+                  >
+                    Buka Ulang Validasi
+                  </Button>
+                )}
+              </div>
+
+              {validatorValidationLoading ? (
+                <div className="py-12 text-center text-sm text-slate-500">Memuat hasil validasi...</div>
+              ) : !validatorValidation ? (
+                <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm font-medium text-slate-500">Belum ada hasil dari validator untuk rumah sakit ini.</div>
+              ) : (
+                <>
+                  <div className="mt-6 grid gap-4 md:grid-cols-4">
+                    <div className="rounded-xl bg-indigo-50 p-4"><p className="text-xs font-black uppercase tracking-wide text-indigo-600">Validator</p><p className="mt-2 font-black text-indigo-950">{validatorValidation.validatorUsername}</p></div>
+                    <div className="rounded-xl bg-blue-50 p-4"><p className="text-xs font-black uppercase tracking-wide text-blue-600">Hospital Structure</p><p className="mt-2 text-2xl font-black text-blue-950">{validatorValidation.data?.summary?.structure?.score ?? "-"}</p><p className="text-xs text-blue-700">{validatorValidation.data?.summary?.structure?.done || 0}/{validatorValidation.data?.summary?.structure?.total || 0} item</p></div>
+                    <div className="rounded-xl bg-purple-50 p-4"><p className="text-xs font-black uppercase tracking-wide text-purple-600">Clinical Audit</p><p className="mt-2 text-2xl font-black text-purple-950">{validatorValidation.data?.summary?.clinical?.score ?? "-"}</p><p className="text-xs text-purple-700">{validatorValidation.data?.summary?.clinical?.done || 0}/{validatorValidation.data?.summary?.clinical?.total || 0} kriteria</p></div>
+                    <div className="rounded-xl bg-teal-50 p-4"><p className="text-xs font-black uppercase tracking-wide text-teal-600">Bukti PREM/PROM</p><p className="mt-2 font-black text-teal-950">{validatorValidation.data?.summary?.premProm?.status || "Belum dinilai"}</p></div>
+                  </div>
+
+                  <ValidatorDetails title="Hospital Structure" rows={validatorValidation.data?.structure || []} type="structure" />
+                  <ValidatorDetails title="Clinical Audit" rows={validatorValidation.data?.clinical || []} type="clinical" />
+                  <div className="mt-6 rounded-xl border border-teal-100 bg-teal-50 p-5"><h4 className="font-black text-teal-950">Catatan PREM/PROM</h4><p className="mt-2 text-sm text-teal-900"><span className="font-bold">Status bukti:</span> {validatorValidation.data?.summary?.premProm?.status || "Belum dinilai"}</p><p className="mt-2 whitespace-pre-wrap text-sm text-teal-900">{validatorValidation.data?.premProm?.notes || "Tidak ada catatan."}</p></div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1949,6 +2012,22 @@ export function SiapAdminReviewPage() {
       </div>
     </div>
   );
+}
+
+function ValidatorDetails({ title, rows, type }: { title: string; rows: any[]; type: "structure" | "clinical" }) {
+  return (
+    <details className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white" open={rows.some((row) => row.status === "Tidak Sesuai")}>
+      <summary className="cursor-pointer list-none px-5 py-4 font-black text-slate-900 hover:bg-slate-50">{title} <span className="ml-2 text-sm font-medium text-slate-500">({rows.length} temuan)</span></summary>
+      {rows.length ? <div className="overflow-x-auto border-t border-slate-200"><table className="w-full min-w-[860px] text-sm"><thead className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-500"><tr>{type === "structure" ? <><th className="p-3">Indikator</th><th className="p-3 text-center">RS</th><th className="p-3 text-center">Validator</th></> : <><th className="p-3">Pasien / Penyakit</th><th className="p-3">Kriteria</th><th className="p-3">Jawaban RS</th><th className="p-3">Temuan Validator</th></>}<th className="p-3">Status</th><th className="p-3">Catatan</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.key || index} className="border-t border-slate-100 align-top"><td className="p-3 font-semibold text-slate-900">{type === "structure" ? row.label : <><div>{row.patientInitials} <span className="text-xs text-blue-700">{row.patientCode}</span></div><div className="mt-1 text-xs font-normal text-slate-500">{row.diseaseName}</div></>}</td>{type === "structure" ? <><td className="p-3 text-center">{row.reportedValue} {row.unit}</td><td className="p-3 text-center">{row.validatorValue ?? "-"} {row.unit}</td></> : <><td className="p-3 text-slate-700">{row.question}</td><td className="p-3">{formatValidatorAuditAnswer(row.hospitalAnswer)}</td><td className="p-3">{formatValidatorAuditAnswer(row.validatorAnswer)}</td></>}<td className="p-3"><span className={`rounded-full px-2.5 py-1 text-xs font-black ${row.status === "Sesuai" ? "bg-emerald-100 text-emerald-800" : row.status === "Tidak Sesuai" ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>{row.status}</span></td><td className="p-3 whitespace-pre-wrap text-slate-600">{row.notes || "-"}</td></tr>)}</tbody></table></div> : <div className="border-t border-slate-200 p-5 text-sm text-slate-500">Belum ada data validasi.</div>}
+    </details>
+  );
+}
+
+function formatValidatorAuditAnswer(value: string) {
+  if (value === "sesuai") return "Sesuai";
+  if (value === "tidak-sesuai-pengecualian") return "Tidak sesuai dengan pengecualian klinis";
+  if (value === "tidak-sesuai") return "Tidak sesuai";
+  return "Belum dinilai";
 }
 
 function ParameterRow({
