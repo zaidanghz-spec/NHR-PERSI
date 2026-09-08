@@ -109,13 +109,17 @@ export function ValidatorHospitalPage() {
   const structureDone = structureRows.filter((row) => structureValues[row.key]?.validatorValue !== undefined && structureValues[row.key]?.validatorValue !== "").length;
   const clinicalDone = clinicalRows.filter((row) => Boolean(clinicalValues[row.key]?.validatorAnswer)).length;
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     setSaving(true); setError(""); setSavedMessage("");
     try {
       const saved = await api.saveValidatorValidation(hospitalCode, payload);
       setResult((previous: any) => ({ ...previous, validation: saved }));
       setSavedMessage("Draft validasi tersimpan di server.");
-    } catch (err: any) { setError(err?.message || "Draft validasi gagal disimpan."); }
+      return true;
+    } catch (err: any) {
+      setError(err?.message || "Draft validasi gagal disimpan.");
+      return false;
+    }
     finally { setSaving(false); }
   };
 
@@ -123,7 +127,8 @@ export function ValidatorHospitalPage() {
     if (stage === 0 && structureDone !== structureRows.length) { setError("Lengkapi seluruh item Hospital Structure yang ditampilkan sebelum melanjutkan."); return; }
     if (stage === 1 && clinicalDone !== clinicalRows.length) { setError("Lengkapi seluruh sampel Clinical Audit sebelum melanjutkan."); return; }
     if (stage === 2 && !premProm.evidenceSent) { setError("Pilih status bukti pengiriman PREM/PROM sebelum melanjutkan."); return; }
-    await save();
+    const didSave = await save();
+    if (!didSave) return;
     setStage((value) => Math.min(3, value + 1));
   };
 
